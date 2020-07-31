@@ -15,8 +15,6 @@ type Reg struct {
 	InDataWidth  string
 	OutDataWidth string
 
-	outPositions []int
-
 	In  *HandshakeChannel
 	Out *HandshakeChannel
 }
@@ -45,34 +43,6 @@ func NewReg(dataWidth string, phaseOut bool) *Reg {
 			Ack:  name + "_o_ack",
 			Data: name + "_data",
 			Out:  true,
-		},
-	}
-}
-
-func NewReturnReg(outPOSs []int) *Reg {
-	nr := regNr
-	regNr++
-
-	name := strings.ToLower(regPrefix + strconv.Itoa(nr))
-
-	vars := len(outPOSs)
-	outwidth := strconv.Itoa(vars) + " * VARIABLE_WIDTH"
-
-	return &Reg{
-		Nr:           nr,
-		archName:     defaultArch,
-		InDataWidth:  "DATA_WIDTH",
-		OutDataWidth: outwidth,
-		outPositions: outPOSs,
-		In: &HandshakeChannel{
-			Out: false,
-		},
-		Out: &HandshakeChannel{
-			Req:       name + "_o_req",
-			Ack:       name + "_o_ack",
-			Data:      name + "_data",
-			DataWidth: vars,
-			Out:       true,
 		},
 	}
 }
@@ -116,14 +86,6 @@ func (r *Reg) Component() string {
 
 func (r *Reg) Architecture() string {
 	dataSigAsgmt := "in_data"
-	if len(r.outPositions) > 0 {
-		dataSigAsgmt = ""
-		for _, pos := range r.outPositions {
-			posStr := strconv.Itoa(pos)
-			dataSigAsgmt += "data_in((" + posStr + "+1) * VARIABLE_WIDTH downto " + posStr + " * VARIABLE_WIDTH) &"
-		}
-		dataSigAsgmt = strings.TrimSuffix(dataSigAsgmt, " &")
-	}
 
 	return `architecture ` + r.archName + ` of decoupled_hs_reg is
   signal phase_in, phase_out : std_logic;
