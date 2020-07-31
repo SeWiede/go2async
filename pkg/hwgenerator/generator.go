@@ -201,19 +201,20 @@ func (g *Generator) GenerateBodyBlock(s ast.Stmt) (c components.BodyComponent, e
 	case *ast.ReturnStmt:
 		return nil, errors.New("Return statements only allowed at the end of function!")
 	case *ast.BlockStmt:
-		return g.GenerateBlock(x.List)
+		return g.GenerateBlock(x.List, false)
 	default:
 		return nil, errors.New(reflect.TypeOf(x).String() + " statements not allowed!")
 	}
 }
 
-func (g *Generator) GenerateBlock(stmts []ast.Stmt) (c *components.Block, err error) {
-	b := components.NewBlock()
+func (g *Generator) GenerateBlock(stmts []ast.Stmt, toplevelStatement bool) (c *components.Block, err error) {
+	b := components.NewBlock(toplevelStatement)
 	for _, s := range stmts {
 		newComponent, err := g.GenerateBodyBlock(s)
 		if err != nil {
 			return nil, err
 		}
+
 		g.components[newComponent.ArchName()] = newComponent
 		b.AddComponent(newComponent)
 	}
@@ -236,7 +237,7 @@ func (g *Generator) GenerateScope(f *ast.FuncDecl) (s *components.Scope, err err
 	if fields < 2 {
 		return nil, errors.New("At least one top-level statement + return expected")
 	}
-	block, err := g.GenerateBlock(f.Body.List[0 : fields-1])
+	block, err := g.GenerateBlock(f.Body.List[0:fields-1], true)
 	if err != nil {
 		return nil, err
 	}
@@ -260,7 +261,7 @@ func (g *Generator) GenerateScope(f *ast.FuncDecl) (s *components.Scope, err err
 		}
 	}
 
-	s = components.NewScope(f.Name.Name, block, len(g.variables), 4, paramCount, returnPositions)
+	s = components.NewScope(f.Name.Name, block, 4, len(g.variables), paramCount, returnPositions)
 
 	g.components[block.ArchName()] = block
 	g.scopes[s.ArchName()] = s

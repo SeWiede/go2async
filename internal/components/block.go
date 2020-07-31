@@ -7,11 +7,17 @@ import (
 
 const blockPrefix = "B_"
 
+type regBodyPair struct {
+	Reg *Reg
+	Bc  BodyComponent
+}
+
 type Block struct {
 	Nr       int
 	archName string
 
-	components []BodyComponent
+	TopLevel      bool
+	RegBlockPairs []*regBodyPair
 
 	In  *HandshakeChannel
 	Out *HandshakeChannel
@@ -19,7 +25,7 @@ type Block struct {
 
 var blockNr = 0
 
-func NewBlock() *Block {
+func NewBlock(toplevel bool) *Block {
 	nr := blockNr
 	blockNr++
 
@@ -27,13 +33,17 @@ func NewBlock() *Block {
 	b := &Block{
 		Nr:       nr,
 		archName: archPrefix + name,
+		TopLevel: toplevel,
 		In: &HandshakeChannel{
-			Out: false,
+			Req:  "in_req",
+			Ack:  "in_ack",
+			Data: "in_data",
+			Out:  false,
 		},
 		Out: &HandshakeChannel{
-			Req:  name + "_o_req",
-			Ack:  name + "_o_ack",
-			Data: name + "_data",
+			Req:  "out_req",
+			Ack:  "out_ack",
+			Data: "out_data",
 			Out:  true,
 		},
 	}
@@ -51,19 +61,34 @@ func (b *Block) OutChannel() *HandshakeChannel {
 
 func (b *Block) AddComponent(c BodyComponent) {
 	b.Out = c.OutChannel()
-	if len(b.components) == 0 {
-		entryIn := &HandshakeChannel{
-			Req:  "in_req",
-			Ack:  "in_ack",
-			Data: "in_data",
-			Out:  true,
+
+	if b.TopLevel {
+
+		newreg := NewReg("DATA_WIDTH", false)
+		newreg.Out.Connect(c.InChannel())
+		if len(b.RegBlockPairs) == 0 {
+			*newreg.InChannel() = *b.In
+		} else {
+			b.Out = c.OutChannel()
+			b.RegBlockPairs[len(b.RegBlockPairs)-1].Bc.OutChannel().Connect(newreg.InChannel())
 		}
-		*c.InChannel() = *entryIn
+		b.RegBlockPairs = append(b.RegBlockPairs, &regBodyPair{newreg, c})
 	} else {
 		b.Out = c.OutChannel()
-		b.components[len(b.components)-1].OutChannel().Connect(c.InChannel())
+		if len(b.RegBlockPairs) == 0 {
+			entryIn := &HandshakeChannel{
+				Req:  "in_req",
+				Ack:  "in_ack",
+				Data: "in_data",
+				Out:  true,
+			}
+			*c.InChannel() = *entryIn
+		} else {
+			b.Out = c.OutChannel()
+			b.RegBlockPairs[len(b.RegBlockPairs)-1].Bc.OutChannel().Connect(c.InChannel())
+		}
+		b.RegBlockPairs = append(b.RegBlockPairs, &regBodyPair{Bc: c})
 	}
-	b.components = append(b.components, c)
 }
 
 func (b *Block) Component() string {
@@ -88,14 +113,17 @@ func (b *Block) Component() string {
 }
 
 func (b *Block) signalDefs() string {
-	if len(b.components) == 0 {
+	if len(b.RegBlockPairs) == 0 {
 		return ""
 	}
 
 	ret := ""
 
-	for _, c := range b.components {
-		ret += SignalsString(c.OutChannel())
+	for _, c := range b.RegBlockPairs {
+		if c.Reg != nil {
+			ret += SignalsString(c.Reg.OutChannel())
+		}
+		ret += SignalsString(c.Bc.OutChannel())
 	}
 
 	return ret
@@ -103,7 +131,7 @@ func (b *Block) signalDefs() string {
 
 func (b *Block) ioChannels() string {
 	ret := ""
-	if len(b.components) == 0 {
+	if len(b.RegBlockPairs) == 0 {
 		ret += "out_req <= in_req; \n"
 		ret += "in_ack <= out_ack; \n"
 		ret += "out_data <= in_data; \n"
@@ -119,8 +147,11 @@ func (b *Block) ioChannels() string {
 
 func (b *Block) componentsString() string {
 	ret := ""
-	for _, c := range b.components {
-		ret += c.Component()
+	for _, c := range b.RegBlockPairs {
+		if c.Reg != nil {
+			ret += c.Reg.Component()
+		}
+		ret += c.Bc.Component()
 	}
 
 	return ret

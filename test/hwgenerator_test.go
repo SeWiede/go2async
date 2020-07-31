@@ -5,7 +5,7 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
-	"go2async/internal/hwgenerator"
+	"go2async/pkg/hwgenerator"
 	"testing"
 )
 

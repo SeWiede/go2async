@@ -11,12 +11,12 @@ type IfBlock struct {
 	Nr       int
 	archName string
 
-	entryRegFork *RegFork
-	cond         *SelectorBlock
-	demux        *DEMUX
-	thenBody     BodyComponent
-	elseBody     BodyComponent
-	merger       *Merge
+	entryFork *Fork
+	cond      *SelectorBlock
+	demux     *DEMUX
+	thenBody  BodyComponent
+	elseBody  BodyComponent
+	merger    *Merge
 
 	In  *HandshakeChannel
 	Out *HandshakeChannel
@@ -53,14 +53,14 @@ func NewIfBlock(cond *SelectorBlock, thenBody, elseBody BodyComponent) *IfBlock 
 		Out:  true,
 	}
 
-	ib.entryRegFork = NewRegFork()
-	ib.entryRegFork.In = entryIn
+	ib.entryFork = NewFork("DATA_WIDTH")
+	ib.entryFork.In = entryIn
 
 	ib.cond = cond
-	ib.entryRegFork.Out1.Connect(ib.cond.In)
+	ib.entryFork.Out1.Connect(ib.cond.In)
 
 	ib.demux = NewDEMUX()
-	ib.entryRegFork.Out2.Connect(ib.demux.In)
+	ib.entryFork.Out2.Connect(ib.demux.In)
 	ib.cond.Out.Connect(ib.demux.Select)
 
 	ib.demux.Out1.Connect(thenBody.InChannel())
@@ -104,8 +104,8 @@ func (ib *IfBlock) Component() string {
 }
 
 func (ib *IfBlock) signalDefs() string {
-	ret := SignalsString(ib.entryRegFork.Out1)
-	ret += SignalsString(ib.entryRegFork.Out2)
+	ret := SignalsString(ib.entryFork.Out1)
+	ret += SignalsString(ib.entryFork.Out2)
 	ret += SignalsString(ib.demux.Out1)
 	ret += SignalsString(ib.demux.Out2)
 	ret += SignalsString(ib.thenBody.OutChannel())
@@ -133,7 +133,7 @@ func (ib *IfBlock) Architecture() string {
 
 	ret += "\n"
 
-	ret += ib.entryRegFork.Component()
+	ret += ib.entryFork.Component()
 	ret += "\n"
 	ret += ib.cond.Component()
 	ret += "\n"

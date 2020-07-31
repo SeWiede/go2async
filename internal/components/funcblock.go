@@ -118,7 +118,11 @@ func (fb *FuncBlock) Architecture() string {
 
     alias result : std_logic_vector(VARIABLE_WIDTH - 1 downto 0)  is out_data( ` + strconv.Itoa(fb.RESULT_POS+1) + `*VARIABLE_WIDTH -1 downto ` + strconv.Itoa(fb.RESULT_POS) + `*VARIABLE_WIDTH);
     alias x      : std_logic_vector(VARIABLE_WIDTH - 1 downto 0)  is in_data( ` + strconv.Itoa(fb.X_POS+1) + `*VARIABLE_WIDTH -1 downto ` + strconv.Itoa(fb.X_POS) + `*VARIABLE_WIDTH);
-    alias y      : std_logic_vector(VARIABLE_WIDTH - 1 downto 0)  is in_data( ` + strconv.Itoa(fb.Y_POS+1) + `*VARIABLE_WIDTH -1 downto ` + strconv.Itoa(fb.Y_POS) + `*VARIABLE_WIDTH);
+	alias y      : std_logic_vector(VARIABLE_WIDTH - 1 downto 0)  is in_data( ` + strconv.Itoa(fb.Y_POS+1) + `*VARIABLE_WIDTH -1 downto ` + strconv.Itoa(fb.Y_POS) + `*VARIABLE_WIDTH);
+	
+	  
+    attribute dont_touch : string;
+    attribute dont_touch of  x,y,in_data: signal is "true";
   begin
     in_ack <= out_ack;
     

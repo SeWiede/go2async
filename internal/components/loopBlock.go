@@ -61,8 +61,10 @@ func NewLoopBlock(loopCond *SelectorBlock, body BodyComponent) *LoopBlock {
 	lb.entryMux.Out.Connect(lb.initRegFork.In)
 
 	lb.initRegFork.Out1.Connect(lb.loopCond.In)
-	lb.condFork = NewFork()
+	lb.condFork = NewFork("1")
 	lb.loopCond.Out.Connect(lb.condFork.In)
+	lb.condFork.Out1.Data = "open"
+	lb.condFork.Out2.Data = "open"
 
 	//to mux
 	lb.condReg = NewReg("1", true)

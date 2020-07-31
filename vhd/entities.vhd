@@ -208,7 +208,8 @@ ENTITY reg_fork IS
     --Output channel 2
     outC_req : OUT std_logic;
     outC_data : OUT std_logic_vector(DATA_WIDTH - 1 DOWNTO 0);
-    outC_ack : IN std_logic);
+    outC_ack : IN std_logic
+    );
 END reg_fork;
 
 LIBRARY ieee;
@@ -216,17 +217,23 @@ USE ieee.std_logic_1164.ALL;
 USE work.g2a_constants.ALL;
 ENTITY fork IS
   GENERIC (
+    VARIABLE_WIDTH : NATURAL := 4;
+    DATA_MULTIPLIER : NATURAL := 3;
+    DATA_WIDTH : NATURAL := 8;
     PHASE_INIT : std_logic := '0');
   PORT (
     rst : IN std_logic;
-    -- Input channel
+    --Input channel
     inA_req : IN std_logic;
+    inA_data : IN std_logic_vector(DATA_WIDTH - 1 DOWNTO 0);
     inA_ack : OUT std_logic;
-    -- Output channel 1
+    --Output channel 1
     outB_req : OUT std_logic;
+    outB_data : OUT std_logic_vector(DATA_WIDTH - 1 DOWNTO 0);
     outB_ack : IN std_logic;
-    -- Output channel 2
+    --Output channel 2
     outC_req : OUT std_logic;
+    outC_data : OUT std_logic_vector(DATA_WIDTH - 1 DOWNTO 0);
     outC_ack : IN std_logic
   );
 END fork;
@@ -564,6 +571,8 @@ BEGIN
   -- Control Path
   outB_req <= inA_req;
   outC_req <= inA_req;
+  outB_data <= inA_data;
+  outC_data <= inA_data;
   inA_ack <= phase;
 
   click <= (outC_ack AND outB_ack AND NOT(phase)) OR (NOT(outC_ack) AND NOT(outB_ack) AND phase) AFTER AND3_DELAY + OR2_DELAY;

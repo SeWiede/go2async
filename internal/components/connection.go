@@ -59,7 +59,9 @@ func (c *HandshakeChannel) getStv() string {
 func SignalsString(c *HandshakeChannel) string {
 	ret := "signal " + c.Req + ", " + c.Ack + " : std_logic;"
 	if c.Data != "" {
-		ret += "signal " + c.Data + ": " + c.getStv() + ";"
+		if c.Data != "open" {
+			ret += "signal " + c.Data + ": " + c.getStv() + ";"
+		}
 	}
 
 	return ret + "\n"
