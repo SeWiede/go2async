@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"go2async/internal/hwgenerator"
+	"go2async/pkg/hwgenerator"
 	"os"
 
 	"github.com/spf13/cobra"
