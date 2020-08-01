@@ -67,7 +67,7 @@ func NewLoopBlock(loopCond *SelectorBlock, body BodyComponent) *LoopBlock {
 	lb.condFork.Out2.Data = "open"
 
 	//to mux
-	lb.condReg = NewReg("1", true)
+	lb.condReg = NewReg("1", true, "1")
 	lb.condFork.Out1.Connect(lb.condReg.In)
 	lb.condReg.In.Data = lb.loopCond.Out.Data
 
@@ -83,7 +83,7 @@ func NewLoopBlock(loopCond *SelectorBlock, body BodyComponent) *LoopBlock {
 
 	lb.body = body
 
-	lb.bodyReg = NewReg("", false)
+	lb.bodyReg = NewReg("", false, "0")
 
 	body.OutChannel().Connect(lb.entryMux.In2)
 
@@ -105,9 +105,7 @@ func (lb *LoopBlock) Component() string {
 	name := loopBlockPrefix + strconv.Itoa(lb.Nr)
 	return name + `: entity work.LoopBlock(` + lb.archName + `)
   generic map(
-	VARIABLE_WIDTH => VARIABLE_WIDTH,
-    DATA_WIDTH => DATA_WIDTH,
-    DATA_MULTIPLIER => DATA_MULTIPLIER
+    DATA_WIDTH => DATA_WIDTH
   )
   port map (
     rst => rst,

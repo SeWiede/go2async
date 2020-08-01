@@ -10,10 +10,10 @@ const regPrefix = "R_"
 type Reg struct {
 	Nr       int
 	archName string
-	phaseOut bool
+	PhaseOut bool
 
-	InDataWidth  string
-	OutDataWidth string
+	StartValue string
+	DataWidth  string
 
 	In  *HandshakeChannel
 	Out *HandshakeChannel
@@ -21,7 +21,7 @@ type Reg struct {
 
 var regNr = 0
 
-func NewReg(dataWidth string, phaseOut bool) *Reg {
+func NewReg(dataWidth string, phaseOut bool, startValue string) *Reg {
 	nr := regNr
 	regNr++
 
@@ -30,11 +30,11 @@ func NewReg(dataWidth string, phaseOut bool) *Reg {
 		dataWidth = "DATA_WIDTH"
 	}
 	return &Reg{
-		Nr:           nr,
-		archName:     defaultArch,
-		InDataWidth:  dataWidth,
-		OutDataWidth: dataWidth,
-		phaseOut:     phaseOut,
+		Nr:         nr,
+		archName:   defaultArch,
+		DataWidth:  dataWidth,
+		PhaseOut:   phaseOut,
+		StartValue: startValue,
 		In: &HandshakeChannel{
 			Out: false,
 		},
@@ -58,16 +58,13 @@ func (r *Reg) OutChannel() *HandshakeChannel {
 func (r *Reg) Component() string {
 	name := regPrefix + strconv.Itoa(r.Nr)
 	phaseOutString := "PHASE_INIT_OUT => '0'"
-	if r.phaseOut {
+	if r.PhaseOut {
 		phaseOutString = "PHASE_INIT_OUT => '1'"
 	}
 	return name + `: entity work.decoupled_hs_reg(` + r.archName + `)
   generic map (
-    VARIABLE_WIDTH => VARIABLE_WIDTH,
-    IN_DATA_WIDTH => ` + r.InDataWidth + `,
-    OUT_DATA_WIDTH => ` + r.OutDataWidth + `,
-    DATA_MULTIPLIER => DATA_MULTIPLIER,
-    VALUE => 1,
+    DATA_WIDTH => ` + r.DataWidth + `,
+    VALUE => ` + r.StartValue + `,
     PHASE_INIT_IN => '0',
     ` + phaseOutString + `
   )

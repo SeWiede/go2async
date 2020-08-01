@@ -23,10 +23,7 @@ USE ieee.numeric_std.ALL;
 USE work.g2a_constants.ALL;
 ENTITY decoupled_hs_reg IS
   GENERIC (
-    VARIABLE_WIDTH : NATURAL := 4;
-    DATA_MULTIPLIER : NATURAL := 3;
-    IN_DATA_WIDTH : NATURAL := 8;
-    OUT_DATA_WIDTH : NATURAL := 8;
+    DATA_WIDTH : NATURAL := 8;
     VALUE : NATURAL := 0;
     PHASE_INIT_IN : std_logic := '0';
     PHASE_INIT_OUT : std_logic := '0');
@@ -35,10 +32,10 @@ ENTITY decoupled_hs_reg IS
     -- Input channel
     in_ack : OUT std_logic;
     in_req : IN std_logic;
-    in_data : IN std_logic_vector(IN_DATA_WIDTH - 1 DOWNTO 0);
+    in_data : IN std_logic_vector(DATA_WIDTH - 1 DOWNTO 0);
     -- Output channel
     out_req : OUT std_logic;
-    out_data : OUT std_logic_vector(OUT_DATA_WIDTH - 1 DOWNTO 0);
+    out_data : OUT std_logic_vector(DATA_WIDTH - 1 DOWNTO 0);
     out_ack : IN std_logic);
 END decoupled_hs_reg;
 LIBRARY IEEE;
@@ -49,8 +46,6 @@ USE work.g2a_constants.ALL;
 
 ENTITY LoopBlock IS
   GENERIC (
-    VARIABLE_WIDTH : NATURAL := 4;
-    DATA_MULTIPLIER : NATURAL := 3;
     DATA_WIDTH : NATURAL := 8
   );
   PORT (
@@ -70,8 +65,6 @@ USE IEEE.STD_LOGIC_1164.ALL;
 USE work.g2a_constants.ALL;
 ENTITY merge IS
   GENERIC (
-    VARIABLE_WIDTH : NATURAL := 4;
-    DATA_MULTIPLIER : NATURAL := 3;
     DATA_WIDTH : NATURAL := 8;
     PHASE_INIT_C : std_logic := '0';
     PHASE_INIT_A : std_logic := '0';
@@ -101,8 +94,6 @@ USE work.g2a_constants.ALL;
 
 ENTITY funcBlock IS
   GENERIC (
-    VARIABLE_WIDTH : NATURAL := 4;
-    DATA_MULTIPLIER : NATURAL := 3;
     DATA_WIDTH : NATURAL := 8
   );
   PORT (-- Input channel
@@ -120,8 +111,6 @@ USE work.g2a_constants.ALL;
 ENTITY mux IS
   --generic for initializing the phase registers
   GENERIC (
-    VARIABLE_WIDTH : NATURAL := 4;
-    DATA_MULTIPLIER : NATURAL := 3;
     DATA_WIDTH : NATURAL := 8;
     PHASE_INIT_C : std_logic := '0';
     PHASE_INIT_A : std_logic := '0';
@@ -153,8 +142,6 @@ USE ieee.std_logic_1164.ALL;
 USE work.g2a_constants.ALL;
 ENTITY demux IS
   GENERIC (
-    VARIABLE_WIDTH : NATURAL := 4;
-    DATA_MULTIPLIER : NATURAL := 3;
     DATA_WIDTH : NATURAL := 8;
     PHASE_INIT_A : std_logic := '0';
     PHASE_INIT_B : std_logic := '0';
@@ -188,8 +175,6 @@ USE ieee.numeric_std.ALL;
 USE work.g2a_constants.ALL;
 ENTITY reg_fork IS
   GENERIC (
-    VARIABLE_WIDTH : NATURAL := 4;
-    DATA_MULTIPLIER : NATURAL := 3;
     DATA_WIDTH : NATURAL := 8;
     VALUE : NATURAL := 0;
     PHASE_INIT_A : std_logic := '0';
@@ -209,7 +194,7 @@ ENTITY reg_fork IS
     outC_req : OUT std_logic;
     outC_data : OUT std_logic_vector(DATA_WIDTH - 1 DOWNTO 0);
     outC_ack : IN std_logic
-    );
+  );
 END reg_fork;
 
 LIBRARY ieee;
@@ -217,8 +202,6 @@ USE ieee.std_logic_1164.ALL;
 USE work.g2a_constants.ALL;
 ENTITY fork IS
   GENERIC (
-    VARIABLE_WIDTH : NATURAL := 4;
-    DATA_MULTIPLIER : NATURAL := 3;
     DATA_WIDTH : NATURAL := 8;
     PHASE_INIT : std_logic := '0');
   PORT (
@@ -246,8 +229,6 @@ USE work.g2a_constants.ALL;
 
 ENTITY Selector IS
   GENERIC (
-    VARIABLE_WIDTH : NATURAL := 4;
-    DATA_MULTIPLIER : NATURAL := 3;
     DATA_WIDTH : NATURAL := 8
   );
   PORT (
@@ -286,8 +267,6 @@ USE work.g2a_constants.ALL;
 
 ENTITY IfBlock IS
   GENERIC (
-    VARIABLE_WIDTH : NATURAL := 4;
-    DATA_MULTIPLIER : NATURAL := 3;
     DATA_WIDTH : NATURAL := 8
   );
   PORT (
@@ -309,8 +288,6 @@ USE work.g2a_constants.ALL;
 
 ENTITY BlockC IS
   GENERIC (
-    VARIABLE_WIDTH : NATURAL := 4;
-    DATA_MULTIPLIER : NATURAL := 3;
     DATA_WIDTH : NATURAL := 8
   );
   PORT (
@@ -336,8 +313,6 @@ USE work.g2a_constants.ALL;
 
 ENTITY Scope IS
   GENERIC (
-    VARIABLE_WIDTH : NATURAL := 4;
-    DATA_MULTIPLIER : NATURAL := 3;
     DATA_WIDTH : NATURAL := 8;
     IN_DATA_WIDTH : NATURAL := 8;
     OUT_DATA_WIDTH : NATURAL := 8
@@ -528,7 +503,7 @@ END ARCHITECTURE;
 ARCHITECTURE behavioural OF decoupled_hs_reg IS
 
   SIGNAL phase_in, phase_out : std_logic;
-  SIGNAL data_sig : std_logic_vector(OUT_DATA_WIDTH - 1 DOWNTO 0);
+  SIGNAL data_sig : std_logic_vector(DATA_WIDTH - 1 DOWNTO 0);
   SIGNAL click : std_logic;
 
   ATTRIBUTE dont_touch : STRING;
@@ -546,7 +521,7 @@ BEGIN
     IF rst = '1' THEN
       phase_in <= PHASE_INIT_IN;
       phase_out <= PHASE_INIT_OUT;
-      data_sig <= std_logic_vector(to_unsigned(VALUE, OUT_DATA_WIDTH));
+      data_sig <= std_logic_vector(to_unsigned(VALUE, DATA_WIDTH));
     ELSIF rising_edge(click) THEN
       phase_in <= NOT phase_in AFTER REG_CQ_DELAY;
       phase_out <= NOT phase_out AFTER REG_CQ_DELAY;
@@ -589,8 +564,6 @@ BEGIN
   END PROCESS clock_regs;
 
 END beh;
-
-
 ARCHITECTURE beh OF reg_fork IS
 
   SIGNAL click : std_logic;

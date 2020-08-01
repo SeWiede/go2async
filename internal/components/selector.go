@@ -1,15 +1,15 @@
 package components
 
 import (
-	"fmt"
-	"os"
 	"strconv"
 	"strings"
 )
 
 const selectorprefix = "SE_"
 
-// TODO: check delays for more operations
+// TODO: check delays
+var SupportedComperators map[string]string = map[string]string{"==": "=", "!=": "/=", "<": "<", ">": ">", ">=": ">=", "<=": "<="}
+var comperatorDelays map[string]string = map[string]string{"==": "ADD_DELAY", "!=": "ADD_DELAY", "<": "ADD_DELAY", ">": "ADD_DELAY", ">=": "ADD_DELAY", "<=": "ADD_DELAY"}
 
 type SelectorBlock struct {
 	Nr       int
@@ -20,25 +20,13 @@ type SelectorBlock struct {
 	In  *HandshakeChannel
 	Out *HandshakeChannel
 
-	X_POS, Y_POS         int
-	XConstVal, YConstVal string
-	Inverted             bool
+	Vi       *OperandInfo
+	Inverted bool
 }
 
 var selectorNr = 0
 
-func NewSelectorBlock(op string, X_POS, Y_POS int, XconstVal, YconstVal string, inverted bool) *SelectorBlock {
-	if op == "==" {
-		op = "="
-	} else if op == "!=" {
-		op = "/="
-	} else if op == "<" || op == ">" || op == ">=" || op == "<=" {
-
-	} else {
-		fmt.Fprint(os.Stderr, "Unkown condition operator ", op, "; defaulting to '='")
-		op = "="
-	}
-
+func NewSelectorBlock(op string, variableInfo *OperandInfo, inverted bool) *SelectorBlock {
 	nr := selectorNr
 	selectorNr++
 
@@ -47,10 +35,7 @@ func NewSelectorBlock(op string, X_POS, Y_POS int, XconstVal, YconstVal string, 
 		Nr:        nr,
 		archName:  archPrefix + name,
 		Operation: op,
-		X_POS:     X_POS,
-		Y_POS:     Y_POS,
-		XConstVal: XconstVal,
-		YConstVal: YconstVal,
+		Vi:        variableInfo,
 		In: &HandshakeChannel{
 			Out: false,
 		},
@@ -69,8 +54,6 @@ func (sb *SelectorBlock) Component() string {
 	name := selectorprefix + strconv.Itoa(sb.Nr)
 	return name + `: entity work.Selector(` + sb.archName + `)
 	generic map(
-	  VARIABLE_WIDTH => VARIABLE_WIDTH,
-	  DATA_MULTIPLIER => DATA_MULTIPLIER,
 	  DATA_WIDTH => DATA_WIDTH
 	)
 	port map (
@@ -86,24 +69,24 @@ func (sb *SelectorBlock) Component() string {
 }
 
 func (sb *SelectorBlock) Architecture() string {
-	x := `unsigned(x)`
-	if sb.XConstVal != "" {
-		x = `to_unsigned(` + sb.XConstVal + `, VARIABLE_WIDTH)`
+	x := "unsigned(x)"
+	if sb.Vi.XConstVal != "" {
+		x = "to_unsigned(" + sb.Vi.XConstVal + ", " + strconv.Itoa(sb.Vi.X_SIZE) + ")"
 	}
 
-	y := `unsigned(y)`
-	if sb.YConstVal != "" {
-		y = `to_unsigned(` + sb.YConstVal + `, VARIABLE_WIDTH)`
+	y := "unsigned(y)"
+	if sb.Vi.YConstVal != "" {
+		y = "to_unsigned(" + sb.Vi.YConstVal + ", " + strconv.Itoa(sb.Vi.Y_SIZE) + ")"
 	}
 
-	compute := `'1' when ` + x + ` ` + sb.Operation + ` ` + y + ` else '0';`
+	compute := "'1' when " + x + " " + SupportedComperators[sb.Operation] + " " + y + " else '0';"
 	if sb.Inverted {
-		compute = `'0' when ` + x + ` ` + sb.Operation + ` ` + y + ` else '1';`
+		compute = "'0' when " + x + " " + SupportedComperators[sb.Operation] + " " + y + " else '1';"
 	}
 
 	return `architecture ` + sb.archName + ` of Selector is
-    alias x      : std_logic_vector(VARIABLE_WIDTH - 1 downto 0)  is in_data( ` + strconv.Itoa(sb.X_POS+1) + `*VARIABLE_WIDTH -1 downto ` + strconv.Itoa(sb.X_POS) + `*VARIABLE_WIDTH);
-    alias y      : std_logic_vector(VARIABLE_WIDTH - 1 downto 0)  is in_data( ` + strconv.Itoa(sb.Y_POS+1) + `*VARIABLE_WIDTH -1 downto ` + strconv.Itoa(sb.Y_POS) + `*VARIABLE_WIDTH);
+    alias x      : std_logic_vector(` + strconv.Itoa(sb.Vi.X_SIZE) + ` - 1 downto 0)  is in_data( ` + strconv.Itoa(sb.Vi.X_POS+sb.Vi.X_SIZE) + ` -1 downto ` + strconv.Itoa(sb.Vi.X_POS) + `);
+	alias y      : std_logic_vector(` + strconv.Itoa(sb.Vi.Y_SIZE) + ` - 1 downto 0)  is in_data( ` + strconv.Itoa(sb.Vi.Y_POS+sb.Vi.Y_SIZE) + ` -1 downto ` + strconv.Itoa(sb.Vi.Y_POS) + `);
   
     attribute dont_touch : string;
     attribute dont_touch of  x,y,in_data: signal is "true";

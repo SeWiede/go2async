@@ -7,19 +7,23 @@ import (
 	"go/parser"
 	"go/token"
 	"go2async/internal/components"
+	"go2async/internal/variable"
 	"io/ioutil"
 	"reflect"
+	"strconv"
 )
 
 var ErrNotImplemented = errors.New("Not implemented")
 var ErrTypeNotSupported = errors.New("Type is not supported")
 
+var SupportedTypes map[string]int = map[string]int{"int": 4, "int8": 8, "int16": 16, "int32": 32, "int64": 64, "uint": 4, "uint8": 8, "uint16": 16, "uint32": 32, "uint64": 64, "byte": 8}
+
 type Generator struct {
-	wires      int
-	variables  map[string]int
-	components map[string]components.Component
-	scopes     map[string]*components.Scope
-	defs       *Defs
+	wires          int
+	knownVariables map[string]*variable.VariableInfo
+	components     map[string]components.Component
+	scopes         map[string]*components.Scope
+	defs           *Defs
 }
 
 // current variable pos
@@ -27,27 +31,37 @@ var cvp = 0
 
 func NewGenerator() *Generator {
 	return &Generator{
-		wires:      0,
-		variables:  make(map[string]int),
-		components: make(map[string]components.Component),
-		scopes:     make(map[string]*components.Scope),
-		defs:       NewDefs(4),
+		wires:          0,
+		knownVariables: make(map[string]*variable.VariableInfo),
+		components:     make(map[string]components.Component),
+		scopes:         make(map[string]*components.Scope),
+		defs:           NewDefs(4),
 	}
 }
 
-// NewVariable sets new varible at given pos, does nothing if variable is already known
-func (g *Generator) NewVariable(name string) {
-	if _, ok := g.variables[name]; !ok {
-		g.variables[name] = cvp
-		cvp++
+// NewVariable sets new varible at next pos, does nothing if variable is already known; returns error on unknwon type
+func (g *Generator) NewVariable(name string, typ string) (*variable.VariableInfo, error) {
+	size, ok := SupportedTypes[typ]
+	if !ok {
+		return nil, errors.New("Unsupported type '" + typ + "'")
 	}
+	if _, ok := g.knownVariables[name]; !ok {
+		g.knownVariables[name] = &variable.VariableInfo{
+			Position: cvp,
+			Size:     size,
+			Typ:      typ,
+		}
+		cvp += size
+	}
+	return g.knownVariables[name], nil
 }
 
-func (g *Generator) GetNewVarialbePos(name string) int {
-	if _, ok := g.variables[name]; !ok {
-		g.NewVariable(name)
+func (g *Generator) GetNewVarialbePos(name string) (*variable.VariableInfo, error) {
+	if kv, ok := g.knownVariables[name]; !ok {
+		return nil, errors.New("Unknown variable '" + name + "'")
+	} else {
+		return kv, nil
 	}
-	return g.variables[name]
 }
 
 func (g *Generator) GetNextWire() int {
@@ -55,12 +69,11 @@ func (g *Generator) GetNextWire() int {
 	return g.wires
 }
 
-func (g *Generator) GenerateFuncBlock(result_pos int, be *ast.BinaryExpr) (fb *components.FuncBlock, err error) {
+func (g *Generator) GenerateFuncBlock(result *variable.VariableInfo, be *ast.BinaryExpr) (fb *components.FuncBlock, err error) {
 	x := be.X
 	y := be.Y
 
-	xpos := 0
-	ypos := 0
+	xpos, xsize, ypos, ysize := 0, 0, 0, 0
 
 	xconstval := ""
 	yconstval := ""
@@ -74,7 +87,12 @@ func (g *Generator) GenerateFuncBlock(result_pos int, be *ast.BinaryExpr) (fb *c
 	case *ast.BasicLit:
 		xconstval = t.Value
 	case *ast.Ident:
-		xpos = g.GetNewVarialbePos(t.Name)
+		xvar, err := g.GetNewVarialbePos(t.Name)
+		if err != nil {
+			return nil, err
+		}
+		xpos = xvar.Position
+		xsize = xvar.Size
 	default:
 		return nil, errors.New("Invalid type in binary expression: " + reflect.TypeOf(t).String())
 	}
@@ -82,13 +100,32 @@ func (g *Generator) GenerateFuncBlock(result_pos int, be *ast.BinaryExpr) (fb *c
 	switch t := y.(type) {
 	case *ast.BasicLit:
 		yconstval = t.Value
+		ysize = xsize
 	case *ast.Ident:
-		ypos = g.GetNewVarialbePos(t.Name)
+		yvar, err := g.GetNewVarialbePos(t.Name)
+		if err != nil {
+			return nil, err
+		}
+		ypos = yvar.Position
+		ysize = yvar.Size
 	default:
 		return nil, errors.New("Invalid type in binary expression: " + reflect.TypeOf(t).String())
 	}
 
-	return components.NewFuncBlock(operation, xpos, ypos, result_pos, xconstval, yconstval), nil
+	if xconstval != "" {
+		xsize = ysize
+	}
+
+	return components.NewFuncBlock(operation, &components.OperandInfo{
+		X_POS:       xpos,
+		Y_POS:       ypos,
+		RESULT_POS:  result.Position,
+		X_SIZE:      xsize,
+		Y_SIZE:      ysize,
+		RESULT_SIZE: result.Size,
+		XConstVal:   xconstval,
+		YConstVal:   yconstval,
+	}), nil //xpos, ypos, result_pos, xconstval, yconstval), nil
 }
 
 func (g *Generator) GenerateSelectorBlock(be *ast.BinaryExpr, inverted bool) (c *components.SelectorBlock, err error) {
@@ -96,7 +133,9 @@ func (g *Generator) GenerateSelectorBlock(be *ast.BinaryExpr, inverted bool) (c 
 	y := be.Y
 
 	xpos := 0
+	xsize := 0
 	ypos := 0
+	ysize := 0
 
 	xconstval := ""
 	yconstval := ""
@@ -105,7 +144,12 @@ func (g *Generator) GenerateSelectorBlock(be *ast.BinaryExpr, inverted bool) (c 
 	case *ast.BasicLit:
 		xconstval = t.Value
 	case *ast.Ident:
-		xpos = g.GetNewVarialbePos(t.Name)
+		vi, err := g.GetNewVarialbePos(t.Name)
+		if err != nil {
+			return nil, err
+		}
+		xpos = vi.Position
+		xsize = vi.Size
 	default:
 		return nil, errors.New("Invalid type in binary expression: " + reflect.TypeOf(t).String())
 	}
@@ -113,13 +157,35 @@ func (g *Generator) GenerateSelectorBlock(be *ast.BinaryExpr, inverted bool) (c 
 	switch t := y.(type) {
 	case *ast.BasicLit:
 		yconstval = t.Value
+		ysize = xsize
 	case *ast.Ident:
-		ypos = g.GetNewVarialbePos(t.Name)
+		vi, err := g.GetNewVarialbePos(t.Name)
+		if err != nil {
+			return nil, err
+		}
+		ypos = vi.Position
+		ysize = vi.Size
 	default:
 		return nil, errors.New("Invalid type in binary expression: " + reflect.TypeOf(t).String())
 	}
 
-	return components.NewSelectorBlock(be.Op.String(), xpos, ypos, xconstval, yconstval, inverted), nil
+	comp := be.Op.String()
+	if _, ok := components.SupportedComperators[comp]; !ok {
+		return nil, errors.New("Invalid comperator " + comp)
+	}
+
+	if xconstval != "" {
+		xsize = ysize
+	}
+
+	return components.NewSelectorBlock(comp, &components.OperandInfo{
+		X_POS:     xpos,
+		Y_POS:     ypos,
+		X_SIZE:    xsize,
+		Y_SIZE:    ysize,
+		XConstVal: xconstval,
+		YConstVal: yconstval,
+	}, inverted), nil
 }
 
 func (g *Generator) GenerateIfBlock(is *ast.IfStmt) (fb *components.IfBlock, err error) {
@@ -141,7 +207,7 @@ func (g *Generator) GenerateIfBlock(is *ast.IfStmt) (fb *components.IfBlock, err
 	}
 
 	var elsebody components.BodyComponent
-	elsebody = components.NewFuncBlock("", 0, -1, 0, "", "")
+	elsebody = components.NewFuncBlock("NOP", &components.OperandInfo{0, -1, 0, 0, 0, 0, "", ""}) //0, -1, 0, "", "")
 	if is.Else != nil {
 		elsebody, err = g.GenerateBodyBlock(is.Else)
 		if err != nil {
@@ -180,16 +246,68 @@ func (g *Generator) GenerateLoopBlock(fs *ast.ForStmt) (fb *components.LoopBlock
 	return components.NewLoopBlock(cond, body), nil
 }
 
+func getTypeOfString(x string) string {
+	if _, err := strconv.Atoi(x); err == nil {
+		return "int"
+	}
+
+	return "string"
+}
+
+func getNodeLineString(n ast.Node) string {
+	return strconv.Itoa(int(n.Pos()))
+}
+
 func (g *Generator) GenerateBodyBlock(s ast.Stmt) (c components.BodyComponent, err error) {
 	switch x := s.(type) {
 	case *ast.AssignStmt:
-		lhs := g.GetNewVarialbePos(x.Lhs[0].(*ast.Ident).Name)
+		if len(x.Lhs) > 1 {
+			return nil, errors.New("Cannot assign more than one value")
+		}
+		var lhs *variable.VariableInfo
+		newVar := false
+		if x.Tok.String() == ":=" {
+			newVar = true
+		} else {
+			lhs, err = g.GetNewVarialbePos(x.Lhs[0].(*ast.Ident).Name)
+			if err != nil {
+				return nil, err
+			}
+
+		}
+
 		switch rhs := x.Rhs[0].(type) {
 		case *ast.BasicLit:
-			return components.NewFuncBlock("", -1, -1, lhs, rhs.Value, ""), nil
+			if newVar {
+				typ := getTypeOfString(rhs.Value)
+				if _, ok := SupportedTypes[typ]; !ok {
+					return nil, errors.New(strconv.Itoa(int(x.Pos())) + ": Unsupported type '" + typ + "'")
+				}
+				lhs, err = g.NewVariable(x.Lhs[0].(*ast.Ident).Name, typ)
+				if err != nil {
+					return nil, err
+				}
+			}
+
+			return components.NewFuncBlock("NOP", &components.OperandInfo{-1, -1, lhs.Position, -1, -1, lhs.Size, rhs.Value, ""}), nil
 		case *ast.Ident:
-			return components.NewFuncBlock("", g.GetNewVarialbePos(rhs.Name), -1, lhs, "", ""), nil
+			v, err := g.GetNewVarialbePos(rhs.Name)
+			if err != nil {
+				return nil, err
+			}
+
+			if newVar {
+				lhs, err = g.NewVariable(x.Lhs[0].(*ast.Ident).Name, v.Typ)
+				if err != nil {
+					return nil, err
+				}
+			}
+
+			return components.NewFuncBlock("NOP", &components.OperandInfo{v.Position, -1, lhs.Position, v.Size, 0, lhs.Size, "", ""}), nil //g.GetNewVarialbePos(rhs.Name), -1, lhs, "", ""), nil
 		case *ast.BinaryExpr:
+			if newVar {
+				return nil, errors.New(getNodeLineString(x) + ": Cannot initialize variable with binary expression")
+			}
 			return g.GenerateFuncBlock(lhs, rhs)
 		default:
 			return nil, errors.New("Expression " + reflect.TypeOf(x).String() + " not supported!")
@@ -222,14 +340,19 @@ func (g *Generator) GenerateBlock(stmts []ast.Stmt, toplevelStatement bool) (c *
 }
 
 func (g *Generator) GenerateScope(f *ast.FuncDecl) (s *components.Scope, err error) {
-	paramCount := 0
+	params := make(map[string]*variable.VariableInfo)
 	for _, field := range f.Type.Params.List {
-		if t, ok := field.Type.(*ast.Ident); !ok || t.Name != "int" {
-			return nil, errors.New("Invalid type in function param list")
+		typeField, ok := field.Type.(*ast.Ident)
+		if !ok {
+			return nil, errors.New("Invalid field type in function param list")
 		}
+
 		for _, param := range field.Names {
-			paramCount++
-			g.GetNewVarialbePos(param.Name)
+			np, err := g.NewVariable(param.Name, typeField.Name)
+			if err != nil {
+				return nil, err
+			}
+			params[param.Name] = np
 		}
 	}
 
@@ -247,21 +370,21 @@ func (g *Generator) GenerateScope(f *ast.FuncDecl) (s *components.Scope, err err
 		return nil, errors.New("Missing return statement at the end")
 	}
 
-	returnPositions := []int{}
+	returnPositions := make(map[string]*variable.VariableInfo)
 	for _, res := range rs.Results {
 		switch x := res.(type) {
 		case *ast.Ident:
-			pos, ok := g.variables[x.Name]
+			vi, ok := g.knownVariables[x.Name]
 			if !ok {
 				return nil, errors.New("No new variable in returns allowed")
 			}
-			returnPositions = append(returnPositions, pos)
+			returnPositions[x.Name] = vi
 		default:
 			return nil, errors.New("Only identifiers returns allowed")
 		}
 	}
 
-	s = components.NewScope(f.Name.Name, block, 4, len(g.variables), paramCount, returnPositions)
+	s = components.NewScope(f.Name.Name, block, params, g.knownVariables, returnPositions)
 
 	g.components[block.ArchName()] = block
 	g.scopes[s.ArchName()] = s
@@ -307,18 +430,29 @@ func (g *Generator) GenerateVHDL() string {
 		ret += c.Architecture()
 	}
 
+	svs, ps, rs := 0, 0, 0
+	for _, s := range g.knownVariables {
+		svs += s.Size
+	}
+
 	for sn, s := range g.scopes {
+		for _, s := range s.Params {
+			ps += s.Size
+		}
+		for _, s := range s.ReturnVars {
+			rs += s.Size
+		}
+
 		g.defs.ScopeProperties[sn] = &ScopeProperty{
-			returnCount: len(s.ReturnPositions),
-			varCount:    s.VarCount,
-			varWidth:    s.VarWidth,
-			paramCount:  s.ParamCount,
+			sumVarSize: svs,
+			paramSize:  ps,
+			returnSize: rs,
 		}
 		ret += s.Architecture()
 	}
 
-	fmt.Println(len(g.variables), " Variables found")
-	for k, v := range g.variables {
+	fmt.Println(len(g.knownVariables), " Variables found")
+	for k, v := range g.knownVariables {
 		fmt.Println("Var ", k, " is at index ", v)
 	}
 

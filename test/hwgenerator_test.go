@@ -58,7 +58,8 @@ package circuit
 
 func MAC(a , b, c int) int {
 	for b != 0 {
-		t := b & 1
+		t := b
+		t = t & 1
 		if t == 1 {
 			a = a + c
 		}
@@ -84,7 +85,7 @@ func TestCode(t *testing.T) {
 		panic("Only one scope allowed")
 	}
 
-	ast.Print(fset, f)
+	//	ast.Print(fset, f)
 
 	ast.Inspect(f.Decls[0], func(n ast.Node) bool {
 		switch x := n.(type) {
@@ -114,26 +115,5 @@ func TestCode(t *testing.T) {
 		}
 	})
 
-	t.Fail()
-}
-
-func TestGenerator(t *testing.T) {
-	gen := hwgenerator.NewGenerator()
-	fb, err := gen.GenerateFuncBlock(5, &ast.BinaryExpr{
-		X: &ast.Ident{
-			Name: "x",
-		},
-		Op: token.ADD,
-		Y: &ast.BasicLit{
-			Value: "123",
-		},
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	fmt.Println(fb.Component())
-	fmt.Println()
-	fmt.Println(fb.Architecture())
 	t.Fail()
 }

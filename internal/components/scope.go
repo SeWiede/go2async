@@ -1,6 +1,7 @@
 package components
 
 import (
+	"go2async/internal/variable"
 	"strconv"
 	"strings"
 )
@@ -13,10 +14,11 @@ type Scope struct {
 
 	Block *Block
 
-	VarWidth        int
-	VarCount        int
-	ParamCount      int
-	ReturnPositions []int
+	Params     map[string]*variable.VariableInfo
+	Variables  map[string]*variable.VariableInfo
+	ReturnVars map[string]*variable.VariableInfo
+
+	OutReg *Reg
 
 	In  *HandshakeChannel
 	Out *HandshakeChannel
@@ -24,7 +26,7 @@ type Scope struct {
 
 var scopeNr = 0
 
-func NewScope(name string, block *Block, varWidth, varCount, paramCount int, returnPositions []int) *Scope {
+func NewScope(name string, block *Block, params, vars, returnVars map[string]*variable.VariableInfo) *Scope {
 	nr := scopeNr
 	if name == "" {
 		scopeNr++
@@ -37,10 +39,9 @@ func NewScope(name string, block *Block, varWidth, varCount, paramCount int, ret
 		In: &HandshakeChannel{
 			Out: false,
 		},
-		VarWidth:        varWidth,
-		VarCount:        varCount,
-		ParamCount:      paramCount,
-		ReturnPositions: returnPositions,
+		Params:     params,
+		Variables:  vars,
+		ReturnVars: returnVars,
 	}
 
 	entryIn := &HandshakeChannel{
@@ -52,7 +53,16 @@ func NewScope(name string, block *Block, varWidth, varCount, paramCount int, ret
 
 	s.Block.In = entryIn
 
-	s.Out = s.Block.Out
+	rs := 0
+	for _, s := range s.ReturnVars {
+		rs += s.Size
+	}
+
+	s.OutReg = NewReg("DATA_WIDTH", false, "0")
+
+	s.Block.Out.Connect(s.OutReg.In)
+
+	s.Out = s.OutReg.Out
 
 	return s
 }
@@ -70,9 +80,7 @@ func (s *Scope) Component() string {
 
 	return name + `: entity work.Scope(` + s.archName + `)
   generic map(
-	VARIABLE_WIDTH => ` + s.archName + `_VARIABLE_WIDTH,
     DATA_WIDTH => ` + s.archName + `_DATA_WIDTH,
-	DATA_MULTIPLIER => ` + s.archName + `_DATA_MULTIPLIER,
 	OUT_DATA_WIDTH => ` + s.archName + `_OUT_DATA_WIDTH,
 	IN_DATA_WIDTH => ` + s.archName + `_IN_DATA_WIDTH
   )
@@ -92,6 +100,7 @@ func (s *Scope) Component() string {
 func (s *Scope) signalDefs() string {
 
 	ret := SignalsString(s.Block.Out)
+	ret += SignalsString(s.OutReg.Out)
 
 	return ret
 }
@@ -109,17 +118,18 @@ func (s *Scope) Architecture() string {
 	ret += "out_req <= " + s.OutChannel().Req + "; \n"
 	ret += s.OutChannel().Ack + " <= out_ack; \n"
 	ret += "out_data <= "
-	for _, retpos := range s.ReturnPositions {
-		posStr := strconv.Itoa(retpos)
-		ret += s.OutChannel().Data + "((" + posStr + " + 1) * VARIABLE_WIDTH -1 downto " + posStr + " * VARIABLE_WIDTH) &"
+	for _, v := range s.ReturnVars {
+		ret += s.OutReg.OutChannel().Data + "(" + strconv.Itoa(v.Size+v.Position) + " -1 downto " + strconv.Itoa(v.Position) + ") & "
 	}
-	ret = strings.TrimSuffix(ret, " &")
+	ret = strings.TrimSuffix(ret, " & ")
 
 	ret += ";\n"
 
 	ret += "\n"
 
 	ret += s.Block.Component()
+	ret += "\n"
+	ret += s.OutReg.Component()
 	ret += "\n"
 
 	ret += `end ` + s.archName + `;

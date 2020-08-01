@@ -55,8 +55,6 @@ func (f *Fork) Component() string {
 	name := forkPrefix + strconv.Itoa(f.Nr)
 	return name + `: entity work.fork
   generic map(
-    VARIABLE_WIDTH => VARIABLE_WIDTH,
-    DATA_MULTIPLIER => DATA_MULTIPLIER,
     DATA_WIDTH => ` + f.DataWidth + `,
     PHASE_INIT => '0'
   )

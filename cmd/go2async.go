@@ -40,7 +40,7 @@ func main() {
 	cmd.AddCommand(genCmd)
 
 	if _, err := cmd.ExecuteC(); err != nil {
-		fmt.Fprint(os.Stderr, "An error occured: ", err.Error())
+		fmt.Fprintln(os.Stderr, "An error occured: ", err.Error())
 		os.Exit(1)
 	}
 }

@@ -46,8 +46,6 @@ func (d *Merge) Component() string {
 	name := mergePrefix + strconv.Itoa(d.Nr)
 	return name + `: entity work.merge
   generic map (
-    VARIABLE_WIDTH => VARIABLE_WIDTH,
-    DATA_MULTIPLIER => DATA_MULTIPLIER,
     DATA_WIDTH => DATA_WIDTH
   )
   port map (

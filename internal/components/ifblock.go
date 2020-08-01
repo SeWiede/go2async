@@ -87,8 +87,7 @@ func (ib *IfBlock) Component() string {
 	name := ifBlockPrefix + strconv.Itoa(ib.Nr)
 	return name + `: entity work.IfBlock(` + ib.archName + `)
   generic map(
-    DATA_WIDTH => DATA_WIDTH,
-    DATA_MULTIPLIER => DATA_MULTIPLIER
+    DATA_WIDTH => DATA_WIDTH
   )
   port map (
     rst => rst,

@@ -64,7 +64,7 @@ func (b *Block) AddComponent(c BodyComponent) {
 
 	if b.TopLevel {
 
-		newreg := NewReg("DATA_WIDTH", false)
+		newreg := NewReg("DATA_WIDTH", false, "0")
 		newreg.Out.Connect(c.InChannel())
 		if len(b.RegBlockPairs) == 0 {
 			*newreg.InChannel() = *b.In
@@ -95,9 +95,7 @@ func (b *Block) Component() string {
 	name := blockPrefix + strconv.Itoa(b.Nr)
 	return name + `: entity work.BlockC(` + b.archName + `)
   generic map(
-   VARIABLE_WIDTH => VARIABLE_WIDTH,
-   DATA_WIDTH => DATA_WIDTH,
-   DATA_MULTIPLIER => DATA_MULTIPLIER
+   DATA_WIDTH => DATA_WIDTH
   )
   port map (
    rst => rst,

@@ -48,8 +48,6 @@ func (rf *RegFork) Component() string {
 	name := regForkPrefix + strconv.Itoa(rf.Nr)
 	return name + `: entity work.reg_fork
   generic map(
-    VARIABLE_WIDTH => VARIABLE_WIDTH,
-    DATA_MULTIPLIER => DATA_MULTIPLIER,
     DATA_WIDTH => DATA_WIDTH,
     PHASE_INIT_A => '0',
     PHASE_INIT_B =>'0',

@@ -49,8 +49,6 @@ func (m *MUX) Component() string {
 	name := muxprefix + strconv.Itoa(m.Nr)
 	return name + `: entity work.mux
   generic map (
-    VARIABLE_WIDTH => VARIABLE_WIDTH,
-    DATA_MULTIPLIER => DATA_MULTIPLIER,
     DATA_WIDTH => DATA_WIDTH
   )
   port map (
