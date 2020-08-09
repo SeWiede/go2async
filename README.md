@@ -1,11 +1,12 @@
 # go2async
-This project is in its very early stages and underwent few practical tests.
 The executable of this project generates vhdl code of an asynchronous circuit derived from a go function.  
 
-# Usage
-main go file is in cmd/
+This project is in its very early stages and underwent few practical tests.
 
-to generate an async circuit run:
+# Usage
+Main go file is in cmd/
+
+To generate an async circuit run:
 go run go2async.go <generate|gen|g> <go file> [outfile]
 
 A go file with only a package name and a function is accepted. The function has to contain at least one parameter, one statement and a return statement at the end. There are some examples in goexamples/
@@ -37,7 +38,7 @@ A full example adjusted for the terasic DE0-CV board can be found in example/. D
 
 # Note 
     - everything is treated unsigned so far 
-    - Uints and ints are downsized to 4-bit values (use u/int8,16 etc for bigger variables)
+    - Uints and ints are downsized to 4-bit values (use u/int8, 16, etc. for bigger variables)
     - the used delays are purely estimated with few practical tests
 
 # References
