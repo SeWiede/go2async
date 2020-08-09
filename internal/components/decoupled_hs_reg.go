@@ -85,7 +85,7 @@ func (r *Reg) Architecture() string {
 	dataSigAsgmt := "in_data"
 
 	return `architecture ` + r.archName + ` of decoupled_hs_reg is
-  signal phase_in, phase_out : std_logic;
+  signal phase_in, phase_out, in_req_d, out_ack_d : std_logic;
   signal data_sig: std_logic_vector(OUT_DATA_WIDTH-1 downto 0);
   signal click : std_logic;
   
@@ -93,6 +93,7 @@ func (r *Reg) Architecture() string {
   attribute dont_touch of  phase_in, phase_out : signal is "true";   
   attribute dont_touch of  data_sig : signal is "true";  
   attribute dont_touch of  click : signal is "true";  
+  attribute dont_touch of  in_req_d, out_ack_d : signal is "true";  
 
 begin
   out_req <= phase_out;
@@ -111,8 +112,26 @@ begin
       data_sig <= ` + dataSigAsgmt + ` after REG_CQ_DELAY;
     end if;
   end process;
+
+  delay_req: entity work.delay_element
+      generic map(
+        NUM_LCELLS => 16  -- Delay  size
+      )
+      port map (
+        i => in_req,
+        o => in_req_d
+	  );
+
+	delay_ack: entity work.delay_element
+      generic map(
+        NUM_LCELLS => 16  -- Delay  size
+      )
+      port map (
+        i => out_ack,
+        o => out_ack_d
+	  );
   
-  click <= (in_req xor phase_in) and (out_ack xnor phase_out) after AND2_DELAY + XOR_DELAY;
+  click <= (in_req_d xor phase_in) and (out_ack_d xnor phase_out) after AND2_DELAY + XOR_DELAY;
 
 end ` + r.archName + `;`
 }

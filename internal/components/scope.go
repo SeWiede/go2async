@@ -16,7 +16,7 @@ type Scope struct {
 
 	Params     map[string]*variable.VariableInfo
 	Variables  map[string]*variable.VariableInfo
-	ReturnVars map[string]*variable.VariableInfo
+	ReturnVars []*variable.VariableInfo
 
 	OutReg *Reg
 
@@ -26,7 +26,7 @@ type Scope struct {
 
 var scopeNr = 0
 
-func NewScope(name string, block *Block, params, vars, returnVars map[string]*variable.VariableInfo) *Scope {
+func NewScope(name string, block *Block, params, vars map[string]*variable.VariableInfo, returnVars []*variable.VariableInfo) *Scope {
 	nr := scopeNr
 	if name == "" {
 		scopeNr++
@@ -119,7 +119,14 @@ func (s *Scope) Architecture() string {
 	ret += s.OutChannel().Ack + " <= out_ack; \n"
 	ret += "out_data <= "
 	for _, v := range s.ReturnVars {
-		ret += s.OutReg.OutChannel().Data + "(" + strconv.Itoa(v.Size+v.Position) + " -1 downto " + strconv.Itoa(v.Position) + ") & "
+		if v.Len == 1 {
+			idx := getIndex(v.Index)
+			ret += s.OutReg.OutChannel().Data + "(" + strconv.Itoa(v.Position+v.Size*(idx+1)) + " -1 downto " + strconv.Itoa(v.Position+v.Size*idx) + ") & "
+		} else {
+			for idx := v.Len - 1; idx >= 0; idx-- {
+				ret += s.OutReg.OutChannel().Data + "(" + strconv.Itoa(v.Position+v.Size*(idx+1)) + " -1 downto " + strconv.Itoa(v.Position+v.Size*idx) + ") & "
+			}
+		}
 	}
 	ret = strings.TrimSuffix(ret, " & ")
 

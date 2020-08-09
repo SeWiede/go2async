@@ -8,14 +8,13 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var printVhd bool
+var verbose bool
 
 func newGo2AsyncCommand() (*cobra.Command, error) {
 	cmd := &cobra.Command{
 		Use:                   "go2async",
 		Short:                 "go 2 async",
 		SilenceErrors:         true,
-		SilenceUsage:          true,
 		PersistentPreRun:      nil,
 		DisableFlagsInUseLine: true,
 	}
@@ -30,13 +29,14 @@ func main() {
 	cmd, _ := newGo2AsyncCommand()
 
 	genCmd := &cobra.Command{
-		Use:     "generate <go file>",
+		Use:     "generate <go file> [outputfile]",
 		Aliases: []string{"gen", "g"},
 		Short:   "Generate async vhdl from go code",
 		RunE:    generate,
 		Args:    cobra.RangeArgs(1, 2),
 	}
-	genCmd.Flags().BoolVar(&printVhd, "s", false, "Print generated vhd")
+
+	genCmd.Flags().BoolVar(&verbose, "verbose", false, "Print informationa about internal signals")
 	cmd.AddCommand(genCmd)
 
 	if _, err := cmd.ExecuteC(); err != nil {
@@ -54,16 +54,16 @@ func generate(c *cobra.Command, args []string) error {
 
 	gen := hwgenerator.NewGenerator()
 	if err := gen.ParseGoFile(file); err != nil {
-		return err
+		fmt.Println("An error occured: ", err.Error())
+		return nil
 	}
 
-	if err := gen.SaveVHDL(outfile); err != nil {
-		return err
+	if err := gen.SaveVHDL(outfile, verbose); err != nil {
+		fmt.Println("An error occured: ", err.Error())
+		return nil
 	}
 
-	if printVhd {
-		fmt.Println(gen.GenerateVHDL())
-	}
+	fmt.Println("Saved in ", outfile)
 
 	return nil
 }

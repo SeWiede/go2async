@@ -5,7 +5,7 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
-	"go2async/pkg/hwgenerator"
+	"go2async/goexamples"
 	"testing"
 )
 
@@ -53,26 +53,19 @@ func TEST(a , b int) int {
 }
 `
 
-const srcMAC = `
-package circuit
+const srcTEST = `
+package goexamples
 
-func MAC(a , b, c int) int {
-	for b != 0 {
-		t := b
-		t = t & 1
-		if t == 1 {
-			a = a + c
-		}
-		c = c << 1
-		b = b >> 1
-	}
-	return a
+func TEST(a [5]int) int {
+	var s, t [16]int
+	return t
 }
+
 `
 
 func TestCode(t *testing.T) {
 	fset := token.NewFileSet()
-	f, err := parser.ParseFile(fset, "", srcMAC, 0)
+	f, err := parser.ParseFile(fset, "", srcTEST, 0)
 	if err != nil {
 		panic(err)
 	}
@@ -85,10 +78,10 @@ func TestCode(t *testing.T) {
 		panic("Only one scope allowed")
 	}
 
-	//	ast.Print(fset, f)
+	ast.Print(fset, f)
 
 	ast.Inspect(f.Decls[0], func(n ast.Node) bool {
-		switch x := n.(type) {
+		switch /* x :=  */ n.(type) {
 		case *ast.GenDecl:
 			return true
 		case *ast.ImportSpec:
@@ -98,16 +91,16 @@ func TestCode(t *testing.T) {
 		case *ast.Ident:
 			return true
 		case *ast.FuncDecl:
+			/*
+				gen := hwgenerator.NewGenerator()
 
-			gen := hwgenerator.NewGenerator()
+				_, err := gen.GenerateScope(x)
+				if err != nil {
+					fmt.Println("Error: ", err)
+					t.Fail()
+				}
 
-			_, err := gen.GenerateScope(x)
-			if err != nil {
-				fmt.Println("Error: ", err)
-				t.Fail()
-			}
-
-			fmt.Println(gen.GenerateVHDL())
+				fmt.Println(gen.GenerateVHDL()) */
 
 			return false
 		default:
@@ -116,4 +109,9 @@ func TestCode(t *testing.T) {
 	})
 
 	t.Fail()
+}
+
+func TestGo(t *testing.T) {
+	t.Fail()
+	fmt.Println(goexamples.TEST([6]int{9, 4, 3, 7, 1, 6}))
 }
