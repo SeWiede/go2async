@@ -1,7 +1,7 @@
 package goexamples
 
 // a = a + b*c
-func MAC(a, b, c int) int {
+func MAC(a int8, b int, c int8) int8 {
 	for b != 0 {
 		t := b
 		t = t & 1
