@@ -7,7 +7,7 @@ import (
 	"go/parser"
 	"go/token"
 	"go2async/internal/components"
-	"go2async/internal/variable"
+	"go2async/pkg/variable"
 	"io/ioutil"
 	"reflect"
 	"strconv"

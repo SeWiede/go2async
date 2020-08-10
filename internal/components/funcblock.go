@@ -1,7 +1,7 @@
 package components
 
 import (
-	"go2async/internal/variable"
+	"go2async/pkg/variable"
 	"strconv"
 	"strings"
 )
