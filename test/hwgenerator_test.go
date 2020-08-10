@@ -1,11 +1,9 @@
 package hwgenerator
 
 import (
-	"fmt"
 	"go/ast"
 	"go/parser"
 	"go/token"
-	"go2async/goexamples"
 	"testing"
 )
 
@@ -109,9 +107,4 @@ func TestCode(t *testing.T) {
 	})
 
 	t.Fail()
-}
-
-func TestGo(t *testing.T) {
-	t.Fail()
-	fmt.Println(goexamples.TEST([6]int{9, 4, 3, 7, 1, 6}))
 }
