@@ -9,7 +9,7 @@ Main go file is in cmd/
 To generate an async circuit run:
 go run go2async.go <generate|gen|g> <go file> [outfile]
 
-A go file with only a package name and a function is accepted. The function has to contain at least one parameter, one statement and a return statement at the end. There are some examples in goexamples/
+A go file with only a package name and a function is accepted. The function has to contain at least one parameter, one statement and a return statement at the end. There are some examples in example/goexamples/
 
 The resulting .vhd and the provided vhd/entities.vhd in are needed for a quartus project. 
 To test the circuit you have to instantiate a 'Scope' entity which the function name as architecture name. Set the ports as follows:
@@ -34,7 +34,7 @@ To test the circuit you have to instantiate a 'Scope' entity which the function 
   );
 ```
 
-A full example adjusted for the terasic DE0-CV board can be found in example/. Don't forget to include vhd/entities.vhd and vhd/delay_element.vhd in your project.
+A full example adjusted for the terasic DE0-CV board can be found in example/vhd. Don't forget to include vhd/entities.vhd and vhd/delay_element.vhd in your project.
 
 # Note 
     - everything is treated unsigned so far 
