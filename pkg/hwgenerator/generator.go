@@ -633,7 +633,10 @@ func (g *Generator) GenerateScope(f *ast.FuncDecl) (s *components.Scope, err err
 func (g *Generator) ParseGoFile(file string) error {
 	fset := token.NewFileSet()
 
-	b, _ := ioutil.ReadFile(file)
+	b, err := ioutil.ReadFile(file)
+	if err != nil {
+		return err
+	}
 
 	f, err := parser.ParseFile(fset, "", string(b), 0)
 	if err != nil {
