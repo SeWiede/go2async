@@ -61,7 +61,7 @@ architecture arch of debounce is
 	signal input_sync_last : std_logic;
 begin
 
-	sync_inst : work.sync
+	sync_inst : entity work.sync
 	generic map (
 		SYNC_STAGES => SYNC_STAGES,
 		RESET_VALUE => '0'
