@@ -9,6 +9,7 @@ import (
 	"go2async/internal/components"
 	"go2async/pkg/variable"
 	"io/ioutil"
+	"os"
 	"reflect"
 	"strconv"
 )
@@ -287,8 +288,17 @@ func (g *Generator) GenerateIfBlock(is *ast.IfStmt) (fb *components.IfBlock, err
 		if err != nil {
 			return nil, err
 		}
+	case *ast.ParenExpr:
+		xBin, ok := x.X.(*ast.BinaryExpr)
+		if !ok {
+			return nil, errors.New("Only binary expression in if condition allowed found " + reflect.TypeOf(x.X).String() + " in parenthesis")
+		}
+		cond, err = g.GenerateSelectorBlock(xBin, false)
+		if err != nil {
+			return nil, err
+		}
 	default:
-		return nil, errors.New("Only binary expression condition allowed")
+		return nil, errors.New("Only binary expression in if condition allowed found " + reflect.TypeOf(x).String())
 	}
 
 	thenbody, err := g.GenerateBodyBlock(is.Body)
@@ -330,8 +340,17 @@ func (g *Generator) GenerateLoopBlock(fs *ast.ForStmt) (fb *components.LoopBlock
 		if err != nil {
 			return nil, err
 		}
+	case *ast.ParenExpr:
+		xBin, ok := x.X.(*ast.BinaryExpr)
+		if !ok {
+			return nil, errors.New("Only binary expression in for condition allowed found " + reflect.TypeOf(x.X).String() + " in parenthesis")
+		}
+		cond, err = g.GenerateSelectorBlock(xBin, false)
+		if err != nil {
+			return nil, err
+		}
 	default:
-		return nil, errors.New("Only binary expression condition allowed")
+		return nil, errors.New("Only binary expression in for condition allowed found " + reflect.TypeOf(x).String())
 	}
 
 	body, err := g.GenerateBodyBlock(fs.Body)
@@ -720,8 +739,8 @@ func (g *Generator) GenerateVHDL(verbose bool) string {
 	return g.defs.GetDefs() + ret
 }
 
-func (g *Generator) SaveVHDL(file string, verbose bool) error {
-	err := ioutil.WriteFile(file, []byte(g.GenerateVHDL(verbose)), 0644)
+func (g *Generator) SaveVHDL(file *os.File, verbose bool) error {
+	_, err := file.Write([]byte(g.GenerateVHDL(verbose)))
 	if err != nil {
 		return err
 	}
