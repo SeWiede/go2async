@@ -47,23 +47,30 @@ func main() {
 
 func generate(c *cobra.Command, args []string) error {
 	file := args[0]
-	outfile := "../vhd/go2async.vhd"
+	outfile := os.Stdout
 	if len(args) > 1 {
-		outfile = args[1]
+		of, err := os.OpenFile(args[1], os.O_CREATE|os.O_RDWR, 0644)
+		if err != nil {
+			fmt.Println("Failed to open file '"+args[1]+"': ", err.Error())
+			return nil
+		}
+		outfile = of
 	}
 
 	gen := hwgenerator.NewGenerator()
 	if err := gen.ParseGoFile(file); err != nil {
-		fmt.Println("An error occured: ", err.Error())
+		fmt.Println("Parsing go file failed: ", err.Error())
 		return nil
 	}
 
 	if err := gen.SaveVHDL(outfile, verbose); err != nil {
-		fmt.Println("An error occured: ", err.Error())
+		fmt.Println("Saving vhdl failed: ", err.Error())
 		return nil
 	}
 
-	fmt.Println("Saved in ", outfile)
+	if outfile != os.Stdout {
+		fmt.Println("Saved in ", outfile.Name())
+	}
 
 	return nil
 }
