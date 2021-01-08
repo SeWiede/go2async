@@ -141,7 +141,11 @@ func (g *Generator) GenerateFuncBlock(result *variable.VariableInfo, be *ast.Bin
 			return nil, errors.New("Invalid indexing")
 		}
 	default:
-		return nil, errors.New("Invalid type in binary expression: " + reflect.TypeOf(t).String())
+		ref := reflect.TypeOf(t)
+		if ref == nil {
+			return nil, errors.New("Invalid type in binary expression: <nil>")
+		}
+		return nil, errors.New("Invalid type in binary expression: " + ref.String())
 	}
 
 	switch t := yexpr.(type) {
@@ -177,7 +181,11 @@ func (g *Generator) GenerateFuncBlock(result *variable.VariableInfo, be *ast.Bin
 			return nil, errors.New("Invalid indexing")
 		}
 	default:
-		return nil, errors.New("Invalid type in binary expression: " + reflect.TypeOf(t).String())
+		ref := reflect.TypeOf(t)
+		if ref == nil {
+			return nil, errors.New("Invalid type in binary expression: <nil>")
+		}
+		return nil, errors.New("Invalid type in binary expression: " + ref.String())
 	}
 
 	return components.NewFuncBlock(operation, &components.OperandInfo{
@@ -230,7 +238,11 @@ func (g *Generator) GenerateSelectorBlock(be *ast.BinaryExpr, inverted bool) (c 
 			return nil, errors.New("Invalid indexing")
 		}
 	default:
-		return nil, errors.New("Invalid type in binary expression: " + reflect.TypeOf(t).String())
+		ref := reflect.TypeOf(t)
+		if ref == nil {
+			return nil, errors.New("Invalid type in binary expression: <nil>")
+		}
+		return nil, errors.New("Invalid type in binary expression: " + ref.String())
 	}
 
 	switch t := yexpr.(type) {
@@ -266,7 +278,11 @@ func (g *Generator) GenerateSelectorBlock(be *ast.BinaryExpr, inverted bool) (c 
 			return nil, errors.New("Invalid indexing")
 		}
 	default:
-		return nil, errors.New("Invalid type in binary expression: " + reflect.TypeOf(t).String())
+		ref := reflect.TypeOf(t)
+		if ref == nil {
+			return nil, errors.New("Invalid type in binary expression: <nil>")
+		}
+		return nil, errors.New("Invalid type in binary expression: " + ref.String())
 	}
 
 	if x.Const != "" {
@@ -291,14 +307,22 @@ func (g *Generator) GenerateIfBlock(is *ast.IfStmt) (fb *components.IfBlock, err
 	case *ast.ParenExpr:
 		xBin, ok := x.X.(*ast.BinaryExpr)
 		if !ok {
-			return nil, errors.New("Only binary expression in if condition allowed found " + reflect.TypeOf(x.X).String() + " in parenthesis")
+			ref := reflect.TypeOf(x.X)
+			if ref == nil {
+				return nil, errors.New("Only binary expression in if condition allowed found <nil> in parenthesis")
+			}
+			return nil, errors.New("Only binary expression in if condition allowed found " + ref.String() + " in parenthesis")
 		}
 		cond, err = g.GenerateSelectorBlock(xBin, false)
 		if err != nil {
 			return nil, err
 		}
 	default:
-		return nil, errors.New("Only binary expression in if condition allowed found " + reflect.TypeOf(x).String())
+		ref := reflect.TypeOf(x)
+		if ref == nil {
+			return nil, errors.New("Only binary expression in if condition allowed found <nil>")
+		}
+		return nil, errors.New("Only binary expression in if condition allowed found " + ref.String())
 	}
 
 	thenbody, err := g.GenerateBodyBlock(is.Body)
@@ -343,6 +367,10 @@ func (g *Generator) GenerateLoopBlock(fs *ast.ForStmt) (fb *components.LoopBlock
 	case *ast.ParenExpr:
 		xBin, ok := x.X.(*ast.BinaryExpr)
 		if !ok {
+			ref := reflect.TypeOf(x.X)
+			if ref == nil {
+				return nil, errors.New("Only binary expression in for condition allowed found <nil> in parenthesis")
+			}
 			return nil, errors.New("Only binary expression in for condition allowed found " + reflect.TypeOf(x.X).String() + " in parenthesis")
 		}
 		cond, err = g.GenerateSelectorBlock(xBin, false)
@@ -350,6 +378,10 @@ func (g *Generator) GenerateLoopBlock(fs *ast.ForStmt) (fb *components.LoopBlock
 			return nil, err
 		}
 	default:
+		ref := reflect.TypeOf(x)
+		if ref == nil {
+			return nil, errors.New("Only binary expression in for condition allowed found <nil>")
+		}
 		return nil, errors.New("Only binary expression in for condition allowed found " + reflect.TypeOf(x).String())
 	}
 
@@ -701,6 +733,7 @@ func (g *Generator) GenerateVHDL(verbose bool) string {
 			ps += s.Size * s.Len
 		}
 		for _, s := range s.ReturnVars {
+			fmt.Printf("%s has size %d\n", s.Typ, s.Len)
 			rs += s.Size * s.Len
 		}
 
