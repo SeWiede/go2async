@@ -9,6 +9,7 @@ import (
 )
 
 var verbose bool
+var intSize *int
 
 func newGo2AsyncCommand() (*cobra.Command, error) {
 	cmd := &cobra.Command{
@@ -37,6 +38,7 @@ func main() {
 	}
 
 	genCmd.Flags().BoolVar(&verbose, "verbose", false, "Print informationa about internal signals")
+	intSize = genCmd.Flags().Int("intSize", 4, "overrides default intSize")
 	cmd.AddCommand(genCmd)
 
 	if _, err := cmd.ExecuteC(); err != nil {
@@ -57,7 +59,7 @@ func generate(c *cobra.Command, args []string) error {
 		outfile = of
 	}
 
-	gen := hwgenerator.NewGenerator()
+	gen := hwgenerator.NewGenerator(*intSize)
 	if err := gen.ParseGoFile(file); err != nil {
 		fmt.Println("Parsing go file failed: ", err.Error())
 		return nil

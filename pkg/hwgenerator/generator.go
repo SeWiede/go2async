@@ -17,7 +17,7 @@ import (
 var ErrNotImplemented = errors.New("Not implemented")
 var ErrTypeNotSupported = errors.New("Type is not supported")
 
-var SupportedTypes map[string]int = map[string]int{"int": 4, "int8": 8, "int16": 16, "int32": 32, "int64": 64, "uint": 4, "uint8": 8, "uint16": 16, "uint32": 32, "uint64": 64, "byte": 8}
+var SupportedTypes map[string]int = map[string]int{"int": strconv.IntSize, "int8": 8, "int16": 16, "int32": 32, "int64": 64, "uint": 4, "uint8": 8, "uint16": 16, "uint32": 32, "uint64": 64, "byte": 8}
 
 type Generator struct {
 	wires          int
@@ -30,7 +30,9 @@ type Generator struct {
 // current variable pos
 var cvp = 0
 
-func NewGenerator() *Generator {
+func NewGenerator(intSize int) *Generator {
+	SupportedTypes["int"] = intSize
+
 	return &Generator{
 		wires:          0,
 		knownVariables: make(map[string]*variable.VariableInfo),
@@ -732,8 +734,8 @@ func (g *Generator) GenerateVHDL(verbose bool) string {
 		for _, s := range s.Params {
 			ps += s.Size * s.Len
 		}
-		for _, s := range s.ReturnVars {
-			fmt.Printf("%s has size %d\n", s.Typ, s.Len)
+		for i, s := range s.ReturnVars {
+			fmt.Printf("return %d type %s has size %d len %d\n", i, s.Typ, s.Size, s.Len)
 			rs += s.Size * s.Len
 		}
 
