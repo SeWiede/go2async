@@ -17,7 +17,7 @@ import (
 var ErrNotImplemented = errors.New("Not implemented")
 var ErrTypeNotSupported = errors.New("Type is not supported")
 
-var SupportedTypes map[string]int = map[string]int{"int": strconv.IntSize, "int8": 8, "int16": 16, "int32": 32, "int64": 64, "uint": 4, "uint8": 8, "uint16": 16, "uint32": 32, "uint64": 64, "byte": 8}
+var SupportedTypes map[string]int = map[string]int{"int": strconv.IntSize, "int8": 8, "int16": 16, "int32": 32, "int64": 64, "uint": strconv.IntSize, "uint8": 8, "uint16": 16, "uint32": 32, "uint64": 64, "byte": 8}
 
 type Generator struct {
 	wires          int
@@ -32,6 +32,7 @@ var cvp = 0
 
 func NewGenerator(intSize int) *Generator {
 	SupportedTypes["int"] = intSize
+	SupportedTypes["uint"] = intSize
 
 	return &Generator{
 		wires:          0,
