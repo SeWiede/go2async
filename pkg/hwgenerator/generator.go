@@ -776,6 +776,7 @@ func (g *Generator) GenerateVHDL(verbose bool) string {
 }
 
 func (g *Generator) SaveVHDL(file *os.File, verbose bool) error {
+	file.Truncate(0)
 	_, err := file.Write([]byte(g.GenerateVHDL(verbose)))
 	if err != nil {
 		return err
