@@ -24,18 +24,18 @@ ENTITY decoupled_hs_reg IS
   GENERIC (
     DATA_WIDTH : NATURAL := 8;
     VALUE : NATURAL := 0;
-    PHASE_INIT_IN : std_logic := '0';
-    PHASE_INIT_OUT : std_logic := '0');
+    PHASE_INIT_IN : STD_LOGIC := '0';
+    PHASE_INIT_OUT : STD_LOGIC := '0');
   PORT (
-    rst : IN std_logic;
+    rst : IN STD_LOGIC;
     -- Input channel
-    in_ack : OUT std_logic;
-    in_req : IN std_logic;
-    in_data : IN std_logic_vector(DATA_WIDTH - 1 DOWNTO 0);
+    in_ack : OUT STD_LOGIC;
+    in_req : IN STD_LOGIC;
+    in_data : IN STD_LOGIC_VECTOR(DATA_WIDTH - 1 DOWNTO 0);
     -- Output channel
-    out_req : OUT std_logic;
-    out_data : OUT std_logic_vector(DATA_WIDTH - 1 DOWNTO 0);
-    out_ack : IN std_logic);
+    out_req : OUT STD_LOGIC;
+    out_data : OUT STD_LOGIC_VECTOR(DATA_WIDTH - 1 DOWNTO 0);
+    out_ack : IN STD_LOGIC);
 END decoupled_hs_reg;
 LIBRARY IEEE;
 USE IEEE.STD_LOGIC_1164.ALL;
@@ -48,15 +48,15 @@ ENTITY LoopBlock IS
     DATA_WIDTH : NATURAL := 8
   );
   PORT (
-    rst : IN std_logic;
+    rst : IN STD_LOGIC;
     -- Input channel
-    in_req : IN std_logic;
-    in_ack : OUT std_logic;
-    in_data : IN std_logic_vector(DATA_WIDTH - 1 DOWNTO 0);
+    in_req : IN STD_LOGIC;
+    in_ack : OUT STD_LOGIC;
+    in_data : IN STD_LOGIC_VECTOR(DATA_WIDTH - 1 DOWNTO 0);
     -- Output channel
-    out_req : OUT std_logic;
-    out_ack : IN std_logic;
-    out_data : OUT std_logic_vector(DATA_WIDTH - 1 DOWNTO 0));
+    out_req : OUT STD_LOGIC;
+    out_ack : IN STD_LOGIC;
+    out_data : OUT STD_LOGIC_VECTOR(DATA_WIDTH - 1 DOWNTO 0));
 END LoopBlock;
 
 LIBRARY IEEE;
@@ -65,23 +65,23 @@ USE work.click_element_library_constants.ALL;
 ENTITY merge IS
   GENERIC (
     DATA_WIDTH : NATURAL := 8;
-    PHASE_INIT_C : std_logic := '0';
-    PHASE_INIT_A : std_logic := '0';
-    PHASE_INIT_B : std_logic := '0');
+    PHASE_INIT_C : STD_LOGIC := '0';
+    PHASE_INIT_A : STD_LOGIC := '0';
+    PHASE_INIT_B : STD_LOGIC := '0');
   PORT (
-    rst : IN std_logic;
+    rst : IN STD_LOGIC;
     --Input channel 1
-    inA_req : IN std_logic;
-    inA_ack : OUT std_logic;
-    inA_data : IN std_logic_vector(DATA_WIDTH - 1 DOWNTO 0);
+    inA_req : IN STD_LOGIC;
+    inA_ack : OUT STD_LOGIC;
+    inA_data : IN STD_LOGIC_VECTOR(DATA_WIDTH - 1 DOWNTO 0);
     -- Input channel 2
-    inB_req : IN std_logic;
-    inB_ack : OUT std_logic;
-    inB_data : IN std_logic_vector(DATA_WIDTH - 1 DOWNTO 0);
+    inB_req : IN STD_LOGIC;
+    inB_ack : OUT STD_LOGIC;
+    inB_data : IN STD_LOGIC_VECTOR(DATA_WIDTH - 1 DOWNTO 0);
     -- Output channel
-    outC_req : OUT std_logic;
-    outC_data : OUT std_logic_vector(DATA_WIDTH - 1 DOWNTO 0);
-    outC_ack : IN std_logic
+    outC_req : OUT STD_LOGIC;
+    outC_data : OUT STD_LOGIC_VECTOR(DATA_WIDTH - 1 DOWNTO 0);
+    outC_ack : IN STD_LOGIC
   );
 END merge;
 
@@ -96,13 +96,13 @@ ENTITY funcBlock IS
     DATA_WIDTH : NATURAL := 8
   );
   PORT (-- Input channel
-    in_req : IN std_logic;
-    in_ack : OUT std_logic;
-    in_data : IN std_logic_vector(DATA_WIDTH - 1 DOWNTO 0);
+    in_req : IN STD_LOGIC;
+    in_ack : OUT STD_LOGIC;
+    in_data : IN STD_LOGIC_VECTOR(DATA_WIDTH - 1 DOWNTO 0);
     -- Output channel
-    out_req : OUT std_logic;
-    out_ack : IN std_logic;
-    out_data : OUT std_logic_vector(DATA_WIDTH - 1 DOWNTO 0));
+    out_req : OUT STD_LOGIC;
+    out_ack : IN STD_LOGIC;
+    out_data : OUT STD_LOGIC_VECTOR(DATA_WIDTH - 1 DOWNTO 0));
 END funcBlock;
 LIBRARY ieee;
 USE ieee.std_logic_1164.ALL;
@@ -111,28 +111,28 @@ ENTITY mux IS
   --generic for initializing the phase registers
   GENERIC (
     DATA_WIDTH : NATURAL := 8;
-    PHASE_INIT_C : std_logic := '0';
-    PHASE_INIT_A : std_logic := '0';
-    PHASE_INIT_B : std_logic := '0';
-    PHASE_INIT_SEL : std_logic := '0');
+    PHASE_INIT_C : STD_LOGIC := '0';
+    PHASE_INIT_A : STD_LOGIC := '0';
+    PHASE_INIT_B : STD_LOGIC := '0';
+    PHASE_INIT_SEL : STD_LOGIC := '0');
   PORT (
-    rst : IN std_logic; -- rst line
+    rst : IN STD_LOGIC; -- rst line
     -- Input from channel 1
-    inA_req : IN std_logic;
-    inA_data : IN std_logic_vector(DATA_WIDTH - 1 DOWNTO 0);
-    inA_ack : OUT std_logic;
+    inA_req : IN STD_LOGIC;
+    inA_data : IN STD_LOGIC_VECTOR(DATA_WIDTH - 1 DOWNTO 0);
+    inA_ack : OUT STD_LOGIC;
     -- Input from channel 2
-    inB_req : IN std_logic;
-    inB_data : IN std_logic_vector(DATA_WIDTH - 1 DOWNTO 0);
-    inB_ack : OUT std_logic;
+    inB_req : IN STD_LOGIC;
+    inB_data : IN STD_LOGIC_VECTOR(DATA_WIDTH - 1 DOWNTO 0);
+    inB_ack : OUT STD_LOGIC;
     -- Output port 
-    outC_req : OUT std_logic;
-    outC_data : OUT std_logic_vector(DATA_WIDTH - 1 DOWNTO 0);
-    outC_ack : IN std_logic;
+    outC_req : OUT STD_LOGIC;
+    outC_data : OUT STD_LOGIC_VECTOR(DATA_WIDTH - 1 DOWNTO 0);
+    outC_ack : IN STD_LOGIC;
     -- Select port
-    inSel_req : IN std_logic;
-    inSel_ack : OUT std_logic;
-    selector : IN std_logic_vector(0 DOWNTO 0)
+    inSel_req : IN STD_LOGIC;
+    inSel_ack : OUT STD_LOGIC;
+    selector : IN STD_LOGIC_VECTOR(0 DOWNTO 0)
   );
 END mux;
 
@@ -142,28 +142,28 @@ USE work.click_element_library_constants.ALL;
 ENTITY demux IS
   GENERIC (
     DATA_WIDTH : NATURAL := 8;
-    PHASE_INIT_A : std_logic := '0';
-    PHASE_INIT_B : std_logic := '0';
-    PHASE_INIT_C : std_logic := '0'
+    PHASE_INIT_A : STD_LOGIC := '0';
+    PHASE_INIT_B : STD_LOGIC := '0';
+    PHASE_INIT_C : STD_LOGIC := '0'
   );
   PORT (
-    rst : IN std_logic;
+    rst : IN STD_LOGIC;
     -- Input port
-    inA_req : IN std_logic;
-    inA_data : IN std_logic_vector(DATA_WIDTH - 1 DOWNTO 0);
-    inA_ack : OUT std_logic;
+    inA_req : IN STD_LOGIC;
+    inA_data : IN STD_LOGIC_VECTOR(DATA_WIDTH - 1 DOWNTO 0);
+    inA_ack : OUT STD_LOGIC;
     -- Select port 
-    inSel_req : IN std_logic;
-    inSel_ack : OUT std_logic;
-    selector : IN std_logic_vector(0 DOWNTO 0);
+    inSel_req : IN STD_LOGIC;
+    inSel_ack : OUT STD_LOGIC;
+    selector : IN STD_LOGIC_VECTOR(0 DOWNTO 0);
     -- Output channel 1
-    outB_req : OUT std_logic;
-    outB_data : OUT std_logic_vector(DATA_WIDTH - 1 DOWNTO 0);
-    outB_ack : IN std_logic;
+    outB_req : OUT STD_LOGIC;
+    outB_data : OUT STD_LOGIC_VECTOR(DATA_WIDTH - 1 DOWNTO 0);
+    outB_ack : IN STD_LOGIC;
     -- Output channel 2
-    outC_req : OUT std_logic;
-    outC_data : OUT std_logic_vector(DATA_WIDTH - 1 DOWNTO 0);
-    outC_ack : IN std_logic
+    outC_req : OUT STD_LOGIC;
+    outC_data : OUT STD_LOGIC_VECTOR(DATA_WIDTH - 1 DOWNTO 0);
+    outC_ack : IN STD_LOGIC
   );
 END demux;
 LIBRARY IEEE;
@@ -176,23 +176,23 @@ ENTITY reg_fork IS
   GENERIC (
     DATA_WIDTH : NATURAL := 8;
     VALUE : NATURAL := 0;
-    PHASE_INIT_A : std_logic := '0';
-    PHASE_INIT_B : std_logic := '0';
-    PHASE_INIT_C : std_logic := '0');
+    PHASE_INIT_A : STD_LOGIC := '0';
+    PHASE_INIT_B : STD_LOGIC := '0';
+    PHASE_INIT_C : STD_LOGIC := '0');
   PORT (
-    rst : IN std_logic;
+    rst : IN STD_LOGIC;
     --Input channel
-    inA_req : IN std_logic;
-    inA_data : IN std_logic_vector(DATA_WIDTH - 1 DOWNTO 0);
-    inA_ack : OUT std_logic;
+    inA_req : IN STD_LOGIC;
+    inA_data : IN STD_LOGIC_VECTOR(DATA_WIDTH - 1 DOWNTO 0);
+    inA_ack : OUT STD_LOGIC;
     --Output channel 1
-    outB_req : OUT std_logic;
-    outB_data : OUT std_logic_vector(DATA_WIDTH - 1 DOWNTO 0);
-    outB_ack : IN std_logic;
+    outB_req : OUT STD_LOGIC;
+    outB_data : OUT STD_LOGIC_VECTOR(DATA_WIDTH - 1 DOWNTO 0);
+    outB_ack : IN STD_LOGIC;
     --Output channel 2
-    outC_req : OUT std_logic;
-    outC_data : OUT std_logic_vector(DATA_WIDTH - 1 DOWNTO 0);
-    outC_ack : IN std_logic
+    outC_req : OUT STD_LOGIC;
+    outC_data : OUT STD_LOGIC_VECTOR(DATA_WIDTH - 1 DOWNTO 0);
+    outC_ack : IN STD_LOGIC
   );
 END reg_fork;
 
@@ -202,21 +202,21 @@ USE work.click_element_library_constants.ALL;
 ENTITY fork IS
   GENERIC (
     DATA_WIDTH : NATURAL := 8;
-    PHASE_INIT : std_logic := '0');
+    PHASE_INIT : STD_LOGIC := '0');
   PORT (
-    rst : IN std_logic;
+    rst : IN STD_LOGIC;
     --Input channel
-    inA_req : IN std_logic;
-    inA_data : IN std_logic_vector(DATA_WIDTH - 1 DOWNTO 0);
-    inA_ack : OUT std_logic;
+    inA_req : IN STD_LOGIC;
+    inA_data : IN STD_LOGIC_VECTOR(DATA_WIDTH - 1 DOWNTO 0);
+    inA_ack : OUT STD_LOGIC;
     --Output channel 1
-    outB_req : OUT std_logic;
-    outB_data : OUT std_logic_vector(DATA_WIDTH - 1 DOWNTO 0);
-    outB_ack : IN std_logic;
+    outB_req : OUT STD_LOGIC;
+    outB_data : OUT STD_LOGIC_VECTOR(DATA_WIDTH - 1 DOWNTO 0);
+    outB_ack : IN STD_LOGIC;
     --Output channel 2
-    outC_req : OUT std_logic;
-    outC_data : OUT std_logic_vector(DATA_WIDTH - 1 DOWNTO 0);
-    outC_ack : IN std_logic
+    outC_req : OUT STD_LOGIC;
+    outC_data : OUT STD_LOGIC_VECTOR(DATA_WIDTH - 1 DOWNTO 0);
+    outC_ack : IN STD_LOGIC
   );
 END fork;
 
@@ -232,13 +232,13 @@ ENTITY Selector IS
   );
   PORT (
     -- Data
-    in_data : IN std_logic_vector(DATA_WIDTH - 1 DOWNTO 0);
-    in_req : IN std_logic;
-    in_ack : OUT std_logic;
+    in_data : IN STD_LOGIC_VECTOR(DATA_WIDTH - 1 DOWNTO 0);
+    in_req : IN STD_LOGIC;
+    in_ack : OUT STD_LOGIC;
     -- Selector
-    selector : OUT std_logic_vector(0 DOWNTO 0);
-    out_req : OUT std_logic;
-    out_ack : IN std_logic
+    selector : OUT STD_LOGIC_VECTOR(0 DOWNTO 0);
+    out_req : OUT STD_LOGIC;
+    out_ack : IN STD_LOGIC
   );
 END Selector;
 
@@ -253,14 +253,14 @@ ENTITY IfBlock IS
     DATA_WIDTH : NATURAL := 8
   );
   PORT (
-    rst : IN std_logic;-- Input channel
-    in_req : IN std_logic;
-    in_ack : OUT std_logic;
-    in_data : IN std_logic_vector(DATA_WIDTH - 1 DOWNTO 0);
+    rst : IN STD_LOGIC;-- Input channel
+    in_req : IN STD_LOGIC;
+    in_ack : OUT STD_LOGIC;
+    in_data : IN STD_LOGIC_VECTOR(DATA_WIDTH - 1 DOWNTO 0);
     -- Output channel
-    out_req : OUT std_logic;
-    out_ack : IN std_logic;
-    out_data : OUT std_logic_vector(DATA_WIDTH - 1 DOWNTO 0));
+    out_req : OUT STD_LOGIC;
+    out_ack : IN STD_LOGIC;
+    out_data : OUT STD_LOGIC_VECTOR(DATA_WIDTH - 1 DOWNTO 0));
 END IfBlock;
 LIBRARY IEEE;
 USE IEEE.STD_LOGIC_1164.ALL;
@@ -271,19 +271,20 @@ USE work.click_element_library_constants.ALL;
 
 ENTITY BlockC IS
   GENERIC (
-    DATA_WIDTH : NATURAL := 8
+    DATA_IN_WIDTH : NATURAL := 8;
+    DATA_OUT_WIDTH : NATURAL := 8
   );
   PORT (
-    rst : IN std_logic;
+    rst : IN STD_LOGIC;
     -- Input channel
     -- Data
-    in_data : IN std_logic_vector(DATA_WIDTH - 1 DOWNTO 0);
-    in_req : IN std_logic;
-    in_ack : OUT std_logic;
+    in_data : IN STD_LOGIC_VECTOR(DATA_IN_WIDTH - 1 DOWNTO 0);
+    in_req : IN STD_LOGIC;
+    in_ack : OUT STD_LOGIC;
     -- Selector
-    out_data : OUT std_logic_vector(DATA_WIDTH - 1 DOWNTO 0);
-    out_req : OUT std_logic;
-    out_ack : IN std_logic
+    out_data : OUT STD_LOGIC_VECTOR(DATA_OUT_WIDTH - 1 DOWNTO 0);
+    out_req : OUT STD_LOGIC;
+    out_ack : IN STD_LOGIC
   );
 END BlockC;
 
@@ -301,30 +302,30 @@ ENTITY Scope IS
     OUT_DATA_WIDTH : NATURAL := 8
   );
   PORT (
-    rst : IN std_logic;
+    rst : IN STD_LOGIC;
     -- Input channel
     -- Data
-    in_data : IN std_logic_vector(IN_DATA_WIDTH - 1 DOWNTO 0);
-    in_req : IN std_logic;
-    in_ack : OUT std_logic;
+    in_data : IN STD_LOGIC_VECTOR(IN_DATA_WIDTH - 1 DOWNTO 0);
+    in_req : IN STD_LOGIC;
+    in_ack : OUT STD_LOGIC;
     -- Selector
-    out_data : OUT std_logic_vector(OUT_DATA_WIDTH - 1 DOWNTO 0);
-    out_req : OUT std_logic;
-    out_ack : IN std_logic
+    out_data : OUT STD_LOGIC_VECTOR(OUT_DATA_WIDTH - 1 DOWNTO 0);
+    out_req : OUT STD_LOGIC;
+    out_ack : IN STD_LOGIC
   );
 END Scope;
 ARCHITECTURE beh OF mux IS
   -- the registers
-  SIGNAL phase_c, phase_sel, inSel_token : std_logic;
+  SIGNAL phase_c, phase_sel, inSel_token : STD_LOGIC;
   -- register control
-  SIGNAL phase_a : std_logic;
-  SIGNAL phase_b : std_logic;
+  SIGNAL phase_a : STD_LOGIC;
+  SIGNAL phase_b : STD_LOGIC;
   -- Clock
-  SIGNAL click_req, click_ack : std_logic;
-  SIGNAL pulse : std_logic;
+  SIGNAL click_req, click_ack : STD_LOGIC;
+  SIGNAL pulse : STD_LOGIC;
   -- control gates
-  SIGNAL inA_token, inB_token : std_logic;
-  SIGNAL selected_a, selected_b : std_logic;
+  SIGNAL inA_token, inB_token : STD_LOGIC;
+  SIGNAL selected_a, selected_b : STD_LOGIC;
 
   ATTRIBUTE dont_touch : STRING;
   ATTRIBUTE dont_touch OF phase_sel, phase_c, phase_a, phase_b : SIGNAL IS "true";
@@ -377,10 +378,10 @@ END beh;
 
 ARCHITECTURE behavioural OF merge IS
 
-  SIGNAL inA_token, inB_token, outC_bubble : std_logic;
-  SIGNAL phase_a, phase_b, phase_c : std_logic;
-  SIGNAL click : std_logic;
-  SIGNAL data_reg, data_sig : std_logic_vector(DATA_WIDTH - 1 DOWNTO 0);
+  SIGNAL inA_token, inB_token, outC_bubble : STD_LOGIC;
+  SIGNAL phase_a, phase_b, phase_c : STD_LOGIC;
+  SIGNAL click : STD_LOGIC;
+  SIGNAL data_reg, data_sig : STD_LOGIC_VECTOR(DATA_WIDTH - 1 DOWNTO 0);
 
   ATTRIBUTE dont_touch : STRING;
   ATTRIBUTE dont_touch OF phase_c, phase_a, phase_b, inA_token, inB_token : SIGNAL IS "true";
@@ -423,11 +424,11 @@ END behavioural;
 
 ARCHITECTURE beh OF demux IS
 
-  SIGNAL phase_a : std_logic;
-  SIGNAL click_req, click_ack : std_logic;
+  SIGNAL phase_a : STD_LOGIC;
+  SIGNAL click_req, click_ack : STD_LOGIC;
 
-  SIGNAL phase_b : std_logic;
-  SIGNAL phase_c : std_logic;
+  SIGNAL phase_b : STD_LOGIC;
+  SIGNAL phase_c : STD_LOGIC;
 
 BEGIN
 
@@ -469,14 +470,15 @@ END beh;
 
 ARCHITECTURE behavioural OF decoupled_hs_reg IS
 
-  SIGNAL phase_in, phase_out : std_logic;
-  SIGNAL data_sig : std_logic_vector(DATA_WIDTH - 1 DOWNTO 0);
-  SIGNAL click : std_logic;
+  SIGNAL phase_in, phase_out, in_req_d, out_ack_d : STD_LOGIC;
+  SIGNAL data_sig : STD_LOGIC_VECTOR(DATA_WIDTH - 1 DOWNTO 0);
+  SIGNAL click : STD_LOGIC;
 
   ATTRIBUTE dont_touch : STRING;
   ATTRIBUTE dont_touch OF phase_in, phase_out : SIGNAL IS "true";
   ATTRIBUTE dont_touch OF data_sig : SIGNAL IS "true";
   ATTRIBUTE dont_touch OF click : SIGNAL IS "true";
+  ATTRIBUTE dont_touch OF in_req_d, out_ack_d : SIGNAL IS "true";
 
 BEGIN
   out_req <= phase_out;
@@ -488,7 +490,7 @@ BEGIN
     IF rst = '1' THEN
       phase_in <= PHASE_INIT_IN;
       phase_out <= PHASE_INIT_OUT;
-      data_sig <= std_logic_vector(to_unsigned(VALUE, DATA_WIDTH));
+      data_sig <= STD_LOGIC_VECTOR(to_unsigned(VALUE, DATA_WIDTH));
     ELSIF rising_edge(click) THEN
       phase_in <= NOT phase_in AFTER REG_CQ_DELAY;
       phase_out <= NOT phase_out AFTER REG_CQ_DELAY;
@@ -496,14 +498,32 @@ BEGIN
     END IF;
   END PROCESS;
 
-  click <= (in_req XOR phase_in) AND (out_ack XNOR phase_out) AFTER AND2_DELAY + XOR_DELAY;
+  delay_req : ENTITY work.delay_element
+    GENERIC MAP(
+      NUM_LCELLS => 16 -- Delay  size
+    )
+    PORT MAP(
+      i => in_req,
+      o => in_req_d
+    );
+
+  delay_ack : ENTITY work.delay_element
+    GENERIC MAP(
+      NUM_LCELLS => 16 -- Delay  size
+    )
+    PORT MAP(
+      i => out_ack,
+      o => out_ack_d
+    );
+
+  click <= (in_req_d XOR phase_in) AND (out_ack_d XNOR phase_out) AFTER AND2_DELAY + XOR_DELAY;
 
 END behavioural;
 
 ARCHITECTURE beh OF fork IS
 
-  SIGNAL click : std_logic;
-  SIGNAL phase : std_logic := PHASE_INIT;
+  SIGNAL click : STD_LOGIC;
+  SIGNAL phase : STD_LOGIC := PHASE_INIT;
 
   ATTRIBUTE dont_touch : STRING;
   ATTRIBUTE dont_touch OF phase : SIGNAL IS "true";
@@ -520,7 +540,7 @@ BEGIN
   click <= (outC_ack AND outB_ack AND NOT(phase)) OR (NOT(outC_ack) AND NOT(outB_ack) AND phase) AFTER AND3_DELAY + OR2_DELAY;
 
   clock_regs : PROCESS (click, rst)
-  begin
+  BEGIN
     IF rst = '1' THEN
       phase <= PHASE_INIT;
     ELSE
@@ -533,10 +553,10 @@ BEGIN
 END beh;
 ARCHITECTURE beh OF reg_fork IS
 
-  SIGNAL click : std_logic;
-  SIGNAL phase_a : std_logic;
-  SIGNAL phase_b, phase_c, outB_bubble, outC_bubble, inA_token : std_logic;
-  SIGNAL data_reg : std_logic_vector(DATA_WIDTH - 1 DOWNTO 0);
+  SIGNAL click : STD_LOGIC;
+  SIGNAL phase_a : STD_LOGIC;
+  SIGNAL phase_b, phase_c, outB_bubble, outC_bubble, inA_token : STD_LOGIC;
+  SIGNAL data_reg : STD_LOGIC_VECTOR(DATA_WIDTH - 1 DOWNTO 0);
 
   ATTRIBUTE dont_touch : STRING;
   ATTRIBUTE dont_touch OF phase_b, phase_a, phase_c : SIGNAL IS "true";
@@ -556,7 +576,7 @@ BEGIN
       phase_a <= PHASE_INIT_A;
       phase_b <= PHASE_INIT_B;
       phase_c <= PHASE_INIT_C;
-      data_reg <= std_logic_vector(to_unsigned(VALUE, DATA_WIDTH));
+      data_reg <= STD_LOGIC_VECTOR(to_unsigned(VALUE, DATA_WIDTH));
     ELSIF rising_edge(click) THEN
       phase_a <= NOT phase_a AFTER REG_CQ_DELAY;
       phase_b <= NOT phase_b AFTER REG_CQ_DELAY;
