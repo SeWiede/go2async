@@ -8,8 +8,9 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var verbose bool
-var intSize *int
+var Verbose bool
+var IntSize *int
+var Debug *bool
 
 func newGo2AsyncCommand() (*cobra.Command, error) {
 	cmd := &cobra.Command{
@@ -21,7 +22,7 @@ func newGo2AsyncCommand() (*cobra.Command, error) {
 	}
 
 	// does nothing for now
-	cmd.PersistentFlags().Bool("debug", false, "Enables debug mode")
+	Debug = cmd.PersistentFlags().Bool("debug", false, "Enables debug mode")
 
 	return cmd, nil
 }
@@ -37,8 +38,8 @@ func main() {
 		Args:    cobra.RangeArgs(1, 2),
 	}
 
-	genCmd.Flags().BoolVar(&verbose, "verbose", false, "Print informationa about internal signals")
-	intSize = genCmd.Flags().Int("intSize", 4, "overrides default intSize")
+	genCmd.Flags().BoolVar(&Verbose, "verbose", false, "Print informationa about internal signals")
+	IntSize = genCmd.Flags().Int("intSize", 4, "overrides default intSize")
 	cmd.AddCommand(genCmd)
 
 	if _, err := cmd.ExecuteC(); err != nil {
@@ -59,13 +60,13 @@ func generate(c *cobra.Command, args []string) error {
 		outfile = of
 	}
 
-	gen := hwgenerator.NewGenerator(*intSize)
+	gen := hwgenerator.NewGenerator(*IntSize)
 	if err := gen.ParseGoFile(file); err != nil {
 		fmt.Println("Parsing go file failed: ", err.Error())
 		return nil
 	}
 
-	if err := gen.SaveVHDL(outfile, verbose); err != nil {
+	if err := gen.SaveVHDL(outfile, Verbose); err != nil {
 		fmt.Println("Saving vhdl failed: ", err.Error())
 		return nil
 	}

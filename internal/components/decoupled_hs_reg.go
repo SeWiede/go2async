@@ -13,7 +13,7 @@ type Reg struct {
 	PhaseOut bool
 
 	StartValue string
-	DataWidth  string
+	DataWidth  *int
 
 	In  *HandshakeChannel
 	Out *HandshakeChannel
@@ -21,14 +21,12 @@ type Reg struct {
 
 var regNr = 0
 
-func NewReg(dataWidth string, phaseOut bool, startValue string) *Reg {
+func NewReg(dataWidth *int, phaseOut bool, startValue string) *Reg {
 	nr := regNr
 	regNr++
 
 	name := strings.ToLower(regPrefix + strconv.Itoa(nr))
-	if dataWidth == "" {
-		dataWidth = "DATA_WIDTH"
-	}
+
 	return &Reg{
 		Nr:         nr,
 		archName:   defaultArch,
@@ -39,10 +37,11 @@ func NewReg(dataWidth string, phaseOut bool, startValue string) *Reg {
 			Out: false,
 		},
 		Out: &HandshakeChannel{
-			Req:  name + "_o_req",
-			Ack:  name + "_o_ack",
-			Data: name + "_data",
-			Out:  true,
+			Req:       name + "_o_req",
+			Ack:       name + "_o_ack",
+			Data:      name + "_data",
+			Out:       true,
+			DataWidth: dataWidth,
 		},
 	}
 }
@@ -61,9 +60,15 @@ func (r *Reg) Component() string {
 	if r.PhaseOut {
 		phaseOutString = "PHASE_INIT_OUT => '1'"
 	}
+
+	dataWidthStr := "DATA_WIDTH"
+	if r.DataWidth != nil && *r.DataWidth > 0 {
+		dataWidthStr = strconv.Itoa(*r.DataWidth)
+	}
+
 	return name + `: entity work.decoupled_hs_reg(` + r.archName + `)
   generic map (
-    DATA_WIDTH => ` + r.DataWidth + `,
+    DATA_WIDTH => ` + dataWidthStr + `,
     VALUE => ` + r.StartValue + `,
     PHASE_INIT_IN => '0',
     ` + phaseOutString + `
@@ -72,10 +77,10 @@ func (r *Reg) Component() string {
     rst => rst,
     in_ack => ` + r.In.Ack + `,
     in_req => ` + r.In.Req + `,
-    in_data => ` + r.In.Data + `,
+    in_data => std_logic_vector(resize(unsigned(` + r.In.Data + `), ` + strconv.Itoa(*r.DataWidth) + `)),
     -- Output channel
     out_req => ` + r.Out.Req + `,
-    out_data => ` + r.Out.Data + `,
+    out_data => ` + r.Out.Data + `(` + dataWidthStr + ` - 1 downto 0),
     out_ack => ` + r.Out.Ack + `
   );
   `
@@ -86,7 +91,7 @@ func (r *Reg) Architecture() string {
 
 	return `architecture ` + r.archName + ` of decoupled_hs_reg is
   signal phase_in, phase_out, in_req_d, out_ack_d : std_logic;
-  signal data_sig: std_logic_vector(OUT_DATA_WIDTH-1 downto 0);
+  signal data_sig: std_logic_vector(DATA_WIDTH - 1 downto 0);
   signal click : std_logic;
   
   attribute dont_touch : string;
@@ -105,7 +110,7 @@ begin
     if rst = '1' then
       phase_in <= PHASE_INIT_IN;
       phase_out <= PHASE_INIT_OUT;
-      data_sig <= std_logic_vector(to_unsigned(VALUE, OUT_DATA_WIDTH));
+      data_sig <= std_logic_vector(to_unsigned(VALUE, DATA_WIDTH));
     elsif rising_edge(click) then
       phase_in <= not phase_in after REG_CQ_DELAY;
       phase_out <= not phase_out after REG_CQ_DELAY;

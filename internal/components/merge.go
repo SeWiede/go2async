@@ -50,10 +50,10 @@ func (d *Merge) Component() string {
   )
   port map (
     inA_ack => ` + d.In1.Ack + `,
-    inA_data => ` + d.In1.Data + `,
+    inA_data => ` + d.In1.Data + `(DATA_WIDTH - 1 downto 0),
     inA_req => ` + d.In1.Req + `,
     inB_ack => ` + d.In2.Ack + `,
-    inB_data => ` + d.In2.Data + `,
+    inB_data => ` + d.In2.Data + `(DATA_WIDTH - 1 downto 0),
     inB_req => ` + d.In2.Req + `,
     outC_ack => ` + d.Out.Ack + `,
     outC_data => ` + d.Out.Data + `,

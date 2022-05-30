@@ -47,7 +47,7 @@ func NewScope(name string, block *Block, params, vars map[string]*variable.Varia
 	entryIn := &HandshakeChannel{
 		Req:  "in_req",
 		Ack:  "in_ack",
-		Data: "std_logic_vector(resize(unsigned(in_data), DATA_WIDTH))", // "in_data",
+		Data: "in_data",
 		Out:  true,
 	}
 
@@ -58,7 +58,7 @@ func NewScope(name string, block *Block, params, vars map[string]*variable.Varia
 		rs += s.Size
 	}
 
-	s.OutReg = NewReg("DATA_WIDTH", false, "0")
+	s.OutReg = NewReg(&s.Block.OutputSize, false, "0")
 
 	s.Block.Out.Connect(s.OutReg.In)
 

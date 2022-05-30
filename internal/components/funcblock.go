@@ -21,7 +21,12 @@ type FuncBlock struct {
 	In  *HandshakeChannel
 	Out *HandshakeChannel
 
+	variables map[string]*variable.VariableInfo
+
 	Oi *OperandInfo
+
+	predecessor   BodyComponent
+	variablesSize int
 }
 
 type OperandInfo struct {
@@ -30,13 +35,13 @@ type OperandInfo struct {
 
 var fbNr = 0
 
-func NewFuncBlock(op string, vi *OperandInfo) *FuncBlock {
+func NewFuncBlock(op string, vi *OperandInfo, predecessor BodyComponent) *FuncBlock {
 	nr := fbNr
 	fbNr++
 
 	name := strings.ToLower(funcblockprefix + strconv.Itoa(nr))
 
-	return &FuncBlock{
+	ret := &FuncBlock{
 		Nr:        nr,
 		archName:  archPrefix + name,
 		Operation: op,
@@ -50,7 +55,16 @@ func NewFuncBlock(op string, vi *OperandInfo) *FuncBlock {
 			Data: name + "_data",
 			Out:  true,
 		},
+
+		variables: make(map[string]*variable.VariableInfo),
+
+		predecessor:   predecessor,
+		variablesSize: *predecessor.GetVariablesSize(),
 	}
+
+	ret.Out.DataWidth = ret.GetVariablesSize()
+
+	return ret
 }
 
 func (fb *FuncBlock) InChannel() *HandshakeChannel {
@@ -63,15 +77,16 @@ func (fb *FuncBlock) OutChannel() *HandshakeChannel {
 
 func (fb *FuncBlock) Component() string {
 	name := funcblockprefix + strconv.Itoa(fb.Nr)
+
 	return name + `: entity work.funcBlock(` + fb.archName + `)
 	generic map(
-	  DATA_WIDTH => DATA_WIDTH
+	  DATA_WIDTH => ` + strconv.Itoa(*fb.GetVariablesSize()) + `
 	)
 	port map (
 	  -- Input channel
 	  in_req  => ` + fb.In.Req + `,
 	  in_ack  => ` + fb.In.Ack + `, 
-	  in_data => ` + fb.In.Data + `,
+	  in_data => std_logic_vector(resize(unsigned(` + fb.In.Data + `), ` + strconv.Itoa(*fb.GetVariablesSize()) + `)),
 	  -- Output channel
 	  out_req => ` + fb.Out.Req + `,
 	  out_ack => ` + fb.Out.Ack + `,
@@ -208,4 +223,16 @@ func (fb *FuncBlock) Architecture() string {
 
 func (fb *FuncBlock) ArchName() string {
 	return fb.archName
+}
+
+func (fb *FuncBlock) ScopedVariables() map[string]*variable.VariableInfo {
+	return fb.variables
+}
+
+func (fb *FuncBlock) Predecessor() BodyComponent {
+	return fb.predecessor
+}
+
+func (fb *FuncBlock) GetVariablesSize() *int {
+	return &fb.variablesSize
 }

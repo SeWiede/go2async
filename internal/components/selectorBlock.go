@@ -22,16 +22,22 @@ type SelectorBlock struct {
 
 	Oi       *OperandInfo
 	Inverted bool
+
+	predecessor   BodyComponent
+	variablesSize int
 }
 
 var selectorNr = 0
 
-func NewSelectorBlock(op string, variableInfo *OperandInfo, inverted bool) *SelectorBlock {
+var selecTorOutDataWith = 1
+
+func NewSelectorBlock(op string, variableInfo *OperandInfo, inverted bool, predecessor BodyComponent) *SelectorBlock {
 	nr := selectorNr
 	selectorNr++
 
 	name := strings.ToLower(selectorprefix + strconv.Itoa(nr))
-	return &SelectorBlock{
+
+	ret := &SelectorBlock{
 		Nr:        nr,
 		archName:  archPrefix + name,
 		Operation: op,
@@ -43,29 +49,42 @@ func NewSelectorBlock(op string, variableInfo *OperandInfo, inverted bool) *Sele
 			Req:       name + "_o_req",
 			Ack:       name + "_o_ack",
 			Data:      name + "_select",
-			DataWidth: 1,
+			DataWidth: &selecTorOutDataWith,
 			Out:       true,
 		},
 		Inverted: inverted,
+
+		predecessor: predecessor,
+
+		variablesSize: *predecessor.GetVariablesSize(),
 	}
+
+	return ret
 }
 
 func (sb *SelectorBlock) Component() string {
 	name := selectorprefix + strconv.Itoa(sb.Nr)
+
+	/* 	prependStr := ""
+	if *sb.GetVariablesSize() > *sb.predecessor.GetVariablesSize() {
+		prependStr = `(` + strconv.Itoa(*sb.GetVariablesSize()) + ` - 1 downto ` + strconv.Itoa(*sb.predecessor.GetVariablesSize()) + ` => '0') & `
+	} */
+
 	return name + `: entity work.Selector(` + sb.archName + `)
 	generic map(
-	  DATA_WIDTH => DATA_WIDTH
+	  DATA_WIDTH =>  DATA_WIDTH
 	)
 	port map (
 	  -- Input channel
 	  in_req  => ` + sb.In.Req + `,
 	  in_ack  => ` + sb.In.Ack + `, 
-	  in_data => ` + sb.In.Data + `,
+	  in_data =>  std_logic_vector(resize(unsigned(` + sb.In.Data + `), ` + strconv.Itoa(*sb.GetVariablesSize()) + `)),
 	  -- Output channel
 	  out_req => ` + sb.Out.Req + `,
 	  out_ack => ` + sb.Out.Ack + `,
 	  selector  => ` + sb.Out.Data + `
-	);`
+	  );`
+	//` & (` + strconv.Itoa(*sb.GetVariablesSize()) + ` - 1 downto ` + strconv.Itoa(*sb.predecessor.GetVariablesSize()) + ` => '0'),
 }
 
 func (sb *SelectorBlock) getAliases() string {
@@ -158,4 +177,12 @@ func (sb *SelectorBlock) Architecture() string {
 
 func (sb *SelectorBlock) ArchName() string {
 	return sb.archName
+}
+
+func (sb *SelectorBlock) Predecessor() BodyComponent {
+	return sb.predecessor
+}
+
+func (sb *SelectorBlock) GetVariablesSize() *int {
+	return &sb.variablesSize
 }

@@ -4,8 +4,7 @@ import (
 	"fmt"
 )
 
-const defsTemplate = `constant %s_DATA_WIDTH : Integer := %d;
-	constant %s_OUT_DATA_WIDTH : Integer := %d;
+const defsTemplate = `constant %s_OUT_DATA_WIDTH : Integer := %d;
 	constant %s_IN_DATA_WIDTH : Integer := %d;
 	`
 
@@ -35,7 +34,7 @@ func (d *Defs) GetDefs() string {
 	`
 
 	for scope, prop := range d.ScopeProperties {
-		ret += fmt.Sprintf(defsTemplate, scope, prop.sumVarSize,
+		ret += fmt.Sprintf(defsTemplate,
 			scope, prop.returnSize,
 			scope, prop.paramSize)
 		ret += "\n"

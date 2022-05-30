@@ -34,16 +34,19 @@ func NewGenerator(intSize int) *Generator {
 	SupportedTypes["int"] = intSize
 	SupportedTypes["uint"] = intSize
 
+	components.SupportedTypes["int"] = intSize
+	components.SupportedTypes["uint"] = intSize
+
 	return &Generator{
 		wires:          0,
 		knownVariables: make(map[string]*variable.VariableInfo),
 		components:     make(map[string]components.Component),
 		scopes:         make(map[string]*components.Scope),
-		defs:           NewDefs(4),
+		defs:           NewDefs(intSize),
 	}
 }
 
-// NewVariable sets new varible at next pos, does nothing if variable is already known; returns error on unknwon type
+/* // NewVariable sets new varible at next pos, does nothing if variable is already known; returns error on unknwon type
 func (g *Generator) NewVariable(name string, typ string) (*variable.VariableInfo, error) {
 	size, ok := SupportedTypes[typ]
 	if !ok {
@@ -93,14 +96,14 @@ func (g *Generator) GetVariablePos(name string) (*variable.VariableInfo, error) 
 	} else {
 		return kv.Copy(), nil
 	}
-}
+} */
 
 func (g *Generator) GetNextWire() int {
 	g.wires++
 	return g.wires
 }
 
-func (g *Generator) GenerateFuncBlock(result *variable.VariableInfo, be *ast.BinaryExpr) (fb *components.FuncBlock, err error) {
+func (g *Generator) GenerateFuncBlock(result *variable.VariableInfo, be *ast.BinaryExpr, predecessor components.BodyComponent) (fb *components.FuncBlock, err error) {
 	xexpr := be.X
 	yexpr := be.Y
 
@@ -118,14 +121,24 @@ func (g *Generator) GenerateFuncBlock(result *variable.VariableInfo, be *ast.Bin
 			Size:  result.Size,
 		}
 	case *ast.Ident:
-		x, err = g.GetVariablePos(t.Name)
+		/* x, err = g.GetVariablePos(t.Name)
 		if err != nil {
 			return nil, err
+		} */
+
+		x = components.GetVariable(predecessor, t.Name)
+		if x == nil {
+			return nil, errors.New("variableInfo is nil")
 		}
 	case *ast.IndexExpr:
-		x, err = g.GetVariablePos(t.X.(*ast.Ident).Name)
+		/* x, err = g.GetVariablePos(t.X.(*ast.Ident).Name)
 		if err != nil {
 			return nil, err
+		} */
+
+		x = components.GetVariable(predecessor, t.X.(*ast.Ident).Name)
+		if x == nil {
+			return nil, errors.New("variableInfo is nil")
 		}
 
 		switch indexNode := t.Index.(type) {
@@ -135,10 +148,16 @@ func (g *Generator) GenerateFuncBlock(result *variable.VariableInfo, be *ast.Bin
 			}
 			x.Index = indexNode.Value
 		case *ast.Ident:
-			v, err := g.GetVariablePos(indexNode.Name)
+			/* v, err := g.GetVariablePos(indexNode.Name)
 			if err != nil {
 				return nil, err
+			} */
+
+			v := components.GetVariable(predecessor, t.X.(*ast.Ident).Name)
+			if v == nil {
+				return nil, errors.New("variableInfo is nil")
 			}
+
 			x.IndexIdent = v
 		default:
 			return nil, errors.New("Invalid indexing")
@@ -158,14 +177,24 @@ func (g *Generator) GenerateFuncBlock(result *variable.VariableInfo, be *ast.Bin
 			Size:  result.Size,
 		}
 	case *ast.Ident:
-		y, err = g.GetVariablePos(t.Name)
+		/* y, err = g.GetVariablePos(t.Name)
 		if err != nil {
 			return nil, err
+		} */
+
+		y = components.GetVariable(predecessor, t.Name)
+		if y == nil {
+			return nil, errors.New("variableInfo is nil")
 		}
 	case *ast.IndexExpr:
-		y, err = g.GetVariablePos(t.X.(*ast.Ident).Name)
+		/* y, err = g.GetVariablePos(t.X.(*ast.Ident).Name)
 		if err != nil {
 			return nil, err
+		} */
+
+		y = components.GetVariable(predecessor, t.X.(*ast.Ident).Name)
+		if y == nil {
+			return nil, errors.New("variableInfo is nil")
 		}
 
 		switch indexNode := t.Index.(type) {
@@ -175,10 +204,16 @@ func (g *Generator) GenerateFuncBlock(result *variable.VariableInfo, be *ast.Bin
 			}
 			y.Index = indexNode.Value
 		case *ast.Ident:
-			v, err := g.GetVariablePos(indexNode.Name)
+			/* v, err := g.GetVariablePos(indexNode.Name)
 			if err != nil {
 				return nil, err
+			} */
+
+			v := components.GetVariable(predecessor, indexNode.Name)
+			if v == nil {
+				return nil, errors.New("variableInfo is nil")
 			}
+
 			y.IndexIdent = v
 		default:
 			return nil, errors.New("Invalid indexing")
@@ -195,10 +230,10 @@ func (g *Generator) GenerateFuncBlock(result *variable.VariableInfo, be *ast.Bin
 		R: result,
 		X: x,
 		Y: y,
-	}), nil
+	}, predecessor), nil
 }
 
-func (g *Generator) GenerateSelectorBlock(be *ast.BinaryExpr, inverted bool) (c *components.SelectorBlock, err error) {
+func (g *Generator) GenerateSelectorBlock(be *ast.BinaryExpr, inverted bool, predecessor components.BodyComponent) (c *components.SelectorBlock, err error) {
 	xexpr := be.X
 	yexpr := be.Y
 
@@ -215,14 +250,24 @@ func (g *Generator) GenerateSelectorBlock(be *ast.BinaryExpr, inverted bool) (c 
 			Const: t.Value,
 		}
 	case *ast.Ident:
-		x, err = g.GetVariablePos(t.Name)
+		/* x, err = g.GetVariablePos(t.Name)
 		if err != nil {
 			return nil, err
+		} */
+
+		x = components.GetVariable(predecessor, t.Name)
+		if x == nil {
+			return nil, errors.New("variableInfo is nil")
 		}
 	case *ast.IndexExpr:
-		x, err = g.GetVariablePos(t.X.(*ast.Ident).Name)
+		/* x, err = g.GetVariablePos(t.X.(*ast.Ident).Name)
 		if err != nil {
 			return nil, err
+		} */
+
+		x = components.GetVariable(predecessor, t.X.(*ast.Ident).Name)
+		if x == nil {
+			return nil, errors.New("variableInfo is nil")
 		}
 
 		switch indexNode := t.Index.(type) {
@@ -232,10 +277,16 @@ func (g *Generator) GenerateSelectorBlock(be *ast.BinaryExpr, inverted bool) (c 
 			}
 			x.Index = indexNode.Value
 		case *ast.Ident:
-			v, err := g.GetVariablePos(indexNode.Name)
+			/* v, err := g.GetVariablePos(indexNode.Name)
 			if err != nil {
 				return nil, err
+			} */
+
+			v := components.GetVariable(predecessor, indexNode.Name)
+			if v == nil {
+				return nil, errors.New("variableInfo is nil")
 			}
+
 			x.IndexIdent = v
 		default:
 			return nil, errors.New("Invalid indexing")
@@ -255,14 +306,24 @@ func (g *Generator) GenerateSelectorBlock(be *ast.BinaryExpr, inverted bool) (c 
 			Size:  x.Size,
 		}
 	case *ast.Ident:
-		y, err = g.GetVariablePos(t.Name)
+		/* y, err = g.GetVariablePos(t.Name)
 		if err != nil {
 			return nil, err
+		} */
+
+		y = components.GetVariable(predecessor, t.Name)
+		if y == nil {
+			return nil, errors.New("variableInfo is nil")
 		}
 	case *ast.IndexExpr:
-		y, err = g.GetVariablePos(t.X.(*ast.Ident).Name)
+		/* y, err = g.GetVariablePos(t.X.(*ast.Ident).Name)
 		if err != nil {
 			return nil, err
+		} */
+
+		y = components.GetVariable(predecessor, t.X.(*ast.Ident).Name)
+		if y == nil {
+			return nil, errors.New("variableInfo is nil")
 		}
 
 		switch indexNode := t.Index.(type) {
@@ -272,10 +333,16 @@ func (g *Generator) GenerateSelectorBlock(be *ast.BinaryExpr, inverted bool) (c 
 			}
 			y.Index = indexNode.Value
 		case *ast.Ident:
-			v, err := g.GetVariablePos(indexNode.Name)
+			/* v, err := g.GetVariablePos(indexNode.Name)
 			if err != nil {
 				return nil, err
+			} */
+
+			v := components.GetVariable(predecessor, indexNode.Name)
+			if v == nil {
+				return nil, errors.New("variableInfo is nil")
 			}
+
 			y.IndexIdent = v
 		default:
 			return nil, errors.New("Invalid indexing")
@@ -295,15 +362,15 @@ func (g *Generator) GenerateSelectorBlock(be *ast.BinaryExpr, inverted bool) (c 
 	return components.NewSelectorBlock(comp, &components.OperandInfo{
 		X: x,
 		Y: y,
-	}, inverted), nil
+	}, inverted, predecessor), nil
 }
 
-func (g *Generator) GenerateIfBlock(is *ast.IfStmt) (fb *components.IfBlock, err error) {
+func (g *Generator) GenerateIfBlock(is *ast.IfStmt, predecessor components.BodyComponent) (fb *components.IfBlock, err error) {
 	var cond *components.SelectorBlock
 
 	switch x := is.Cond.(type) {
 	case *ast.BinaryExpr:
-		cond, err = g.GenerateSelectorBlock(x, false)
+		cond, err = g.GenerateSelectorBlock(x, false, predecessor)
 		if err != nil {
 			return nil, err
 		}
@@ -316,7 +383,7 @@ func (g *Generator) GenerateIfBlock(is *ast.IfStmt) (fb *components.IfBlock, err
 			}
 			return nil, errors.New("Only binary expression in if condition allowed found " + ref.String() + " in parenthesis")
 		}
-		cond, err = g.GenerateSelectorBlock(xBin, false)
+		cond, err = g.GenerateSelectorBlock(xBin, false, predecessor)
 		if err != nil {
 			return nil, err
 		}
@@ -328,7 +395,7 @@ func (g *Generator) GenerateIfBlock(is *ast.IfStmt) (fb *components.IfBlock, err
 		return nil, errors.New("Only binary expression in if condition allowed found " + ref.String())
 	}
 
-	thenbody, err := g.GenerateBodyBlock(is.Body)
+	thenbody, err := g.GenerateBodyBlock(is.Body, predecessor)
 	if err != nil {
 		return nil, err
 	}
@@ -343,9 +410,9 @@ func (g *Generator) GenerateIfBlock(is *ast.IfStmt) (fb *components.IfBlock, err
 			Position: 0,
 			Size:     8,
 		},
-	})
+	}, predecessor)
 	if is.Else != nil {
-		elsebody, err = g.GenerateBodyBlock(is.Else)
+		elsebody, err = g.GenerateBodyBlock(is.Else, predecessor)
 		if err != nil {
 			return nil, err
 		}
@@ -355,15 +422,15 @@ func (g *Generator) GenerateIfBlock(is *ast.IfStmt) (fb *components.IfBlock, err
 	g.components[thenbody.ArchName()] = thenbody
 	g.components[elsebody.ArchName()] = elsebody
 
-	return components.NewIfBlock(cond, thenbody, elsebody), nil
+	return components.NewIfBlock(cond, thenbody, elsebody, predecessor), nil
 }
 
-func (g *Generator) GenerateLoopBlock(fs *ast.ForStmt) (fb *components.LoopBlock, err error) {
+func (g *Generator) GenerateLoopBlock(fs *ast.ForStmt, predecessor components.BodyComponent) (fb *components.LoopBlock, err error) {
 	var cond *components.SelectorBlock
 
 	switch x := fs.Cond.(type) {
 	case *ast.BinaryExpr:
-		cond, err = g.GenerateSelectorBlock(x, true)
+		cond, err = g.GenerateSelectorBlock(x, true, predecessor)
 		if err != nil {
 			return nil, err
 		}
@@ -376,7 +443,7 @@ func (g *Generator) GenerateLoopBlock(fs *ast.ForStmt) (fb *components.LoopBlock
 			}
 			return nil, errors.New("Only binary expression in for condition allowed found " + reflect.TypeOf(x.X).String() + " in parenthesis")
 		}
-		cond, err = g.GenerateSelectorBlock(xBin, false)
+		cond, err = g.GenerateSelectorBlock(xBin, false, predecessor)
 		if err != nil {
 			return nil, err
 		}
@@ -388,7 +455,9 @@ func (g *Generator) GenerateLoopBlock(fs *ast.ForStmt) (fb *components.LoopBlock
 		return nil, errors.New("Only binary expression in for condition allowed found " + reflect.TypeOf(x).String())
 	}
 
-	body, err := g.GenerateBodyBlock(fs.Body)
+	fmt.Printf("Generating body for loop\n")
+
+	body, err := g.GenerateBodyBlock(fs.Body, predecessor)
 	if err != nil {
 		return nil, err
 	}
@@ -396,7 +465,10 @@ func (g *Generator) GenerateLoopBlock(fs *ast.ForStmt) (fb *components.LoopBlock
 	g.components[cond.ArchName()] = cond
 	g.components[body.ArchName()] = body
 
-	return components.NewLoopBlock(cond, body), nil
+	variableDummyBlock := components.NewParamDummyBlock(predecessor.ScopedVariables(), predecessor)
+	*variableDummyBlock.GetVariablesSize() = *predecessor.GetVariablesSize()
+
+	return components.NewLoopBlock(cond, body, variableDummyBlock), nil
 }
 
 func getTypeOfString(x string) string {
@@ -411,7 +483,7 @@ func getNodeLineString(n ast.Node) string {
 	return strconv.Itoa(int(n.Pos()))
 }
 
-func (g *Generator) GenerateBodyBlock(s ast.Stmt) (c components.BodyComponent, err error) {
+func (g *Generator) GenerateBodyBlock(s ast.Stmt, predecessor components.BodyComponent) (c components.BodyComponent, err error) {
 	switch lhsexpr := s.(type) {
 	case *ast.DeclStmt:
 		decl, ok := lhsexpr.Decl.(*ast.GenDecl)
@@ -426,8 +498,12 @@ func (g *Generator) GenerateBodyBlock(s ast.Stmt) (c components.BodyComponent, e
 		for _, spec := range decl.Specs[0].(*ast.ValueSpec).Names {
 			switch declType := decl.Specs[0].(*ast.ValueSpec).Type.(type) {
 			case *ast.Ident:
-				_, err = g.NewVariable(spec.Name, declType.Name)
+				/* _, err = g.NewVariable(spec.Name, declType.Name)
 				if err != nil {
+					return nil, err
+				} */
+
+				if _, err := components.NewVariable(predecessor, spec.Name, declType.Name, 1); err != nil {
 					return nil, err
 				}
 			case *ast.ArrayType:
@@ -444,14 +520,24 @@ func (g *Generator) GenerateBodyBlock(s ast.Stmt) (c components.BodyComponent, e
 					return nil, errors.New("Invalid array declaration")
 				}
 
-				_, err = g.NewArrayVariable(spec.Name, elt.Name, len.Value)
+				/* _, err = g.NewArrayVariable(spec.Name, elt.Name, len.Value)
 				if err != nil {
+					return nil, err
+				} */
+
+				leni, err := strconv.Atoi(len.Value)
+				if err != nil {
+					return nil, err
+				}
+
+				if _, err := components.NewVariable(predecessor, spec.Name, elt.Name, leni); err != nil {
 					return nil, err
 				}
 			default:
 				return nil, errors.New("Invalid declaration")
 			}
 		}
+
 		return nil, nil
 	case *ast.AssignStmt:
 		if len(lhsexpr.Lhs) > 1 {
@@ -465,9 +551,14 @@ func (g *Generator) GenerateBodyBlock(s ast.Stmt) (c components.BodyComponent, e
 
 			switch lhstype := lhsexpr.Lhs[0].(type) {
 			case *ast.Ident:
-				lhs, err = g.GetVariablePos(lhstype.Name)
+				/* lhs, err = g.GetVariablePos(lhstype.Name)
 				if err != nil {
 					return nil, err
+				} */
+
+				lhs = components.GetVariable(predecessor, lhstype.Name)
+				if lhs == nil {
+					return nil, errors.New("variableInfo is nil")
 				}
 			case *ast.IndexExpr:
 				X, ok := lhstype.X.(*ast.Ident)
@@ -475,9 +566,13 @@ func (g *Generator) GenerateBodyBlock(s ast.Stmt) (c components.BodyComponent, e
 					return nil, errors.New("Lhs index expression X has to be an identifier")
 				}
 
-				lhs, err = g.GetVariablePos(X.Name)
+				/* lhs, err = g.GetVariablePos(X.Name)
 				if err != nil {
 					return nil, err
+				} */
+				lhs = components.GetVariable(predecessor, X.Name)
+				if lhs == nil {
+					return nil, errors.New("variableInfo is nil")
 				}
 
 				switch indexNode := lhstype.Index.(type) {
@@ -487,10 +582,16 @@ func (g *Generator) GenerateBodyBlock(s ast.Stmt) (c components.BodyComponent, e
 					}
 					lhs.Index = indexNode.Value
 				case *ast.Ident:
-					v, err := g.GetVariablePos(indexNode.Name)
+					/* v, err := g.GetVariablePos(indexNode.Name)
 					if err != nil {
 						return nil, err
+					} */
+
+					v := components.GetVariable(predecessor, indexNode.Name)
+					if v == nil {
+						return nil, errors.New("variableInfo is nil")
 					}
+
 					lhs.IndexIdent = v
 				default:
 					return nil, errors.New("Invalid indexing")
@@ -507,8 +608,13 @@ func (g *Generator) GenerateBodyBlock(s ast.Stmt) (c components.BodyComponent, e
 				if _, ok := SupportedTypes[typ]; !ok {
 					return nil, errors.New(strconv.Itoa(int(lhsexpr.Pos())) + ": Unsupported type '" + typ + "'")
 				}
-				lhs, err = g.NewVariable(lhsexpr.Lhs[0].(*ast.Ident).Name, typ)
+
+				/* lhs, err = g.NewVariable(lhsexpr.Lhs[0].(*ast.Ident).Name, typ)
 				if err != nil {
+					return nil, err
+				} */
+
+				if lhs, err = components.NewVariable(predecessor, lhsexpr.Lhs[0].(*ast.Ident).Name, typ, 1); err != nil {
 					return nil, err
 				}
 			}
@@ -519,16 +625,25 @@ func (g *Generator) GenerateBodyBlock(s ast.Stmt) (c components.BodyComponent, e
 					Const: rhsExpr.Value,
 					Size:  lhs.Size,
 				},
-			}), nil
+			}, predecessor), nil
 		case *ast.Ident:
-			v, err := g.GetVariablePos(rhsExpr.Name)
+			/* v, err := g.GetVariablePos(rhsExpr.Name)
 			if err != nil {
 				return nil, err
+			} */
+
+			v := components.GetVariable(predecessor, rhsExpr.Name)
+			if v == nil {
+				return nil, errors.New("variableInfo is nil")
 			}
 
 			if newVar {
-				lhs, err = g.NewVariable(lhsexpr.Lhs[0].(*ast.Ident).Name, v.Typ)
+				/* lhs, err = g.NewVariable(lhsexpr.Lhs[0].(*ast.Ident).Name, v.Typ)
 				if err != nil {
+					return nil, err
+				} */
+
+				if lhs, err = components.NewVariable(predecessor, lhsexpr.Lhs[0].(*ast.Ident).Name, v.Typ, 1); err != nil {
 					return nil, err
 				}
 			}
@@ -536,16 +651,21 @@ func (g *Generator) GenerateBodyBlock(s ast.Stmt) (c components.BodyComponent, e
 			return components.NewFuncBlock("=", &components.OperandInfo{
 				R: lhs,
 				X: v,
-			}), nil
+			}, predecessor), nil
 		case *ast.BinaryExpr:
 			if newVar {
 				return nil, errors.New(getNodeLineString(lhsexpr) + ": Cannot initialize variable with binary expression")
 			}
-			return g.GenerateFuncBlock(lhs.Copy(), rhsExpr)
+			return g.GenerateFuncBlock(lhs.Copy(), rhsExpr, predecessor)
 		case *ast.IndexExpr:
-			v, err := g.GetVariablePos(rhsExpr.X.(*ast.Ident).Name)
+			/* v, err := g.GetVariablePos(rhsExpr.X.(*ast.Ident).Name)
 			if err != nil {
 				return nil, err
+			} */
+
+			v := components.GetVariable(predecessor, rhsExpr.X.(*ast.Ident).Name)
+			if v == nil {
+				return nil, errors.New("variableInfo is nil")
 			}
 
 			switch indexNode := rhsExpr.Index.(type) {
@@ -555,47 +675,59 @@ func (g *Generator) GenerateBodyBlock(s ast.Stmt) (c components.BodyComponent, e
 				}
 				v.Index = indexNode.Value
 			case *ast.Ident:
-				vn, err := g.GetVariablePos(indexNode.Name)
+				/* vn, err := g.GetVariablePos(indexNode.Name)
 				if err != nil {
 					return nil, err
+				} */
+
+				vn := components.GetVariable(predecessor, indexNode.Name)
+				if vn == nil {
+					return nil, errors.New("variableInfo is nil")
 				}
+
 				v.IndexIdent = vn
 			default:
 				return nil, errors.New("Invalid indexing")
 			}
 
 			if newVar {
-				lhs, err = g.NewVariable(lhsexpr.Lhs[0].(*ast.Ident).Name, v.Typ)
+				/* lhs, err = g.NewVariable(lhsexpr.Lhs[0].(*ast.Ident).Name, v.Typ)
 				if err != nil {
+					return nil, err
+				} */
+
+				if lhs, err = components.NewVariable(predecessor, lhsexpr.Lhs[0].(*ast.Ident).Name, v.Typ, 1); err != nil {
 					return nil, err
 				}
 			}
 			return components.NewFuncBlock("=", &components.OperandInfo{
 				R: lhs,
 				X: v,
-			}), nil
+			}, predecessor), nil
 		default:
 			return nil, errors.New("Expression " + reflect.TypeOf(rhsExpr).String() + " in rhs not supported!")
 		}
 	case *ast.ForStmt:
-		return g.GenerateLoopBlock(lhsexpr)
+		return g.GenerateLoopBlock(lhsexpr, predecessor)
 	case *ast.IfStmt:
-		return g.GenerateIfBlock(lhsexpr)
+		return g.GenerateIfBlock(lhsexpr, predecessor)
 	case *ast.ReturnStmt:
 		return nil, errors.New("Return statements only allowed at the end of function!")
 	case *ast.BlockStmt:
-		return g.GenerateBlock(lhsexpr.List, false)
+		r, _, err := g.GenerateBlock(lhsexpr.List, false, predecessor)
+		return r, err
 	default:
 		return nil, errors.New(reflect.TypeOf(lhsexpr).String() + " statements not allowed!")
 	}
 }
 
-func (g *Generator) GenerateBlock(stmts []ast.Stmt, toplevelStatement bool) (c *components.Block, err error) {
-	b := components.NewBlock(toplevelStatement)
+func (g *Generator) GenerateBlock(stmts []ast.Stmt, toplevelStatement bool, predecessor components.BodyComponent) (b *components.Block, predecessor_ components.BodyComponent, err error) {
+	b = components.NewBlock(toplevelStatement, predecessor)
+	predecessor_ = b
 	for _, s := range stmts {
-		newComponent, err := g.GenerateBodyBlock(s)
+		newComponent, err := g.GenerateBodyBlock(s, predecessor_)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		if newComponent == nil {
 			continue
@@ -603,26 +735,52 @@ func (g *Generator) GenerateBlock(stmts []ast.Stmt, toplevelStatement bool) (c *
 
 		g.components[newComponent.ArchName()] = newComponent
 		b.AddComponent(newComponent)
+
+		predecessor_ = newComponent
 	}
-	return b, nil
+
+	//*b.GetVariablesSize() = *predecessor_.GetVariablesSize()
+
+	return b, predecessor_, nil
 }
 
 func (g *Generator) GenerateScope(f *ast.FuncDecl) (s *components.Scope, err error) {
 	params := make(map[string]*variable.VariableInfo)
+
+	// only relevant for variable handling
+	paramDummyBlock := components.NewParamDummyBlock(params, nil)
+
 	for _, field := range f.Type.Params.List {
 		for _, param := range field.Names {
 			switch fieldType := field.Type.(type) {
 			case *ast.Ident:
-				np, err := g.NewVariable(param.Name, fieldType.Name)
+				/* np, err := g.NewVariable(param.Name, fieldType.Name)
+				if err != nil {
+					return nil, err
+				} */
+
+				np, err := components.NewVariable(paramDummyBlock, param.Name, fieldType.Name, 1)
 				if err != nil {
 					return nil, err
 				}
+
 				params[param.Name] = np
 			case *ast.ArrayType:
-				np, err := g.NewArrayVariable(param.Name, fieldType.Elt.(*ast.Ident).Name, fieldType.Len.(*ast.BasicLit).Value)
+				/* np, err := g.NewArrayVariable(param.Name, fieldType.Elt.(*ast.Ident).Name, fieldType.Len.(*ast.BasicLit).Value)
+				if err != nil {
+					return nil, err
+				} */
+
+				len, err := strconv.Atoi(fieldType.Len.(*ast.BasicLit).Value)
 				if err != nil {
 					return nil, err
 				}
+
+				np, err := components.NewVariable(paramDummyBlock, param.Name, fieldType.Elt.(*ast.Ident).Name, len)
+				if err != nil {
+					return nil, err
+				}
+
 				params[param.Name] = np
 			default:
 				return nil, errors.New("Invalid field type in function param list")
@@ -638,10 +796,15 @@ func (g *Generator) GenerateScope(f *ast.FuncDecl) (s *components.Scope, err err
 	if fields < 2 {
 		return nil, errors.New("At least one top-level statement + return expected")
 	}
-	block, err := g.GenerateBlock(f.Body.List[0:fields-1], true)
+
+	block, lastBodyComp, err := g.GenerateBlock(f.Body.List[0:fields-1], true, paramDummyBlock)
 	if err != nil {
 		return nil, err
 	}
+	block.OutputSize = *lastBodyComp.GetVariablesSize()
+
+	// last block outputs all declared variables
+	//*block.GetVariablesSize() = *lastBodyComp.GetVariablesSize()
 
 	rs, ok := f.Body.List[fields-1].(*ast.ReturnStmt)
 	if !ok {
@@ -652,15 +815,26 @@ func (g *Generator) GenerateScope(f *ast.FuncDecl) (s *components.Scope, err err
 	for _, res := range rs.Results {
 		switch x := res.(type) {
 		case *ast.Ident:
-			vi, ok := g.knownVariables[x.Name]
+			/* vi, ok := g.knownVariables[x.Name]
 			if !ok {
 				return nil, errors.New("No new variable in returns allowed")
+			} */
+
+			vi := components.GetVariable(lastBodyComp, x.Name)
+			if vi == nil {
+				return nil, errors.New("No new variable in returns allowed")
 			}
+
 			returnPositions = append(returnPositions, vi)
 		case *ast.IndexExpr:
-			vi, ok := g.knownVariables[x.X.(*ast.Ident).Name]
+			/* vi, ok := g.knownVariables[x.X.(*ast.Ident).Name]
 			if !ok {
-				return nil, errors.New("Invalid return base address iodentifier")
+				return nil, errors.New("Invalid return base address identifier")
+			} */
+
+			vi := components.GetVariable(lastBodyComp, x.X.(*ast.Ident).Name)
+			if vi == nil {
+				return nil, errors.New("No new variable in returns allowed")
 			}
 
 			switch indexType := x.Index.(type) {
@@ -736,7 +910,7 @@ func (g *Generator) GenerateVHDL(verbose bool) string {
 			ps += s.Size * s.Len
 		}
 		for i, s := range s.ReturnVars {
-			fmt.Printf("return %d type %s has size %d len %d\n", i, s.Typ, s.Size, s.Len)
+			fmt.Printf("return %d type %s has size %d len %d thus %d\n", i, s.Typ, s.Size, s.Len, s.Size*s.Len)
 			rs += s.Size * s.Len
 		}
 

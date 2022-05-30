@@ -1,6 +1,7 @@
 package components
 
 import (
+	"go2async/pkg/variable"
 	"strconv"
 	"strings"
 )
@@ -21,11 +22,18 @@ type Block struct {
 
 	In  *HandshakeChannel
 	Out *HandshakeChannel
+
+	variables map[string]*variable.VariableInfo
+
+	predecessor   BodyComponent
+	variablesSize int
+
+	OutputSize int
 }
 
 var blockNr = 0
 
-func NewBlock(toplevel bool) *Block {
+func NewBlock(toplevel bool, predecessor BodyComponent) *Block {
 	nr := blockNr
 	blockNr++
 
@@ -46,9 +54,30 @@ func NewBlock(toplevel bool) *Block {
 			Data: "out_data",
 			Out:  true,
 		},
+
+		variables: make(map[string]*variable.VariableInfo),
+
+		predecessor:   predecessor,
+		variablesSize: *predecessor.GetVariablesSize(),
 	}
 
+	b.Out.DataWidth = b.GetVariablesSize()
+
 	return b
+}
+
+func NewParamDummyBlock(params map[string]*variable.VariableInfo, predecessor BodyComponent) *Block {
+	ret := &Block{}
+
+	ret.predecessor = predecessor
+	ret.variables = params
+
+	ret.variablesSize = 0
+	for _, v := range params {
+		ret.variablesSize += v.Len * v.Size
+	}
+
+	return ret
 }
 
 func (b *Block) InChannel() *HandshakeChannel {
@@ -63,18 +92,20 @@ func (b *Block) AddComponent(c BodyComponent) {
 	b.Out = c.OutChannel()
 
 	if b.TopLevel {
-
-		newreg := NewReg("DATA_WIDTH", false, "0")
+		newreg := NewReg(c.GetVariablesSize(), false, "0")
 		newreg.Out.Connect(c.InChannel())
+
 		if len(b.RegBlockPairs) == 0 {
 			*newreg.InChannel() = *b.In
 		} else {
 			b.Out = c.OutChannel()
 			b.RegBlockPairs[len(b.RegBlockPairs)-1].Bc.OutChannel().Connect(newreg.InChannel())
 		}
+
 		b.RegBlockPairs = append(b.RegBlockPairs, &regBodyPair{newreg, c})
 	} else {
 		b.Out = c.OutChannel()
+
 		if len(b.RegBlockPairs) == 0 {
 			entryIn := &HandshakeChannel{
 				Req:  "in_req",
@@ -87,27 +118,32 @@ func (b *Block) AddComponent(c BodyComponent) {
 			b.Out = c.OutChannel()
 			b.RegBlockPairs[len(b.RegBlockPairs)-1].Bc.OutChannel().Connect(c.InChannel())
 		}
+
 		b.RegBlockPairs = append(b.RegBlockPairs, &regBodyPair{Bc: c})
 	}
 }
 
 func (b *Block) Component() string {
 	name := blockPrefix + strconv.Itoa(b.Nr)
+
 	return name + `: entity work.BlockC(` + b.archName + `)
   generic map(
-   DATA_WIDTH => DATA_WIDTH
+   DATA_IN_WIDTH => ` + strconv.Itoa(*b.GetVariablesSize()) + `,
+   DATA_OUT_WIDTH => ` + strconv.Itoa(*b.RegBlockPairs[len(b.RegBlockPairs)-1].Bc.GetVariablesSize()) + `
   )
   port map (
    rst => rst,
+   -- Input channel
    in_ack => ` + b.In.Ack + `,
    in_req => ` + b.In.Req + `,
-   in_data => ` + b.In.Data + `,
+   in_data => std_logic_vector(resize(unsigned(` + b.In.Data + `), ` + strconv.Itoa(*b.GetVariablesSize()) + `)),
    -- Output channel
    out_req => ` + b.Out.Req + `,
    out_data => ` + b.Out.Data + `,
    out_ack => ` + b.Out.Ack + `
   );
   `
+	//out_data => ` + b.Out.Data + `(` + b.Out.Data + `'length - 1 downto ` + b.Out.Data + `'length - ` + strconv.Itoa(*b.GetVariablesSize()) + `),
 }
 
 func (b *Block) signalDefs() string {
@@ -134,10 +170,16 @@ func (b *Block) ioChannels() string {
 		ret += "in_ack <= out_ack; \n"
 		ret += "out_data <= in_data; \n"
 	} else {
-
 		ret += "out_req <= " + b.OutChannel().Req + "; \n"
 		ret += b.OutChannel().Ack + " <= out_ack; \n"
-		ret += "out_data <= " + b.OutChannel().Data + "; \n"
+
+		/*lowerBound := "0"
+		if *b.GetVariablesSize() != *b.Out.DataWidth {
+			lowerBound = strconv.Itoa(*b.GetVariablesSize())
+		}*/
+
+		//ret += "out_data <= " + b.OutChannel().Data + "(" + strconv.Itoa(*b.OutChannel().DataWidth) + " - 1 downto " + lowerBound + "); \n"
+		ret += "out_data <= " + b.OutChannel().Data + "(" + b.OutChannel().Data + "'length - 1 downto " + b.OutChannel().Data + "'length - out_data'length); \n"
 	}
 
 	return ret
@@ -178,4 +220,16 @@ func (b *Block) Architecture() string {
 
 func (b *Block) ArchName() string {
 	return b.archName
+}
+
+func (b *Block) ScopedVariables() map[string]*variable.VariableInfo {
+	return b.variables
+}
+
+func (b *Block) Predecessor() BodyComponent {
+	return b.predecessor
+}
+
+func (b *Block) GetVariablesSize() *int {
+	return &b.variablesSize
 }

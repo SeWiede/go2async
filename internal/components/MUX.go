@@ -52,11 +52,11 @@ func (m *MUX) Component() string {
     DATA_WIDTH => DATA_WIDTH
   )
   port map (
+    inA_req => ` + m.In1.Req + `,
     inA_ack => ` + m.In1.Ack + `,
     inA_data => ` + m.In1.Data + `,
-    inA_req => ` + m.In1.Req + `,
     inB_ack => ` + m.In2.Ack + `,
-    inB_data => ` + m.In2.Data + `,
+    inB_data => ` + m.In2.Data + `(DATA_WIDTH - 1 downto 0),
     inB_req => ` + m.In2.Req + `,
     outC_ack => ` + m.Out.Ack + `,
     outC_data => ` + m.Out.Data + `,

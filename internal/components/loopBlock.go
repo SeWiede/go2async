@@ -1,6 +1,8 @@
 package components
 
 import (
+	"fmt"
+	"go2async/pkg/variable"
 	"strconv"
 	"strings"
 )
@@ -21,13 +23,18 @@ type LoopBlock struct {
 	In  *HandshakeChannel
 	Out *HandshakeChannel
 
+	variables map[string]*variable.VariableInfo
+
 	bodyReg *Reg
 	body    BodyComponent
+
+	predecessor   BodyComponent
+	variablesSize int
 }
 
 var loopBlockNr = 0
 
-func NewLoopBlock(loopCond *SelectorBlock, body BodyComponent) *LoopBlock {
+func NewLoopBlock(loopCond *SelectorBlock, body, predecessor BodyComponent) *LoopBlock {
 	nr := loopBlockNr
 	loopBlockNr++
 
@@ -67,7 +74,7 @@ func NewLoopBlock(loopCond *SelectorBlock, body BodyComponent) *LoopBlock {
 	lb.condFork.Out2.Data = "open"
 
 	//to mux
-	lb.condReg = NewReg("1", true, "1")
+	lb.condReg = NewReg(&one, true, "1")
 	lb.condFork.Out1.Connect(lb.condReg.In)
 	lb.condReg.In.Data = lb.loopCond.Out.Data
 
@@ -83,12 +90,22 @@ func NewLoopBlock(loopCond *SelectorBlock, body BodyComponent) *LoopBlock {
 
 	lb.body = body
 
-	lb.bodyReg = NewReg("", false, "0")
+	lb.variablesSize = *predecessor.GetVariablesSize()
+
+	lb.Out.DataWidth = &lb.variablesSize
+
+	lb.bodyReg = NewReg(&lb.variablesSize, false, "0")
 
 	body.OutChannel().Connect(lb.entryMux.In2)
 
 	lb.exitDemux.Out2.Connect(lb.bodyReg.In)
 	lb.bodyReg.Out.Connect(body.InChannel())
+
+	lb.variables = make(map[string]*variable.VariableInfo)
+
+	lb.predecessor = predecessor
+
+	fmt.Printf("loop  block %d created with width %d\n", loopBlockNr-1, lb.variablesSize)
 
 	return lb
 }
@@ -103,15 +120,16 @@ func (lb *LoopBlock) OutChannel() *HandshakeChannel {
 
 func (lb *LoopBlock) Component() string {
 	name := loopBlockPrefix + strconv.Itoa(lb.Nr)
+
 	return name + `: entity work.LoopBlock(` + lb.archName + `)
   generic map(
-    DATA_WIDTH => DATA_WIDTH
+    DATA_WIDTH => ` + strconv.Itoa(*lb.GetVariablesSize()) + `
   )
   port map (
     rst => rst,
     in_ack => ` + lb.In.Ack + `,
     in_req => ` + lb.In.Req + `,
-    in_data => ` + lb.In.Data + `,
+    in_data => std_logic_vector(resize(unsigned(` + lb.In.Data + `), ` + strconv.Itoa(*lb.GetVariablesSize()) + `)),
     -- Output channel
     out_req => ` + lb.Out.Req + `,
     out_data => ` + lb.Out.Data + `,
@@ -179,4 +197,16 @@ func (lb *LoopBlock) Architecture() string {
 
 func (lb *LoopBlock) ArchName() string {
 	return lb.archName
+}
+
+func (lb *LoopBlock) ScopedVariables() map[string]*variable.VariableInfo {
+	return lb.variables
+}
+
+func (lb *LoopBlock) Predecessor() BodyComponent {
+	return lb.predecessor
+}
+
+func (lb *LoopBlock) GetVariablesSize() *int {
+	return &lb.variablesSize
 }

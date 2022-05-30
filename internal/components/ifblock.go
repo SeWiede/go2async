@@ -1,6 +1,7 @@
 package components
 
 import (
+	"go2async/pkg/variable"
 	"strconv"
 	"strings"
 )
@@ -20,11 +21,16 @@ type IfBlock struct {
 
 	In  *HandshakeChannel
 	Out *HandshakeChannel
+
+	variables map[string]*variable.VariableInfo
+
+	predecessor   BodyComponent
+	variablesSize int
 }
 
 var ifBlockNr = 0
 
-func NewIfBlock(cond *SelectorBlock, thenBody, elseBody BodyComponent) *IfBlock {
+func NewIfBlock(cond *SelectorBlock, thenBody, elseBody, predecessor BodyComponent) *IfBlock {
 	nr := ifBlockNr
 	ifBlockNr++
 
@@ -72,6 +78,14 @@ func NewIfBlock(cond *SelectorBlock, thenBody, elseBody BodyComponent) *IfBlock 
 
 	ib.merger.Out = ib.Out
 
+	ib.variables = make(map[string]*variable.VariableInfo)
+
+	ib.predecessor = predecessor
+
+	ib.variablesSize = *predecessor.GetVariablesSize()
+
+	ib.Out.DataWidth = ib.GetVariablesSize()
+
 	return ib
 }
 
@@ -85,15 +99,16 @@ func (ib *IfBlock) OutChannel() *HandshakeChannel {
 
 func (ib *IfBlock) Component() string {
 	name := ifBlockPrefix + strconv.Itoa(ib.Nr)
+
 	return name + `: entity work.IfBlock(` + ib.archName + `)
   generic map(
-    DATA_WIDTH => DATA_WIDTH
+    DATA_WIDTH => ` + strconv.Itoa(*ib.GetVariablesSize()) + `
   )
   port map (
     rst => rst,
     in_ack => ` + ib.In.Ack + `,
     in_req => ` + ib.In.Req + `,
-    in_data => ` + ib.In.Data + `,
+    in_data => std_logic_vector(resize(unsigned(` + ib.In.Data + `), ` + strconv.Itoa(*ib.GetVariablesSize()) + `)),
     -- Output channel
     out_req => ` + ib.Out.Req + `,
     out_data => ` + ib.Out.Data + `,
@@ -152,4 +167,16 @@ func (ib *IfBlock) Architecture() string {
 
 func (ib *IfBlock) ArchName() string {
 	return ib.archName
+}
+
+func (ib *IfBlock) ScopedVariables() map[string]*variable.VariableInfo {
+	return ib.variables
+}
+
+func (ib *IfBlock) Predecessor() BodyComponent {
+	return ib.predecessor
+}
+
+func (ib *IfBlock) GetVariablesSize() *int {
+	return &ib.variablesSize
 }
