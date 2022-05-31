@@ -49,7 +49,7 @@ func NewDEMUX() *DEMUX {
 	}
 }
 
-func (d *DEMUX) Component() string {
+func (d *DEMUX) ComponentStr() string {
 	name := demuxPrefix + strconv.Itoa(d.Nr)
 	return name + `: entity work.demux
   generic map (

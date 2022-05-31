@@ -1,9 +1,6 @@
 package components
 
 import (
-	"errors"
-	"fmt"
-	"go2async/pkg/variable"
 	"strconv"
 )
 
@@ -16,60 +13,51 @@ var zero = 0
 var one = 1
 
 type Component interface {
-	Component() string
-	Architecture() string
 	ArchName() string
+	ComponentStr() string
+	Architecture() string
 }
 
-type BodyComponent interface {
+type BodyComponentType interface {
 	Component
 	InChannel() *HandshakeChannel
 	OutChannel() *HandshakeChannel
 
-	ScopedVariables() map[string]*variable.VariableInfo
-	Predecessor() BodyComponent
-	GetVariablesSize() *int
+	GetVariableSize() int
 }
 
-func NewVariable(receiver BodyComponent, name string, typ string, len int) (*variable.VariableInfo, error) {
-	if len <= 0 {
-		return nil, errors.New("Invalid variable len")
-	}
+type BodyComponent struct {
+	parent *Block
 
-	size, ok := SupportedTypes[typ]
-	if !ok {
-		return nil, errors.New("Unsupported type '" + typ + "'")
-	}
+	archName string
 
-	cvp := receiver.GetVariablesSize()
+	In  *HandshakeChannel
+	Out *HandshakeChannel
 
-	newV := &variable.VariableInfo{
-		Position: *cvp,
-		Size:     size,
-		Typ:      typ,
-		Len:      len,
-	}
-
-	receiver.ScopedVariables()[name] = newV
-
-	fmt.Printf("Allocated %s at pos %d downto %d\n", name, (*cvp)+(len*size)-1, (*cvp))
-
-	*cvp += size * len
-
-	return newV.Copy(), nil
+	variableSize int
 }
 
-func GetVariable(receiver BodyComponent, name string) *variable.VariableInfo {
-	if receiver == nil {
-		return nil
-	}
+// Type checks
+func (bc *BodyComponent) ArchName() string {
+	return bc.archName
+}
 
-	v, ok := receiver.ScopedVariables()[name]
-	if !ok {
-		v = GetVariable(receiver.Predecessor(), name)
-	} else {
-		fmt.Printf("Got variable %s at %d downto %d\n", name, (v.Position + v.Len*v.Size - 1), v.Position)
-	}
+func (bc *BodyComponent) ScopedVariables() *ScopedVariables {
+	return bc.Parent().ScopedVariables()
+}
 
-	return v.Copy()
+func (bc *BodyComponent) Parent() *Block {
+	return bc.parent
+}
+
+func (bc *BodyComponent) InChannel() *HandshakeChannel {
+	return bc.In
+}
+
+func (bc *BodyComponent) OutChannel() *HandshakeChannel {
+	return bc.Out
+}
+
+func (bc *BodyComponent) GetVariableSize() int {
+	return bc.variableSize
 }

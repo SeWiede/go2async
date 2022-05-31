@@ -45,7 +45,7 @@ func NewMUX() *MUX {
 	}
 }
 
-func (m *MUX) Component() string {
+func (m *MUX) ComponentStr() string {
 	name := muxprefix + strconv.Itoa(m.Nr)
 	return name + `: entity work.mux
   generic map (

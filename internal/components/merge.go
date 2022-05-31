@@ -42,7 +42,7 @@ func NewMerge() *Merge {
 	}
 }
 
-func (d *Merge) Component() string {
+func (d *Merge) ComponentStr() string {
 	name := mergePrefix + strconv.Itoa(d.Nr)
 	return name + `: entity work.merge
   generic map (

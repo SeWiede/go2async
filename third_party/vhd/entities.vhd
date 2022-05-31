@@ -500,7 +500,7 @@ BEGIN
 
   delay_req : ENTITY work.delay_element
     GENERIC MAP(
-      NUM_LCELLS => 16 -- Delay  size
+      NUM_LCELLS => 2 * LUT_CHAIN_SIZE -- Delay  size
     )
     PORT MAP(
       i => in_req,
@@ -509,7 +509,7 @@ BEGIN
 
   delay_ack : ENTITY work.delay_element
     GENERIC MAP(
-      NUM_LCELLS => 16 -- Delay  size
+      NUM_LCELLS => 2 * LUT_CHAIN_SIZE -- Delay  size
     )
     PORT MAP(
       i => out_ack,

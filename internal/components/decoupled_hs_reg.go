@@ -13,7 +13,7 @@ type Reg struct {
 	PhaseOut bool
 
 	StartValue string
-	DataWidth  *int
+	DataWidth  int
 
 	In  *HandshakeChannel
 	Out *HandshakeChannel
@@ -21,7 +21,7 @@ type Reg struct {
 
 var regNr = 0
 
-func NewReg(dataWidth *int, phaseOut bool, startValue string) *Reg {
+func NewReg(dataWidth int, phaseOut bool, startValue string) *Reg {
 	nr := regNr
 	regNr++
 
@@ -54,7 +54,7 @@ func (r *Reg) OutChannel() *HandshakeChannel {
 	return r.Out
 }
 
-func (r *Reg) Component() string {
+func (r *Reg) ComponentStr() string {
 	name := regPrefix + strconv.Itoa(r.Nr)
 	phaseOutString := "PHASE_INIT_OUT => '0'"
 	if r.PhaseOut {
@@ -62,8 +62,8 @@ func (r *Reg) Component() string {
 	}
 
 	dataWidthStr := "DATA_WIDTH"
-	if r.DataWidth != nil && *r.DataWidth > 0 {
-		dataWidthStr = strconv.Itoa(*r.DataWidth)
+	if r.DataWidth > 0 {
+		dataWidthStr = strconv.Itoa(r.DataWidth)
 	}
 
 	return name + `: entity work.decoupled_hs_reg(` + r.archName + `)
@@ -77,7 +77,7 @@ func (r *Reg) Component() string {
     rst => rst,
     in_ack => ` + r.In.Ack + `,
     in_req => ` + r.In.Req + `,
-    in_data => std_logic_vector(resize(unsigned(` + r.In.Data + `), ` + strconv.Itoa(*r.DataWidth) + `)),
+    in_data => std_logic_vector(resize(unsigned(` + r.In.Data + `), ` + strconv.Itoa(r.DataWidth) + `)),
     -- Output channel
     out_req => ` + r.Out.Req + `,
     out_data => ` + r.Out.Data + `(` + dataWidthStr + ` - 1 downto 0),

@@ -12,57 +12,54 @@ var SupportedComperators map[string]string = map[string]string{"==": "=", "!=": 
 var comperatorDelays map[string]string = map[string]string{"==": "ADD_DELAY", "!=": "ADD_DELAY", "<": "ADD_DELAY", ">": "ADD_DELAY", ">=": "ADD_DELAY", "<=": "ADD_DELAY"}
 
 type SelectorBlock struct {
-	Nr       int
-	archName string
+	BodyComponent
+
+	Nr int
 
 	Operation string
-
-	In  *HandshakeChannel
-	Out *HandshakeChannel
-
-	Oi       *OperandInfo
-	Inverted bool
-
-	predecessor   BodyComponent
-	variablesSize int
+	Oi        *OperandInfo
+	Inverted  bool
 }
 
 var selectorNr = 0
 
 var selecTorOutDataWith = 1
 
-func NewSelectorBlock(op string, variableInfo *OperandInfo, inverted bool, predecessor BodyComponent) *SelectorBlock {
+func NewSelectorBlock(op string, variableInfo *OperandInfo, inverted bool, parent *Block) *SelectorBlock {
 	nr := selectorNr
 	selectorNr++
 
 	name := strings.ToLower(selectorprefix + strconv.Itoa(nr))
 
 	ret := &SelectorBlock{
-		Nr:        nr,
-		archName:  archPrefix + name,
+		BodyComponent: BodyComponent{
+			archName: archPrefix + name,
+			In: &HandshakeChannel{
+				Out: false,
+			},
+			Out: &HandshakeChannel{
+				Req:       name + "_o_req",
+				Ack:       name + "_o_ack",
+				Data:      name + "_select",
+				Out:       true,
+				DataWidth: selecTorOutDataWith,
+			},
+
+			parent:       parent,
+			variableSize: parent.GetCurrentVariableSize(),
+		},
+
+		Nr: nr,
+
 		Operation: op,
 		Oi:        variableInfo,
-		In: &HandshakeChannel{
-			Out: false,
-		},
-		Out: &HandshakeChannel{
-			Req:       name + "_o_req",
-			Ack:       name + "_o_ack",
-			Data:      name + "_select",
-			DataWidth: &selecTorOutDataWith,
-			Out:       true,
-		},
-		Inverted: inverted,
-
-		predecessor: predecessor,
-
-		variablesSize: *predecessor.GetVariablesSize(),
+		Inverted:  inverted,
 	}
 
 	return ret
 }
 
-func (sb *SelectorBlock) Component() string {
+func (sb *SelectorBlock) ComponentStr() string {
 	name := selectorprefix + strconv.Itoa(sb.Nr)
 
 	/* 	prependStr := ""
@@ -78,7 +75,7 @@ func (sb *SelectorBlock) Component() string {
 	  -- Input channel
 	  in_req  => ` + sb.In.Req + `,
 	  in_ack  => ` + sb.In.Ack + `, 
-	  in_data =>  std_logic_vector(resize(unsigned(` + sb.In.Data + `), ` + strconv.Itoa(*sb.GetVariablesSize()) + `)),
+	  in_data =>  std_logic_vector(resize(unsigned(` + sb.In.Data + `), ` + strconv.Itoa(sb.GetVariableSize()) + `)),
 	  -- Output channel
 	  out_req => ` + sb.Out.Req + `,
 	  out_ack => ` + sb.Out.Ack + `,
@@ -173,16 +170,4 @@ func (sb *SelectorBlock) Architecture() string {
 
   end ` + sb.archName + `;
   `
-}
-
-func (sb *SelectorBlock) ArchName() string {
-	return sb.archName
-}
-
-func (sb *SelectorBlock) Predecessor() BodyComponent {
-	return sb.predecessor
-}
-
-func (sb *SelectorBlock) GetVariablesSize() *int {
-	return &sb.variablesSize
 }

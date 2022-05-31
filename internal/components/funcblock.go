@@ -14,19 +14,12 @@ var SupportedOperations map[string]string = map[string]string{"+": "+", "-": "-"
 var operationDelays map[string]string = map[string]string{"+": "ADD_DELAY", "-": "ADD_DELAY", "<<": "ADD_DELAY", ">>": "ADD_DELAY", "|": "ADD_DELAY", "&": "ADD_DELAY", "NOP": "ADD_DELAY", "=": "ADD_DELAY"}
 
 type FuncBlock struct {
+	BodyComponent
+
 	Nr        int
 	Operation string
-	archName  string
-
-	In  *HandshakeChannel
-	Out *HandshakeChannel
-
-	variables map[string]*variable.VariableInfo
 
 	Oi *OperandInfo
-
-	predecessor   BodyComponent
-	variablesSize int
 }
 
 type OperandInfo struct {
@@ -35,34 +28,37 @@ type OperandInfo struct {
 
 var fbNr = 0
 
-func NewFuncBlock(op string, vi *OperandInfo, predecessor BodyComponent) *FuncBlock {
+func NewFuncBlock(op string, vi *OperandInfo, parent *Block) *FuncBlock {
 	nr := fbNr
 	fbNr++
 
 	name := strings.ToLower(funcblockprefix + strconv.Itoa(nr))
 
 	ret := &FuncBlock{
-		Nr:        nr,
-		archName:  archPrefix + name,
+		BodyComponent: BodyComponent{
+			archName: archPrefix + name,
+
+			In: &HandshakeChannel{
+				Out: false,
+			},
+
+			Out: &HandshakeChannel{
+				Req:       name + "_o_req",
+				Ack:       name + "_o_ack",
+				Data:      name + "_data",
+				Out:       true,
+				DataWidth: parent.GetCurrentVariableSize(),
+			},
+
+			parent:       parent,
+			variableSize: parent.GetCurrentVariableSize(),
+		},
+
+		Nr: nr,
+
 		Operation: op,
 		Oi:        vi,
-		In: &HandshakeChannel{
-			Out: false,
-		},
-		Out: &HandshakeChannel{
-			Req:  name + "_o_req",
-			Ack:  name + "_o_ack",
-			Data: name + "_data",
-			Out:  true,
-		},
-
-		variables: make(map[string]*variable.VariableInfo),
-
-		predecessor:   predecessor,
-		variablesSize: *predecessor.GetVariablesSize(),
 	}
-
-	ret.Out.DataWidth = ret.GetVariablesSize()
 
 	return ret
 }
@@ -75,18 +71,18 @@ func (fb *FuncBlock) OutChannel() *HandshakeChannel {
 	return fb.Out
 }
 
-func (fb *FuncBlock) Component() string {
+func (fb *FuncBlock) ComponentStr() string {
 	name := funcblockprefix + strconv.Itoa(fb.Nr)
 
 	return name + `: entity work.funcBlock(` + fb.archName + `)
 	generic map(
-	  DATA_WIDTH => ` + strconv.Itoa(*fb.GetVariablesSize()) + `
+	  DATA_WIDTH => ` + strconv.Itoa(fb.GetVariableSize()) + `
 	)
 	port map (
 	  -- Input channel
 	  in_req  => ` + fb.In.Req + `,
 	  in_ack  => ` + fb.In.Ack + `, 
-	  in_data => std_logic_vector(resize(unsigned(` + fb.In.Data + `), ` + strconv.Itoa(*fb.GetVariablesSize()) + `)),
+	  in_data => std_logic_vector(resize(unsigned(` + fb.In.Data + `), ` + strconv.Itoa(fb.GetVariableSize()) + `)),
 	  -- Output channel
 	  out_req => ` + fb.Out.Req + `,
 	  out_ack => ` + fb.Out.Ack + `,
@@ -219,20 +215,4 @@ func (fb *FuncBlock) Architecture() string {
 	  ` + fb.getCalcProcess() + `
   end ` + fb.archName + `;
   `
-}
-
-func (fb *FuncBlock) ArchName() string {
-	return fb.archName
-}
-
-func (fb *FuncBlock) ScopedVariables() map[string]*variable.VariableInfo {
-	return fb.variables
-}
-
-func (fb *FuncBlock) Predecessor() BodyComponent {
-	return fb.predecessor
-}
-
-func (fb *FuncBlock) GetVariablesSize() *int {
-	return &fb.variablesSize
 }

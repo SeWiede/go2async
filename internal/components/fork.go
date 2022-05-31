@@ -51,7 +51,7 @@ func NewFork(datawdith string) *Fork {
 	}
 }
 
-func (f *Fork) Component() string {
+func (f *Fork) ComponentStr() string {
 	name := forkPrefix + strconv.Itoa(f.Nr)
 	return name + `: entity work.fork
   generic map(

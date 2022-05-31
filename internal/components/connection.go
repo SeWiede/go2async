@@ -10,7 +10,7 @@ type HandshakeChannel struct {
 	Ack  string
 	Data string
 
-	DataWidth *int
+	DataWidth int
 
 	Out bool
 }
@@ -50,8 +50,8 @@ func (hw *HandshakeChannel) Connect(to *HandshakeChannel) (*HandshakeChannel, er
 
 func (c *HandshakeChannel) getStv() string {
 	ret := "std_logic_vector(DATA_WIDTH - 1 downto 0)"
-	if c.DataWidth != nil && *c.DataWidth > 0 {
-		ret = "std_logic_vector(" + strconv.Itoa(*c.DataWidth) + "-1 downto 0)"
+	if c.DataWidth > 0 {
+		ret = "std_logic_vector(" + strconv.Itoa(c.DataWidth) + "-1 downto 0)"
 	}
 	return ret
 }

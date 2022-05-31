@@ -44,7 +44,7 @@ func NewRegFork() *RegFork {
 	}
 }
 
-func (rf *RegFork) Component() string {
+func (rf *RegFork) ComponentStr() string {
 	name := regForkPrefix + strconv.Itoa(rf.Nr)
 	return name + `: entity work.reg_fork
   generic map(

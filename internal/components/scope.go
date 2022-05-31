@@ -58,7 +58,7 @@ func NewScope(name string, block *Block, params, vars map[string]*variable.Varia
 		rs += s.Size
 	}
 
-	s.OutReg = NewReg(&s.Block.OutputSize, false, "0")
+	s.OutReg = NewReg(s.Block.OutputSize, false, "0")
 
 	s.Block.Out.Connect(s.OutReg.In)
 
@@ -134,9 +134,9 @@ func (s *Scope) Architecture() string {
 
 	ret += "\n"
 
-	ret += s.Block.Component()
+	ret += s.Block.ComponentStr()
 	ret += "\n"
-	ret += s.OutReg.Component()
+	ret += s.OutReg.ComponentStr()
 	ret += "\n"
 
 	ret += `end ` + s.archName + `;

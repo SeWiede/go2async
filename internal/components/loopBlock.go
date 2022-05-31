@@ -1,8 +1,6 @@
 package components
 
 import (
-	"fmt"
-	"go2async/pkg/variable"
 	"strconv"
 	"strings"
 )
@@ -10,48 +8,50 @@ import (
 const loopBlockPrefix = "LB_"
 
 type LoopBlock struct {
-	Nr       int
-	archName string
+	BodyComponent
 
-	entryMux    *MUX
+	Nr int
+
+	entryMux *MUX
+
 	initRegFork *RegFork
 	loopCond    *SelectorBlock
 	condFork    *Fork
 	condReg     *Reg
 	exitDemux   *DEMUX
 
-	In  *HandshakeChannel
-	Out *HandshakeChannel
-
-	variables map[string]*variable.VariableInfo
-
 	bodyReg *Reg
-	body    BodyComponent
-
-	predecessor   BodyComponent
-	variablesSize int
+	body    BodyComponentType
 }
 
 var loopBlockNr = 0
 
-func NewLoopBlock(loopCond *SelectorBlock, body, predecessor BodyComponent) *LoopBlock {
+func NewLoopBlock(loopCond *SelectorBlock, body BodyComponentType, parent *Block) *LoopBlock {
 	nr := loopBlockNr
 	loopBlockNr++
 
 	name := strings.ToLower(loopBlockPrefix + strconv.Itoa(nr))
 	lb := &LoopBlock{
-		Nr:       nr,
-		archName: archPrefix + name,
-		In: &HandshakeChannel{
-			Out: false,
+		BodyComponent: BodyComponent{
+			archName: archPrefix + name,
+			In: &HandshakeChannel{
+				Out: false,
+			},
+			Out: &HandshakeChannel{
+				Req:       name + "_o_req",
+				Ack:       name + "_o_ack",
+				Data:      name + "_data",
+				Out:       true,
+				DataWidth: parent.GetCurrentVariableSize(),
+			},
+
+			parent:       parent,
+			variableSize: parent.GetCurrentVariableSize(),
 		},
-		Out: &HandshakeChannel{
-			Req:  name + "_o_req",
-			Ack:  name + "_o_ack",
-			Data: name + "_data",
-			Out:  true,
-		},
+		Nr: nr,
 	}
+
+	//fmt.Printf("varialbesize of parrent : %d\n", parent.GetCurrentVariableSize())
 
 	entryIn := &HandshakeChannel{
 		Req:  "in_req",
@@ -74,7 +74,7 @@ func NewLoopBlock(loopCond *SelectorBlock, body, predecessor BodyComponent) *Loo
 	lb.condFork.Out2.Data = "open"
 
 	//to mux
-	lb.condReg = NewReg(&one, true, "1")
+	lb.condReg = NewReg(one, true, "1")
 	lb.condFork.Out1.Connect(lb.condReg.In)
 	lb.condReg.In.Data = lb.loopCond.Out.Data
 
@@ -90,46 +90,30 @@ func NewLoopBlock(loopCond *SelectorBlock, body, predecessor BodyComponent) *Loo
 
 	lb.body = body
 
-	lb.variablesSize = *predecessor.GetVariablesSize()
+	//lb.Out.DataWidth = &lb.variablesSize
 
-	lb.Out.DataWidth = &lb.variablesSize
-
-	lb.bodyReg = NewReg(&lb.variablesSize, false, "0")
+	lb.bodyReg = NewReg(lb.GetVariableSize(), false, "0")
 
 	body.OutChannel().Connect(lb.entryMux.In2)
 
 	lb.exitDemux.Out2.Connect(lb.bodyReg.In)
 	lb.bodyReg.Out.Connect(body.InChannel())
 
-	lb.variables = make(map[string]*variable.VariableInfo)
-
-	lb.predecessor = predecessor
-
-	fmt.Printf("loop  block %d created with width %d\n", loopBlockNr-1, lb.variablesSize)
-
 	return lb
 }
 
-func (lb *LoopBlock) InChannel() *HandshakeChannel {
-	return lb.In
-}
-
-func (lb *LoopBlock) OutChannel() *HandshakeChannel {
-	return lb.Out
-}
-
-func (lb *LoopBlock) Component() string {
+func (lb *LoopBlock) ComponentStr() string {
 	name := loopBlockPrefix + strconv.Itoa(lb.Nr)
 
 	return name + `: entity work.LoopBlock(` + lb.archName + `)
   generic map(
-    DATA_WIDTH => ` + strconv.Itoa(*lb.GetVariablesSize()) + `
+    DATA_WIDTH => ` + strconv.Itoa(lb.GetVariableSize()) + `
   )
   port map (
     rst => rst,
     in_ack => ` + lb.In.Ack + `,
     in_req => ` + lb.In.Req + `,
-    in_data => std_logic_vector(resize(unsigned(` + lb.In.Data + `), ` + strconv.Itoa(*lb.GetVariablesSize()) + `)),
+    in_data => std_logic_vector(resize(unsigned(` + lb.In.Data + `), ` + strconv.Itoa(lb.GetVariableSize()) + `)),
     -- Output channel
     out_req => ` + lb.Out.Req + `,
     out_data => ` + lb.Out.Data + `,
@@ -173,40 +157,24 @@ func (lb *LoopBlock) Architecture() string {
 
 	ret += "\n"
 
-	ret += lb.entryMux.Component()
+	ret += lb.entryMux.ComponentStr()
 	ret += "\n"
-	ret += lb.initRegFork.Component()
+	ret += lb.initRegFork.ComponentStr()
 	ret += "\n"
-	ret += lb.loopCond.Component()
+	ret += lb.loopCond.ComponentStr()
 	ret += "\n"
-	ret += lb.condFork.Component()
+	ret += lb.condFork.ComponentStr()
 	ret += "\n"
-	ret += lb.condReg.Component()
+	ret += lb.condReg.ComponentStr()
 	ret += "\n"
-	ret += lb.exitDemux.Component()
+	ret += lb.exitDemux.ComponentStr()
 	ret += "\n"
-	ret += lb.bodyReg.Component()
+	ret += lb.bodyReg.ComponentStr()
 	ret += "\n"
-	ret += lb.body.Component()
+	ret += lb.body.ComponentStr()
 	ret += "\n"
 
 	ret += `end ` + lb.archName + `;
 	`
 	return ret
-}
-
-func (lb *LoopBlock) ArchName() string {
-	return lb.archName
-}
-
-func (lb *LoopBlock) ScopedVariables() map[string]*variable.VariableInfo {
-	return lb.variables
-}
-
-func (lb *LoopBlock) Predecessor() BodyComponent {
-	return lb.predecessor
-}
-
-func (lb *LoopBlock) GetVariablesSize() *int {
-	return &lb.variablesSize
 }

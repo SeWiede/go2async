@@ -1,7 +1,6 @@
 package components
 
 import (
-	"go2async/pkg/variable"
 	"strconv"
 	"strings"
 )
@@ -9,44 +8,42 @@ import (
 const ifBlockPrefix = "IF_"
 
 type IfBlock struct {
-	Nr       int
-	archName string
+	BodyComponent
+
+	Nr int
 
 	entryFork *Fork
 	cond      *SelectorBlock
 	demux     *DEMUX
-	thenBody  BodyComponent
-	elseBody  BodyComponent
+	thenBody  BodyComponentType
+	elseBody  BodyComponentType
 	merger    *Merge
-
-	In  *HandshakeChannel
-	Out *HandshakeChannel
-
-	variables map[string]*variable.VariableInfo
-
-	predecessor   BodyComponent
-	variablesSize int
 }
 
 var ifBlockNr = 0
 
-func NewIfBlock(cond *SelectorBlock, thenBody, elseBody, predecessor BodyComponent) *IfBlock {
+func NewIfBlock(cond *SelectorBlock, thenBody, elseBody BodyComponentType, parent *Block) *IfBlock {
 	nr := ifBlockNr
 	ifBlockNr++
 
 	name := strings.ToLower(ifBlockPrefix + strconv.Itoa(nr))
 	ib := &IfBlock{
-		Nr:       nr,
-		archName: archPrefix + name,
-		In: &HandshakeChannel{
-			Out: false,
+		BodyComponent: BodyComponent{
+			archName: archPrefix + name,
+			In: &HandshakeChannel{
+				Out: false,
+			},
+			Out: &HandshakeChannel{
+				Req:       name + "_o_req",
+				Ack:       name + "_o_ack",
+				Data:      name + "_data",
+				Out:       true,
+				DataWidth: parent.GetCurrentVariableSize(),
+			},
+			variableSize: parent.GetCurrentVariableSize(),
+			parent:       parent,
 		},
-		Out: &HandshakeChannel{
-			Req:  name + "_o_req",
-			Ack:  name + "_o_ack",
-			Data: name + "_data",
-			Out:  true,
-		},
+		Nr: nr,
 	}
 
 	ib.thenBody = thenBody
@@ -78,37 +75,21 @@ func NewIfBlock(cond *SelectorBlock, thenBody, elseBody, predecessor BodyCompone
 
 	ib.merger.Out = ib.Out
 
-	ib.variables = make(map[string]*variable.VariableInfo)
-
-	ib.predecessor = predecessor
-
-	ib.variablesSize = *predecessor.GetVariablesSize()
-
-	ib.Out.DataWidth = ib.GetVariablesSize()
-
 	return ib
 }
 
-func (ib *IfBlock) InChannel() *HandshakeChannel {
-	return ib.In
-}
-
-func (ib *IfBlock) OutChannel() *HandshakeChannel {
-	return ib.Out
-}
-
-func (ib *IfBlock) Component() string {
+func (ib *IfBlock) ComponentStr() string {
 	name := ifBlockPrefix + strconv.Itoa(ib.Nr)
 
 	return name + `: entity work.IfBlock(` + ib.archName + `)
   generic map(
-    DATA_WIDTH => ` + strconv.Itoa(*ib.GetVariablesSize()) + `
+    DATA_WIDTH => ` + strconv.Itoa(ib.GetVariableSize()) + `
   )
   port map (
     rst => rst,
     in_ack => ` + ib.In.Ack + `,
     in_req => ` + ib.In.Req + `,
-    in_data => std_logic_vector(resize(unsigned(` + ib.In.Data + `), ` + strconv.Itoa(*ib.GetVariablesSize()) + `)),
+    in_data => std_logic_vector(resize(unsigned(` + ib.In.Data + `), ` + strconv.Itoa(ib.GetVariableSize()) + `)),
     -- Output channel
     out_req => ` + ib.Out.Req + `,
     out_data => ` + ib.Out.Data + `,
@@ -147,36 +128,20 @@ func (ib *IfBlock) Architecture() string {
 
 	ret += "\n"
 
-	ret += ib.entryFork.Component()
+	ret += ib.entryFork.ComponentStr()
 	ret += "\n"
-	ret += ib.cond.Component()
+	ret += ib.cond.ComponentStr()
 	ret += "\n"
-	ret += ib.demux.Component()
+	ret += ib.demux.ComponentStr()
 	ret += "\n"
-	ret += ib.thenBody.Component()
+	ret += ib.thenBody.ComponentStr()
 	ret += "\n"
-	ret += ib.elseBody.Component()
+	ret += ib.elseBody.ComponentStr()
 	ret += "\n"
-	ret += ib.merger.Component()
+	ret += ib.merger.ComponentStr()
 	ret += "\n"
 
 	ret += `end ` + ib.archName + `;
 	`
 	return ret
-}
-
-func (ib *IfBlock) ArchName() string {
-	return ib.archName
-}
-
-func (ib *IfBlock) ScopedVariables() map[string]*variable.VariableInfo {
-	return ib.variables
-}
-
-func (ib *IfBlock) Predecessor() BodyComponent {
-	return ib.predecessor
-}
-
-func (ib *IfBlock) GetVariablesSize() *int {
-	return &ib.variablesSize
 }
