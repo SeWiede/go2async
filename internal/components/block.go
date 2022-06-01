@@ -170,14 +170,7 @@ func (b *Block) ioChannels() string {
 	} else {
 		ret += "out_req <= " + b.OutChannel().Req + "; \n"
 		ret += b.OutChannel().Ack + " <= out_ack; \n"
-
-		/*lowerBound := "0"
-		if *b.GetVariablesSize() != *b.Out.DataWidth {
-			lowerBound = strconv.Itoa(*b.GetVariablesSize())
-		}*/
-
-		//ret += "out_data <= " + b.OutChannel().Data + "(" + strconv.Itoa(*b.OutChannel().DataWidth) + " - 1 downto " + lowerBound + "); \n"
-		ret += "out_data <= " + b.OutChannel().Data + "(" + b.OutChannel().Data + "'length - 1 downto " + b.OutChannel().Data + "'length - out_data'length); \n"
+		ret += "out_data <= std_logic_vector(resize(unsigned(" + b.OutChannel().Data + "), out_data'length)); \n"
 	}
 
 	return ret
