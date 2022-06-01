@@ -51,8 +51,6 @@ func NewLoopBlock(loopCond *SelectorBlock, body BodyComponentType, parent *Block
 		Nr: nr,
 	}
 
-	//fmt.Printf("varialbesize of parrent : %d\n", parent.GetCurrentVariableSize())
-
 	entryIn := &HandshakeChannel{
 		Req:  "in_req",
 		Ack:  "in_ack",
