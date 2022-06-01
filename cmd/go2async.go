@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"go2async/internal/globalArguments"
 	"go2async/pkg/hwgenerator"
@@ -36,7 +37,7 @@ func main() {
 		Args:    cobra.RangeArgs(1, 2),
 	}
 
-	globalArguments.IntSize = genCmd.Flags().Int("intSize", 4, "overrides default intSize")
+	globalArguments.IntSize = genCmd.Flags().Int("intSize", 4, "overrides default intSize (>= 0)")
 	cmd.AddCommand(genCmd)
 
 	if _, err := cmd.ExecuteC(); err != nil {
@@ -46,12 +47,17 @@ func main() {
 }
 
 func generate(c *cobra.Command, args []string) error {
+	if *globalArguments.IntSize <= 0 {
+		fmt.Errorf("IntSize has to be >= 0")
+		return errors.New("Invalid intSize")
+	}
+
 	file := args[0]
 	outfile := os.Stdout
 	if len(args) > 1 {
 		of, err := os.OpenFile(args[1], os.O_CREATE|os.O_RDWR, 0644)
 		if err != nil {
-			fmt.Println("Failed to open file '"+args[1]+"': ", err.Error())
+			fmt.Errorf("Failed to open file '"+args[1]+"': ", err.Error())
 			return nil
 		}
 		outfile = of
@@ -59,17 +65,17 @@ func generate(c *cobra.Command, args []string) error {
 
 	gen := hwgenerator.NewGenerator(*globalArguments.IntSize)
 	if err := gen.ParseGoFile(file); err != nil {
-		fmt.Println("Parsing go file failed:\n", err.Error())
+		fmt.Errorf("Parsing go file failed:\n", err.Error())
 		return nil
 	}
 
 	if err := gen.SaveVHDL(outfile); err != nil {
-		fmt.Println("Saving vhdl failed: ", err.Error())
+		fmt.Errorf("Saving vhdl failed: ", err.Error())
 		return nil
 	}
 
 	if outfile != os.Stdout {
-		fmt.Println("Saved in ", outfile.Name())
+		fmt.Errorf("Saved in ", outfile.Name())
 	}
 
 	return nil

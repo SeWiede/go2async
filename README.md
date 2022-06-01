@@ -39,6 +39,7 @@ A full example adjusted for the terasic DE0-CV board can be found in example/vhd
 # Note 
     - everything is treated unsigned so far 
     - Uints and ints are downsized to 4-bit values (use u/int8, 16, etc. for bigger variables)
+      - int/uint can be resized with --intSize <number>
     - the used delays are purely estimated with few practical tests
 
 # References
