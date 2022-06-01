@@ -606,7 +606,8 @@ func (g *Generator) GenerateScope(f *ast.FuncDecl) (s *components.Scope, err err
 		return nil, errors.New("At least one top-level statement + return expected")
 	}
 
-	block, err := g.GenerateBlock(f.Body.List[0:fields-1], true, paramDummyBlock)
+	// TODO: assign toplevelstatement bool true again later
+	block, err := g.GenerateBlock(f.Body.List[0:fields-1], false, paramDummyBlock)
 	if err != nil {
 		return nil, err
 	}
