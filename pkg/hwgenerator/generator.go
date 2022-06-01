@@ -46,63 +46,6 @@ func NewGenerator(intSize int) *Generator {
 	}
 }
 
-/* // NewVariable sets new varible at next pos, does nothing if variable is already known; returns error on unknwon type
-func (g *Generator) NewVariable(name string, typ string) (*variable.VariableInfo, error) {
-	size, ok := SupportedTypes[typ]
-	if !ok {
-		return nil, errors.New("Unsupported type '" + typ + "'")
-	}
-	if _, ok := g.knownVariables[name]; !ok {
-		g.knownVariables[name] = &variable.VariableInfo{
-			Position: cvp,
-			Size:     size,
-			Typ:      typ,
-			Len:      1,
-		}
-		cvp += size
-	}
-	return g.knownVariables[name].Copy(), nil
-}
-
-// NewVariable sets new varible at next pos, does nothing if variable is already known; returns error on unknwon type
-func (g *Generator) NewArrayVariable(name string, typ string, lenStr string) (*variable.VariableInfo, error) {
-	size, ok := SupportedTypes[typ]
-	if !ok {
-		return nil, errors.New("Unsupported type '" + typ + "'")
-	}
-	len, err := strconv.Atoi(lenStr)
-	if err != nil {
-		return nil, err
-	}
-	if len <= 0 {
-		return nil, errors.New("Invalid array lentgh " + lenStr)
-	}
-
-	if _, ok := g.knownVariables[name]; !ok {
-		g.knownVariables[name] = &variable.VariableInfo{
-			Position: cvp,
-			Size:     size,
-			Typ:      typ,
-			Len:      len,
-		}
-		cvp += size * len
-	}
-	return g.knownVariables[name].Copy(), nil
-}
-
-func (g *Generator) GetVariablePos(name string) (*variable.VariableInfo, error) {
-	if kv, ok := g.knownVariables[name]; !ok {
-		return nil, errors.New("Unknown variable '" + name + "'")
-	} else {
-		return kv.Copy(), nil
-	}
-} */
-
-func (g *Generator) GetNextWire() int {
-	g.wires++
-	return g.wires
-}
-
 func (g *Generator) GenerateFuncBlock(result *variable.VariableInfo, be *ast.BinaryExpr, parent *components.Block) (fb *components.FuncBlock, err error) {
 	xexpr := be.X
 	yexpr := be.Y
@@ -121,21 +64,11 @@ func (g *Generator) GenerateFuncBlock(result *variable.VariableInfo, be *ast.Bin
 			Size:  result.Size,
 		}
 	case *ast.Ident:
-		/* x, err = g.GetVariablePos(t.Name)
-		if err != nil {
-			return nil, err
-		} */
-
 		x, err = parent.GetVariable(t.Name)
 		if err != nil {
 			return nil, err
 		}
 	case *ast.IndexExpr:
-		/* x, err = g.GetVariablePos(t.X.(*ast.Ident).Name)
-		if err != nil {
-			return nil, err
-		} */
-
 		x, err = parent.GetVariable(t.X.(*ast.Ident).Name)
 		if err != nil {
 			return nil, err
@@ -148,11 +81,6 @@ func (g *Generator) GenerateFuncBlock(result *variable.VariableInfo, be *ast.Bin
 			}
 			x.Index = indexNode.Value
 		case *ast.Ident:
-			/* v, err := g.GetVariablePos(indexNode.Name)
-			if err != nil {
-				return nil, err
-			} */
-
 			v, err := parent.GetVariable(t.X.(*ast.Ident).Name)
 			if err != nil {
 				return nil, err
@@ -177,21 +105,11 @@ func (g *Generator) GenerateFuncBlock(result *variable.VariableInfo, be *ast.Bin
 			Size:  result.Size,
 		}
 	case *ast.Ident:
-		/* y, err = g.GetVariablePos(t.Name)
-		if err != nil {
-			return nil, err
-		} */
-
 		y, err = parent.GetVariable(t.Name)
 		if err != nil {
 			return nil, err
 		}
 	case *ast.IndexExpr:
-		/* y, err = g.GetVariablePos(t.X.(*ast.Ident).Name)
-		if err != nil {
-			return nil, err
-		} */
-
 		y, err = parent.GetVariable(t.X.(*ast.Ident).Name)
 		if err != nil {
 			return nil, err
@@ -204,11 +122,6 @@ func (g *Generator) GenerateFuncBlock(result *variable.VariableInfo, be *ast.Bin
 			}
 			y.Index = indexNode.Value
 		case *ast.Ident:
-			/* v, err := g.GetVariablePos(indexNode.Name)
-			if err != nil {
-				return nil, err
-			} */
-
 			v, err := parent.GetVariable(indexNode.Name)
 			if err != nil {
 				return nil, err
@@ -250,21 +163,11 @@ func (g *Generator) GenerateSelectorBlock(be *ast.BinaryExpr, inverted bool, par
 			Const: t.Value,
 		}
 	case *ast.Ident:
-		/* x, err = g.GetVariablePos(t.Name)
-		if err != nil {
-			return nil, err
-		} */
-
 		x, err = parent.GetVariable(t.Name)
 		if err != nil {
 			return nil, err
 		}
 	case *ast.IndexExpr:
-		/* x, err = g.GetVariablePos(t.X.(*ast.Ident).Name)
-		if err != nil {
-			return nil, err
-		} */
-
 		x, err = parent.GetVariable(t.X.(*ast.Ident).Name)
 		if err != nil {
 			return nil, err
@@ -277,11 +180,6 @@ func (g *Generator) GenerateSelectorBlock(be *ast.BinaryExpr, inverted bool, par
 			}
 			x.Index = indexNode.Value
 		case *ast.Ident:
-			/* v, err := g.GetVariablePos(indexNode.Name)
-			if err != nil {
-				return nil, err
-			} */
-
 			v, err := parent.GetVariable(indexNode.Name)
 			if err != nil {
 				return nil, err
@@ -306,21 +204,11 @@ func (g *Generator) GenerateSelectorBlock(be *ast.BinaryExpr, inverted bool, par
 			Size:  x.Size,
 		}
 	case *ast.Ident:
-		/* y, err = g.GetVariablePos(t.Name)
-		if err != nil {
-			return nil, err
-		} */
-
 		y, err = parent.GetVariable(t.Name)
 		if err != nil {
 			return nil, err
 		}
 	case *ast.IndexExpr:
-		/* y, err = g.GetVariablePos(t.X.(*ast.Ident).Name)
-		if err != nil {
-			return nil, err
-		} */
-
 		y, err = parent.GetVariable(t.X.(*ast.Ident).Name)
 		if y == nil {
 			return nil, err
@@ -333,11 +221,6 @@ func (g *Generator) GenerateSelectorBlock(be *ast.BinaryExpr, inverted bool, par
 			}
 			y.Index = indexNode.Value
 		case *ast.Ident:
-			/* v, err := g.GetVariablePos(indexNode.Name)
-			if err != nil {
-				return nil, err
-			} */
-
 			v, err := parent.GetVariable(indexNode.Name)
 			if err != nil {
 				return nil, err
@@ -493,11 +376,6 @@ func (g *Generator) GenerateBodyBlock(s ast.Stmt, parent *components.Block) (c c
 		for _, spec := range decl.Specs[0].(*ast.ValueSpec).Names {
 			switch declType := decl.Specs[0].(*ast.ValueSpec).Type.(type) {
 			case *ast.Ident:
-				/* _, err = g.NewVariable(spec.Name, declType.Name)
-				if err != nil {
-					return nil, err
-				} */
-
 				if _, err := parent.NewVariable(spec.Name, declType.Name, 1); err != nil {
 					return nil, err
 				}
@@ -514,11 +392,6 @@ func (g *Generator) GenerateBodyBlock(s ast.Stmt, parent *components.Block) (c c
 				if !ok {
 					return nil, errors.New("Invalid array declaration")
 				}
-
-				/* _, err = g.NewArrayVariable(spec.Name, elt.Name, len.Value)
-				if err != nil {
-					return nil, err
-				} */
 
 				leni, err := strconv.Atoi(len.Value)
 				if err != nil {
@@ -546,11 +419,6 @@ func (g *Generator) GenerateBodyBlock(s ast.Stmt, parent *components.Block) (c c
 
 			switch lhstype := lhsexpr.Lhs[0].(type) {
 			case *ast.Ident:
-				/* lhs, err = g.GetVariablePos(lhstype.Name)
-				if err != nil {
-					return nil, err
-				} */
-
 				lhs, err = parent.GetVariable(lhstype.Name)
 				if err != nil {
 					return nil, err
@@ -561,10 +429,6 @@ func (g *Generator) GenerateBodyBlock(s ast.Stmt, parent *components.Block) (c c
 					return nil, errors.New("Lhs index expression X has to be an identifier")
 				}
 
-				/* lhs, err = g.GetVariablePos(X.Name)
-				if err != nil {
-					return nil, err
-				} */
 				lhs, err = parent.GetVariable(X.Name)
 				if err != nil {
 					return nil, err
@@ -577,11 +441,6 @@ func (g *Generator) GenerateBodyBlock(s ast.Stmt, parent *components.Block) (c c
 					}
 					lhs.Index = indexNode.Value
 				case *ast.Ident:
-					/* v, err := g.GetVariablePos(indexNode.Name)
-					if err != nil {
-						return nil, err
-					} */
-
 					v, err := parent.GetVariable(indexNode.Name)
 					if err != nil {
 						return nil, err
@@ -604,11 +463,6 @@ func (g *Generator) GenerateBodyBlock(s ast.Stmt, parent *components.Block) (c c
 					return nil, errors.New(strconv.Itoa(int(lhsexpr.Pos())) + ": Unsupported type '" + typ + "'")
 				}
 
-				/* lhs, err = g.NewVariable(lhsexpr.Lhs[0].(*ast.Ident).Name, typ)
-				if err != nil {
-					return nil, err
-				} */
-
 				if lhs, err = parent.NewVariable(lhsexpr.Lhs[0].(*ast.Ident).Name, typ, 1); err != nil {
 					return nil, err
 				}
@@ -622,22 +476,12 @@ func (g *Generator) GenerateBodyBlock(s ast.Stmt, parent *components.Block) (c c
 				},
 			}, parent), nil
 		case *ast.Ident:
-			/* v, err := g.GetVariablePos(rhsExpr.Name)
-			if err != nil {
-				return nil, err
-			} */
-
 			v, err := parent.GetVariable(rhsExpr.Name)
 			if err != nil {
 				return nil, err
 			}
 
 			if newVar {
-				/* lhs, err = g.NewVariable(lhsexpr.Lhs[0].(*ast.Ident).Name, v.Typ)
-				if err != nil {
-					return nil, err
-				} */
-
 				if lhs, err = parent.NewVariable(lhsexpr.Lhs[0].(*ast.Ident).Name, v.Typ, 1); err != nil {
 					return nil, err
 				}
@@ -653,11 +497,6 @@ func (g *Generator) GenerateBodyBlock(s ast.Stmt, parent *components.Block) (c c
 			}
 			return g.GenerateFuncBlock(lhs.Copy(), rhsExpr, parent)
 		case *ast.IndexExpr:
-			/* v, err := g.GetVariablePos(rhsExpr.X.(*ast.Ident).Name)
-			if err != nil {
-				return nil, err
-			} */
-
 			v, err := parent.GetVariable(rhsExpr.X.(*ast.Ident).Name)
 			if err != nil {
 				return nil, err
@@ -670,11 +509,6 @@ func (g *Generator) GenerateBodyBlock(s ast.Stmt, parent *components.Block) (c c
 				}
 				v.Index = indexNode.Value
 			case *ast.Ident:
-				/* vn, err := g.GetVariablePos(indexNode.Name)
-				if err != nil {
-					return nil, err
-				} */
-
 				vn, err := parent.GetVariable(indexNode.Name)
 				if err != nil {
 					return nil, err
@@ -686,11 +520,6 @@ func (g *Generator) GenerateBodyBlock(s ast.Stmt, parent *components.Block) (c c
 			}
 
 			if newVar {
-				/* lhs, err = g.NewVariable(lhsexpr.Lhs[0].(*ast.Ident).Name, v.Typ)
-				if err != nil {
-					return nil, err
-				} */
-
 				if lhs, err = parent.NewVariable(lhsexpr.Lhs[0].(*ast.Ident).Name, v.Typ, 1); err != nil {
 					return nil, err
 				}
@@ -744,11 +573,6 @@ func (g *Generator) GenerateScope(f *ast.FuncDecl) (s *components.Scope, err err
 		for _, param := range field.Names {
 			switch fieldType := field.Type.(type) {
 			case *ast.Ident:
-				/* np, err := g.NewVariable(param.Name, fieldType.Name)
-				if err != nil {
-					return nil, err
-				} */
-
 				np, err := paramDummyBlock.NewVariable(param.Name, fieldType.Name, 1)
 				if err != nil {
 					return nil, err
@@ -756,11 +580,6 @@ func (g *Generator) GenerateScope(f *ast.FuncDecl) (s *components.Scope, err err
 
 				params[param.Name] = np
 			case *ast.ArrayType:
-				/* np, err := g.NewArrayVariable(param.Name, fieldType.Elt.(*ast.Ident).Name, fieldType.Len.(*ast.BasicLit).Value)
-				if err != nil {
-					return nil, err
-				} */
-
 				len, err := strconv.Atoi(fieldType.Len.(*ast.BasicLit).Value)
 				if err != nil {
 					return nil, err
@@ -793,9 +612,6 @@ func (g *Generator) GenerateScope(f *ast.FuncDecl) (s *components.Scope, err err
 	}
 	block.OutputSize = block.ScopedVariables().GetSize()
 
-	// last block outputs all declared variables
-	//*block.GetVariablesSize() = *lastBodyComp.GetVariablesSize()
-
 	rs, ok := f.Body.List[fields-1].(*ast.ReturnStmt)
 	if !ok {
 		return nil, errors.New("Missing return statement at the end")
@@ -805,11 +621,6 @@ func (g *Generator) GenerateScope(f *ast.FuncDecl) (s *components.Scope, err err
 	for _, res := range rs.Results {
 		switch x := res.(type) {
 		case *ast.Ident:
-			/* vi, ok := g.knownVariables[x.Name]
-			if !ok {
-				return nil, errors.New("No new variable in returns allowed")
-			} */
-
 			vi, err := block.GetVariable(x.Name)
 			if err != nil {
 				return nil, err
@@ -817,11 +628,6 @@ func (g *Generator) GenerateScope(f *ast.FuncDecl) (s *components.Scope, err err
 
 			returnPositions = append(returnPositions, vi)
 		case *ast.IndexExpr:
-			/* vi, ok := g.knownVariables[x.X.(*ast.Ident).Name]
-			if !ok {
-				return nil, errors.New("Invalid return base address identifier")
-			} */
-
 			vi, err := block.GetVariable(x.X.(*ast.Ident).Name)
 			if err != nil {
 				return nil, err
