@@ -48,7 +48,7 @@ func main() {
 
 func generate(c *cobra.Command, args []string) error {
 	if *globalArguments.IntSize <= 0 {
-		fmt.Errorf("IntSize has to be >= 0")
+		fmt.Println("IntSize has to be >= 0")
 		return errors.New("Invalid intSize")
 	}
 
@@ -57,7 +57,7 @@ func generate(c *cobra.Command, args []string) error {
 	if len(args) > 1 {
 		of, err := os.OpenFile(args[1], os.O_CREATE|os.O_RDWR, 0644)
 		if err != nil {
-			fmt.Errorf("Failed to open file '"+args[1]+"': ", err.Error())
+			fmt.Println("Failed to open file '"+args[1]+"': ", err.Error())
 			return nil
 		}
 		outfile = of
@@ -65,17 +65,17 @@ func generate(c *cobra.Command, args []string) error {
 
 	gen := hwgenerator.NewGenerator(*globalArguments.IntSize)
 	if err := gen.ParseGoFile(file); err != nil {
-		fmt.Errorf("Parsing go file failed:\n", err.Error())
+		fmt.Println("Parsing go file failed:\n", err.Error())
 		return nil
 	}
 
 	if err := gen.SaveVHDL(outfile); err != nil {
-		fmt.Errorf("Saving vhdl failed: ", err.Error())
+		fmt.Println("Saving vhdl failed: ", err.Error())
 		return nil
 	}
 
 	if outfile != os.Stdout {
-		fmt.Errorf("Saved in ", outfile.Name())
+		fmt.Println("Saved in ", outfile.Name())
 	}
 
 	return nil

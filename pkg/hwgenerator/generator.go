@@ -649,6 +649,7 @@ func (g *Generator) GenerateScope(f *ast.FuncDecl) (s *components.Scope, err err
 
 			returnPositions = append(returnPositions, vi)
 		default:
+			return nil, g.peb.NewParseError(f, errors.New("Invalid expression in return"))
 		}
 	}
 
