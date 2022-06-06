@@ -50,7 +50,187 @@ func NewGenerator(intSize int) *Generator {
 	}
 }
 
-func (g *Generator) GenerateFuncBlock(result *variable.VariableInfo, be *ast.BinaryExpr, parent *components.Block) (fb *components.FuncBlock, err error) {
+func (g *Generator) GenerateFuncBlock(s *ast.AssignStmt, parent *components.Block) (fb *components.FuncBlock, err error) {
+	if len(s.Lhs) > 1 {
+		return nil, g.peb.NewParseError(s, errors.New("Expression lists are not allowed"))
+	}
+
+	lhsExpr := s.Lhs[0]
+	rhsExpr := s.Rhs[0]
+
+	/////////////////////////////////
+
+	var lhsVar *variable.VariableInfo
+	newVar := false
+
+	if s.Tok == token.DEFINE { // :=
+		newVar = true
+		// get var after looking at RHS ... we need to determine type
+	} else if s.Tok == token.ASSIGN { // =
+		switch lhstype := lhsExpr.(type) {
+		case *ast.Ident:
+			lhsVar, err = parent.GetVariable(lhstype.Name)
+			if err != nil {
+				return nil, g.peb.NewParseError(s, err)
+			}
+		case *ast.IndexExpr:
+			X, ok := lhstype.X.(*ast.Ident)
+			if !ok {
+				return nil, g.peb.NewParseError(s, errors.New("Lhs index expression X has to be an identifier"))
+			}
+
+			lhsVar, err = parent.GetVariable(X.Name)
+			if err != nil {
+				return nil, g.peb.NewParseError(s, err)
+			}
+
+			switch indexNode := lhstype.Index.(type) {
+			case *ast.BasicLit:
+				if indexNode.Kind != token.INT {
+					return nil, g.peb.NewParseError(s, errors.New("Invalid indexing value kind '"+indexNode.Kind.String()+"'"))
+				}
+				lhsVar.Index = indexNode.Value
+			case *ast.Ident:
+				v, err := parent.GetVariable(indexNode.Name)
+				if err != nil {
+					return nil, g.peb.NewParseError(s, err)
+				}
+
+				lhsVar.IndexIdent = v
+			default:
+				return nil, g.peb.NewParseError(s, errors.New("Invalid indexing"))
+			}
+		default:
+			return nil, g.peb.NewParseError(s, errors.New("Invalid lhs type '"+reflect.TypeOf(lhsExpr).String()+"'"))
+		}
+	} else { // ?
+		return nil, g.peb.NewParseError(s, errors.New("Invalid token in assign statement (expected '=' or ':=')"))
+	}
+
+	switch rhsExpr := rhsExpr.(type) {
+	case *ast.BasicLit:
+		if newVar {
+			typ := getTypeOfString(rhsExpr.Value)
+			if _, ok := SupportedTypes[typ]; !ok {
+				return nil, g.peb.NewParseError(s, errors.New(strconv.Itoa(int(lhsExpr.Pos()))+": Unsupported type '"+typ+"'"))
+			}
+
+			if lhsVar, err = parent.NewVariable(lhsExpr.(*ast.Ident).Name, typ, 1); err != nil {
+				return nil, g.peb.NewParseError(s, err)
+			}
+		}
+
+		newFuncBlk := components.NewFuncBlock("=", &components.OperandInfo{
+			R: lhsVar,
+			X: &variable.VariableInfo{
+				Const: rhsExpr.Value,
+				Size:  lhsVar.Size,
+			},
+		}, parent)
+
+		g.components[newFuncBlk.ArchName()] = newFuncBlk
+		parent.AddComponent(newFuncBlk)
+
+		return newFuncBlk, nil
+	case *ast.Ident:
+		v, err := parent.GetVariable(rhsExpr.Name)
+		if err != nil {
+			return nil, g.peb.NewParseError(s, err)
+		}
+
+		if newVar {
+			if lhsVar, err = parent.NewVariable(lhsExpr.(*ast.Ident).Name, v.Typ, 1); err != nil {
+				return nil, g.peb.NewParseError(s, err)
+			}
+		}
+
+		newFuncBlk := components.NewFuncBlock("=", &components.OperandInfo{
+			R: lhsVar,
+			X: v,
+		}, parent)
+
+		g.components[newFuncBlk.ArchName()] = newFuncBlk
+		parent.AddComponent(newFuncBlk)
+
+		return newFuncBlk, nil
+	case *ast.IndexExpr:
+		v, err := parent.GetVariable(rhsExpr.X.(*ast.Ident).Name)
+		if err != nil {
+			return nil, g.peb.NewParseError(s, err)
+		}
+
+		switch indexNode := rhsExpr.Index.(type) {
+		case *ast.BasicLit:
+			if indexNode.Kind != token.INT {
+				return nil, g.peb.NewParseError(s, errors.New("Invalid indexing value kind '"+indexNode.Kind.String()+"'"))
+			}
+			v.Index = indexNode.Value
+		case *ast.Ident:
+			vn, err := parent.GetVariable(indexNode.Name)
+			if err != nil {
+				return nil, g.peb.NewParseError(s, err)
+			}
+
+			v.IndexIdent = vn
+		default:
+			return nil, g.peb.NewParseError(s, errors.New("Invalid indexing"))
+		}
+
+		if newVar {
+			if lhsVar, err = parent.NewVariable(lhsExpr.(*ast.Ident).Name, v.Typ, 1); err != nil {
+				return nil, g.peb.NewParseError(s, err)
+			}
+		}
+
+		newFuncBlk := components.NewFuncBlock("=", &components.OperandInfo{
+			R: lhsVar,
+			X: v,
+		}, parent)
+
+		g.components[newFuncBlk.ArchName()] = newFuncBlk
+		parent.AddComponent(newFuncBlk)
+
+		return newFuncBlk, nil
+
+	case *ast.BinaryExpr:
+		if newVar {
+			// TODO: infer size first
+			return nil, g.peb.NewParseError(s, errors.New("Cannot initialize variable with binary expression"))
+		}
+
+		tmpBlock, err := g.GenerateBlock([]ast.Stmt{}, false, parent, false)
+		if err != nil {
+			return nil, g.peb.NewParseError(s, err)
+		}
+
+		tmpVar, err := tmpBlock.NewVariable("__g2a_tempVar", lhsVar.Typ, lhsVar.Len)
+		if err != nil {
+			return nil, g.peb.NewParseError(s, err)
+		}
+
+		g.components[tmpBlock.ArchName()] = tmpBlock
+		parent.AddComponent(tmpBlock)
+
+		_, err = g.GenerateBinaryExpressionFuncBlock(tmpVar, rhsExpr, tmpBlock)
+		if err != nil {
+			return nil, g.peb.NewParseError(s, err)
+		}
+
+		newFuncBlk := components.NewFuncBlock("=", &components.OperandInfo{
+			R: lhsVar,
+			X: tmpVar,
+		}, tmpBlock)
+
+		g.components[newFuncBlk.ArchName()] = newFuncBlk
+		parent.AddComponent(newFuncBlk)
+
+		return newFuncBlk, nil
+	default:
+		return nil, g.peb.NewParseError(s, errors.New("Expression "+reflect.TypeOf(rhsExpr).String()+" in rhs not supported!"))
+	}
+}
+
+func (g *Generator) GenerateBinaryExpressionFuncBlock(result *variable.VariableInfo, be *ast.BinaryExpr, parent *components.Block) (fb *components.FuncBlock, err error) {
 	xexpr := be.X
 	yexpr := be.Y
 
@@ -62,6 +242,11 @@ func (g *Generator) GenerateFuncBlock(result *variable.VariableInfo, be *ast.Bin
 	}
 
 	switch t := xexpr.(type) {
+	case *ast.BinaryExpr:
+		infoprinter.DebugPrintln("nexted binary expression left: ", t.X, t.Op.String(), t.Y)
+
+		g.GenerateBinaryExpressionFuncBlock(result, t, parent)
+		x = result
 	case *ast.BasicLit:
 		x = &variable.VariableInfo{
 			Const: t.Value,
@@ -103,6 +288,9 @@ func (g *Generator) GenerateFuncBlock(result *variable.VariableInfo, be *ast.Bin
 	}
 
 	switch t := yexpr.(type) {
+	case *ast.BinaryExpr:
+		infoprinter.DebugPrintln("nested binary expression right: ", t.X, t.Op.String(), t.Y)
+		return nil, g.peb.NewParseError(be, errors.New("Binary expression in right side of binary expression not allowed"))
 	case *ast.BasicLit:
 		y = &variable.VariableInfo{
 			Const: t.Value,
@@ -143,11 +331,18 @@ func (g *Generator) GenerateFuncBlock(result *variable.VariableInfo, be *ast.Bin
 		return nil, g.peb.NewParseError(be, errors.New("Invalid type in binary expression: "+ref.String()))
 	}
 
-	return components.NewFuncBlock(operation, &components.OperandInfo{
+	infoprinter.DebugPrintln("generating func: ", result.Name, " = ", x.Name, " ", operation, " ", y.Name, " const: ", y.Const)
+
+	newFuncBlk := components.NewFuncBlock(operation, &components.OperandInfo{
 		R: result,
 		X: x,
 		Y: y,
-	}, parent), nil
+	}, parent)
+
+	g.components[newFuncBlk.ArchName()] = newFuncBlk
+	parent.AddComponent(newFuncBlk)
+
+	return newFuncBlk, nil
 }
 
 func (g *Generator) GenerateSelectorBlock(be *ast.BinaryExpr, inverted bool, parent *components.Block) (c *components.SelectorBlock, err error) {
@@ -282,7 +477,7 @@ func (g *Generator) GenerateIfBlock(is *ast.IfStmt, parent *components.Block) (f
 		return nil, g.peb.NewParseError(is, errors.New("Only binary expression in if condition allowed found "+ref.String()))
 	}
 
-	thenBody, err := g.GenerateBodyBlock(is.Body, parent)
+	thenBody, err := g.GenerateBlock(is.Body.List, false, parent, false)
 	if err != nil {
 		return nil, g.peb.NewParseError(is, err)
 	}
@@ -299,7 +494,7 @@ func (g *Generator) GenerateIfBlock(is *ast.IfStmt, parent *components.Block) (f
 		},
 	}, parent)
 	if is.Else != nil {
-		elseBody, err = g.GenerateBlock(is.Else.(*ast.BlockStmt).List, false, parent)
+		elseBody, err = g.GenerateBlock(is.Else.(*ast.BlockStmt).List, false, parent, false)
 		if err != nil {
 			return nil, g.peb.NewParseError(is, err)
 		}
@@ -309,7 +504,11 @@ func (g *Generator) GenerateIfBlock(is *ast.IfStmt, parent *components.Block) (f
 	g.components[thenBody.ArchName()] = thenBody
 	g.components[elseBody.ArchName()] = elseBody
 
-	return components.NewIfBlock(cond, thenBody, elseBody, parent), nil
+	newIfBlk := components.NewIfBlock(cond, thenBody, elseBody, parent)
+	g.components[newIfBlk.ArchName()] = newIfBlk
+	parent.AddComponent(newIfBlk)
+
+	return newIfBlk, nil
 }
 
 func (g *Generator) GenerateLoopBlock(fs *ast.ForStmt, parent *components.Block) (fb *components.LoopBlock, err error) {
@@ -342,7 +541,7 @@ func (g *Generator) GenerateLoopBlock(fs *ast.ForStmt, parent *components.Block)
 		return nil, g.peb.NewParseError(fs, errors.New("Only binary expression in for condition allowed found "+reflect.TypeOf(x).String()))
 	}
 
-	body, err := g.GenerateBlock(fs.Body.List, false, parent)
+	body, err := g.GenerateBlock(fs.Body.List, false, parent, false)
 	if err != nil {
 		return nil, g.peb.NewParseError(fs, err)
 	}
@@ -350,7 +549,11 @@ func (g *Generator) GenerateLoopBlock(fs *ast.ForStmt, parent *components.Block)
 	g.components[cond.ArchName()] = cond
 	g.components[body.ArchName()] = body
 
-	return components.NewLoopBlock(cond, body, parent), nil
+	newForBlk := components.NewLoopBlock(cond, body, parent)
+	g.components[newForBlk.ArchName()] = newForBlk
+	parent.AddComponent(newForBlk)
+
+	return newForBlk, nil
 }
 
 func getTypeOfString(x string) string {
@@ -361,14 +564,10 @@ func getTypeOfString(x string) string {
 	return "string"
 }
 
-func getNodeLineString(n ast.Node) string {
-	return strconv.Itoa(int(n.Pos()))
-}
-
 func (g *Generator) GenerateBodyBlock(s ast.Stmt, parent *components.Block) (c components.BodyComponentType, err error) {
-	switch lhsexpr := s.(type) {
+	switch sType := s.(type) {
 	case *ast.DeclStmt:
-		decl, ok := lhsexpr.Decl.(*ast.GenDecl)
+		decl, ok := sType.Decl.(*ast.GenDecl)
 		if !ok {
 			return nil, g.peb.NewParseError(s, errors.New("Invalid declaration type!"))
 		} else {
@@ -412,143 +611,21 @@ func (g *Generator) GenerateBodyBlock(s ast.Stmt, parent *components.Block) (c c
 
 		return nil, nil
 	case *ast.AssignStmt:
-		if len(lhsexpr.Lhs) > 1 {
-			return nil, g.peb.NewParseError(s, errors.New("Cannot assign more than one value"))
-		}
-		var lhs *variable.VariableInfo
-		newVar := false
-		if lhsexpr.Tok.String() == ":=" {
-			newVar = true
-		} else {
-
-			switch lhstype := lhsexpr.Lhs[0].(type) {
-			case *ast.Ident:
-				lhs, err = parent.GetVariable(lhstype.Name)
-				if err != nil {
-					return nil, g.peb.NewParseError(s, err)
-				}
-			case *ast.IndexExpr:
-				X, ok := lhstype.X.(*ast.Ident)
-				if !ok {
-					return nil, g.peb.NewParseError(s, errors.New("Lhs index expression X has to be an identifier"))
-				}
-
-				lhs, err = parent.GetVariable(X.Name)
-				if err != nil {
-					return nil, g.peb.NewParseError(s, err)
-				}
-
-				switch indexNode := lhstype.Index.(type) {
-				case *ast.BasicLit:
-					if indexNode.Kind != token.INT {
-						return nil, g.peb.NewParseError(s, errors.New("Invalid indexing value kind '"+indexNode.Kind.String()+"'"))
-					}
-					lhs.Index = indexNode.Value
-				case *ast.Ident:
-					v, err := parent.GetVariable(indexNode.Name)
-					if err != nil {
-						return nil, g.peb.NewParseError(s, err)
-					}
-
-					lhs.IndexIdent = v
-				default:
-					return nil, g.peb.NewParseError(s, errors.New("Invalid indexing"))
-				}
-			default:
-				return nil, g.peb.NewParseError(s, errors.New("Invalid lhs type '"+reflect.TypeOf(lhsexpr).String()+"'"))
-			}
-		}
-
-		switch rhsExpr := lhsexpr.Rhs[0].(type) {
-		case *ast.BasicLit:
-			if newVar {
-				typ := getTypeOfString(rhsExpr.Value)
-				if _, ok := SupportedTypes[typ]; !ok {
-					return nil, g.peb.NewParseError(s, errors.New(strconv.Itoa(int(lhsexpr.Pos()))+": Unsupported type '"+typ+"'"))
-				}
-
-				if lhs, err = parent.NewVariable(lhsexpr.Lhs[0].(*ast.Ident).Name, typ, 1); err != nil {
-					return nil, g.peb.NewParseError(s, err)
-				}
-			}
-
-			return components.NewFuncBlock("=", &components.OperandInfo{
-				R: lhs,
-				X: &variable.VariableInfo{
-					Const: rhsExpr.Value,
-					Size:  lhs.Size,
-				},
-			}, parent), nil
-		case *ast.Ident:
-			v, err := parent.GetVariable(rhsExpr.Name)
-			if err != nil {
-				return nil, g.peb.NewParseError(s, err)
-			}
-
-			if newVar {
-				if lhs, err = parent.NewVariable(lhsexpr.Lhs[0].(*ast.Ident).Name, v.Typ, 1); err != nil {
-					return nil, g.peb.NewParseError(s, err)
-				}
-			}
-
-			return components.NewFuncBlock("=", &components.OperandInfo{
-				R: lhs,
-				X: v,
-			}, parent), nil
-		case *ast.BinaryExpr:
-			if newVar {
-				return nil, g.peb.NewParseError(s, errors.New(getNodeLineString(lhsexpr)+": Cannot initialize variable with binary expression"))
-			}
-			return g.GenerateFuncBlock(lhs.Copy(), rhsExpr, parent)
-		case *ast.IndexExpr:
-			v, err := parent.GetVariable(rhsExpr.X.(*ast.Ident).Name)
-			if err != nil {
-				return nil, g.peb.NewParseError(s, err)
-			}
-
-			switch indexNode := rhsExpr.Index.(type) {
-			case *ast.BasicLit:
-				if indexNode.Kind != token.INT {
-					return nil, g.peb.NewParseError(s, errors.New("Invalid indexing value kind '"+indexNode.Kind.String()+"'"))
-				}
-				v.Index = indexNode.Value
-			case *ast.Ident:
-				vn, err := parent.GetVariable(indexNode.Name)
-				if err != nil {
-					return nil, g.peb.NewParseError(s, err)
-				}
-
-				v.IndexIdent = vn
-			default:
-				return nil, g.peb.NewParseError(s, errors.New("Invalid indexing"))
-			}
-
-			if newVar {
-				if lhs, err = parent.NewVariable(lhsexpr.Lhs[0].(*ast.Ident).Name, v.Typ, 1); err != nil {
-					return nil, g.peb.NewParseError(s, err)
-				}
-			}
-			return components.NewFuncBlock("=", &components.OperandInfo{
-				R: lhs,
-				X: v,
-			}, parent), nil
-		default:
-			return nil, g.peb.NewParseError(s, errors.New("Expression "+reflect.TypeOf(rhsExpr).String()+" in rhs not supported!"))
-		}
+		return g.GenerateFuncBlock(sType, parent)
 	case *ast.ForStmt:
-		return g.GenerateLoopBlock(lhsexpr, parent)
+		return g.GenerateLoopBlock(sType, parent)
 	case *ast.IfStmt:
-		return g.GenerateIfBlock(lhsexpr, parent)
+		return g.GenerateIfBlock(sType, parent)
 	case *ast.ReturnStmt:
 		return nil, g.peb.NewParseError(s, errors.New("Return statements only allowed at the end of function!"))
 	case *ast.BlockStmt:
-		return g.GenerateBlock(lhsexpr.List, false, parent)
+		return g.GenerateBlock(sType.List, false, parent, true)
 	default:
-		return nil, g.peb.NewParseError(s, errors.New("Invalid statement "+reflect.TypeOf(lhsexpr).String()))
+		return nil, g.peb.NewParseError(s, errors.New("Invalid statement "+reflect.TypeOf(sType).String()))
 	}
 }
 
-func (g *Generator) GenerateBlock(stmts []ast.Stmt, toplevelStatement bool, parent *components.Block) (b *components.Block, err error) {
+func (g *Generator) GenerateBlock(stmts []ast.Stmt, toplevelStatement bool, parent *components.Block, addComponentToParent bool) (b *components.Block, err error) {
 	b = components.NewBlock(toplevelStatement, parent)
 
 	for _, s := range stmts {
@@ -560,8 +637,13 @@ func (g *Generator) GenerateBlock(stmts []ast.Stmt, toplevelStatement bool, pare
 			continue
 		}
 
-		g.components[newComponent.ArchName()] = newComponent
-		b.AddComponent(newComponent)
+		/* g.components[newComponent.ArchName()] = newComponent
+		b.AddComponent(newComponent) */
+	}
+
+	if addComponentToParent {
+		g.components[b.ArchName()] = b
+		parent.AddComponent(b)
 	}
 
 	return b, nil
@@ -611,7 +693,7 @@ func (g *Generator) GenerateScope(f *ast.FuncDecl) (s *components.Scope, err err
 	}
 
 	// TODO: assign toplevelstatement bool true again later
-	block, err := g.GenerateBlock(f.Body.List[0:fields-1], false, paramDummyBlock)
+	block, err := g.GenerateBlock(f.Body.List[0:fields-1], false, paramDummyBlock, true)
 	if err != nil {
 		return nil, g.peb.NewParseError(f, err)
 	}

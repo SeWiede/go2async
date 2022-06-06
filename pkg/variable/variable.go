@@ -1,6 +1,7 @@
 package variable
 
 type VariableInfo struct {
+	Name       string
 	Position   int
 	Size       int
 	Typ        string
@@ -12,6 +13,7 @@ type VariableInfo struct {
 
 func (vi *VariableInfo) Copy() *VariableInfo {
 	return &VariableInfo{
+		Name:       vi.Name,
 		Position:   vi.Position,
 		Size:       vi.Size,
 		Typ:        vi.Typ,

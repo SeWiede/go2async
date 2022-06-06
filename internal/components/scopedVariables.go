@@ -55,6 +55,7 @@ func (sv *ScopedVariables) AddVariable(name string, typ string, len int) (*varia
 	}
 
 	newV := &variable.VariableInfo{
+		Name:     name,
 		Position: sv.size,
 		Size:     typeSize,
 		Typ:      typ,

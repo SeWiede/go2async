@@ -28,5 +28,5 @@ func GCD(a, b int) int {
 
 	a = t
 
-	return a + 1
+	return a
 }
