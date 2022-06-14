@@ -17,9 +17,8 @@ To test the circuit you have to instantiate a 'Scope' entity which the function 
 ```
   [name:] entity work.Scope(<function name>)
   generic map(
-   DATA_WIDTH => <function name>_DATA_WIDTH,
-	OUT_DATA_WIDTH => <function name>_OUT_DATA_WIDTH,
-	IN_DATA_WIDTH => <function name>_IN_DATA_WIDTH
+	  OUT_DATA_WIDTH => <function name>_OUT_DATA_WIDTH,
+	  IN_DATA_WIDTH => <function name>_IN_DATA_WIDTH
   )
   port map (
    rst => not res_n,
