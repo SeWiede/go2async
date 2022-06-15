@@ -7,7 +7,6 @@ import (
 	"go/parser"
 	"go/token"
 	"go2async/internal/components"
-	"go2async/internal/globalArguments"
 	infoprinter "go2async/internal/infoPrinter"
 	"go2async/pkg/variable"
 	"io/ioutil"
@@ -757,22 +756,20 @@ func (g *Generator) ParseGoFile(file string) error {
 	}
 
 	if len(f.Imports) > 0 {
-		return errors.New("No imports allowed")
-	}
-
-	if len(f.Scope.Objects) > 1 {
-		return errors.New("Only one scope allowed")
+		return g.peb.NewParseError(f, errors.New("No imports allowed"))
 	}
 
 	//ast.Print(fset, f)
-	switch x := f.Decls[0].(type) {
-	case *ast.FuncDecl:
-		_, err := g.GenerateScope(x)
-		if err != nil {
-			return err
+	for _, decl := range f.Decls {
+		switch x := decl.(type) {
+		case *ast.FuncDecl:
+			_, err := g.GenerateScope(x)
+			if err != nil {
+				return err
+			}
+		default:
+			return g.peb.NewParseError(x, errors.New(reflect.TypeOf(x).String()+" not allowed! Expected fucntion declaration"))
 		}
-	default:
-		return errors.New(reflect.TypeOf(x).String() + " not allowed! Expected fucntion declaration")
 	}
 
 	return nil
@@ -795,8 +792,13 @@ func (g *Generator) GenerateVHDL() string {
 			ps += s.Size * s.Len
 		}
 
+		for _, v := range s.Params {
+			fmt.Println(sn, ": Param ", v.String())
+		}
+
 		for i, s := range s.ReturnVars {
-			infoprinter.VerbosePrintf("return %d type %s has size %d len %d thus %d\n", i, s.Typ, s.Size, s.Len, s.Size*s.Len)
+			fmt.Println(sn, ": ReturnVar(", i, ") ", s.String())
+
 			rs += s.Size * s.Len
 		}
 
@@ -807,29 +809,6 @@ func (g *Generator) GenerateVHDL() string {
 		}
 		ret += s.Architecture()
 
-		for k, v := range s.Params {
-			lB := strconv.Itoa(v.Position)
-			uB := strconv.Itoa(v.Position + v.Size)
-			if v.Len > 1 {
-				k = k + "[k]"
-				lB += " + " + strconv.Itoa(v.Size) + " * k"
-				uB = strconv.Itoa(v.Position) + " + " + strconv.Itoa(v.Size) + " * (k + 1)"
-			}
-			fmt.Println(sn, ": Param ", k, " is at (", uB, " - 1 downto ", lB, ") ")
-		}
-	}
-
-	if *globalArguments.Verbose {
-		for k, v := range g.knownVariables {
-			lB := strconv.Itoa(v.Position)
-			uB := strconv.Itoa(v.Position + v.Size)
-			if v.Len > 1 {
-				k = k + "[k]"
-				lB += " + " + strconv.Itoa(v.Size) + " * k"
-				uB = strconv.Itoa(v.Position) + " + " + strconv.Itoa(v.Size) + " * (k + 1)"
-			}
-			fmt.Println(k, " is at (", uB, " - 1 downto ", lB, ") ")
-		}
 	}
 
 	return g.defs.GetDefs() + ret
