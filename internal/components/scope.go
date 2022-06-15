@@ -26,7 +26,7 @@ type Scope struct {
 
 var scopeNr = 0
 
-func NewScope(name string, block *Block, params, vars map[string]*variable.VariableInfo, returnVars []*variable.VariableInfo) *Scope {
+func NewScope(name string, block *Block, params map[string]*variable.VariableInfo, returnVars []*variable.VariableInfo) *Scope {
 	nr := scopeNr
 	if name == "" {
 		scopeNr++
@@ -40,7 +40,7 @@ func NewScope(name string, block *Block, params, vars map[string]*variable.Varia
 			Out: false,
 		},
 		Params:     params,
-		Variables:  vars,
+		Variables:  make(map[string]*variable.VariableInfo),
 		ReturnVars: returnVars,
 	}
 

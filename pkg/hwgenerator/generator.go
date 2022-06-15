@@ -15,17 +15,10 @@ import (
 	"strconv"
 )
 
-var ErrNotImplemented = errors.New("Not implemented")
-var ErrTypeNotSupported = errors.New("Type is not supported")
-
-var SupportedTypes map[string]int = map[string]int{"int": strconv.IntSize, "int8": 8, "int16": 16, "int32": 32, "int64": 64, "uint": strconv.IntSize, "uint8": 8, "uint16": 16, "uint32": 32, "uint64": 64, "byte": 8}
-
 type Generator struct {
-	wires          int
-	knownVariables map[string]*variable.VariableInfo
-	components     map[string]components.Component
-	scopes         map[string]*components.Scope
-	defs           *Defs
+	components map[string]components.Component
+	scopes     map[string]*components.Scope
+	defs       *Defs
 
 	peb *parseErrorBuilder
 }
@@ -34,18 +27,13 @@ type Generator struct {
 var cvp = 0
 
 func NewGenerator(intSize int) *Generator {
-	SupportedTypes["int"] = intSize
-	SupportedTypes["uint"] = intSize
-
 	components.SupportedTypes["int"] = intSize
 	components.SupportedTypes["uint"] = intSize
 
 	return &Generator{
-		wires:          0,
-		knownVariables: make(map[string]*variable.VariableInfo),
-		components:     make(map[string]components.Component),
-		scopes:         make(map[string]*components.Scope),
-		defs:           NewDefs(intSize),
+		components: make(map[string]components.Component),
+		scopes:     make(map[string]*components.Scope),
+		defs:       NewDefs(intSize),
 	}
 }
 
@@ -110,9 +98,6 @@ func (g *Generator) GenerateFuncBlock(s *ast.AssignStmt, parent *components.Bloc
 	case *ast.BasicLit:
 		if newVar {
 			typ := getTypeOfString(rhsExpr.Value)
-			if _, ok := SupportedTypes[typ]; !ok {
-				return nil, g.peb.NewParseError(s, errors.New(strconv.Itoa(int(lhsExpr.Pos()))+": Unsupported type '"+typ+"'"))
-			}
 
 			if lhsVar, err = parent.NewVariable(lhsExpr.(*ast.Ident).Name, typ, 1); err != nil {
 				return nil, g.peb.NewParseError(s, err)
@@ -782,12 +767,8 @@ func (g *Generator) GenerateVHDL() string {
 		ret += c.Architecture()
 	}
 
-	svs, ps, rs := 0, 0, 0
-	for _, s := range g.knownVariables {
-		svs += s.Size * s.Len
-	}
-
 	for sn, s := range g.scopes {
+		ps, rs := 0, 0
 		for _, s := range s.Params {
 			ps += s.Size * s.Len
 		}
@@ -803,7 +784,6 @@ func (g *Generator) GenerateVHDL() string {
 		}
 
 		g.defs.ScopeProperties[sn] = &ScopeProperty{
-			sumVarSize: svs,
 			paramSize:  s.Block.GetVariableSize(),
 			returnSize: rs,
 		}

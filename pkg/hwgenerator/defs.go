@@ -9,9 +9,8 @@ const defsTemplate = `constant %s_OUT_DATA_WIDTH : Integer := %d;
 	`
 
 type ScopeProperty struct {
-	sumVarSize int
-	returnSize int
 	paramSize  int
+	returnSize int
 }
 
 type Defs struct {
