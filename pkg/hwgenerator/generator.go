@@ -719,7 +719,7 @@ func (g *Generator) GenerateScope(f *ast.FuncDecl) (s *components.Scope, err err
 		}
 	}
 
-	s = components.NewScope(f.Name.Name, block, params, g.knownVariables, returnPositions)
+	s = components.NewScope(f.Name.Name, block, params, returnPositions)
 
 	g.components[block.ArchName()] = block
 	g.scopes[s.ArchName()] = s
