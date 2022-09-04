@@ -4,9 +4,7 @@ import (
 	"fmt"
 )
 
-const defsTemplate = `constant %s_OUT_DATA_WIDTH : Integer := %d;
-	constant %s_IN_DATA_WIDTH : Integer := %d;
-	`
+const defsTemplate = "\tconstant %s_OUT_DATA_WIDTH : Integer := %d;\n\tconstant %s_IN_DATA_WIDTH : Integer := %d;"
 
 type ScopeProperty struct {
 	paramSize  int
@@ -27,16 +25,15 @@ func NewDefs(defaulVariableWidth int) *Defs {
 
 func (d *Defs) GetDefs() string {
 	ret := `library IEEE;
-	use IEEE.std_logic_1164.all;
+use IEEE.std_logic_1164.all;
 	
-	package defs is
-	`
-
+package defs is
+`
 	for scope, prop := range d.ScopeProperties {
 		ret += fmt.Sprintf(defsTemplate,
 			scope, prop.returnSize,
 			scope, prop.paramSize)
-		ret += "\n"
+		ret += "\n\n"
 	}
 
 	ret += "end package;\n"

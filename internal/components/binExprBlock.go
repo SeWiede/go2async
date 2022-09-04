@@ -1,13 +1,19 @@
 package components
 
 import (
+	"go2async/pkg/variable"
 	"strconv"
 	"strings"
 )
 
-const funcblockprefix = "FB_"
+const binexprblockprefix = "CL_"
 
-type FuncBlock struct {
+// TODO: check delays for more operations
+
+var SupportedOperations map[string]string = map[string]string{"+": "+", "-": "-", "<<": "sll", ">>": "srl", "|": "or", "&": "and", "NOP": "", "=": ""}
+var operationDelays map[string]string = map[string]string{"+": "ADD_DELAY", "-": "ADD_DELAY", "<<": "ADD_DELAY", ">>": "ADD_DELAY", "|": "ADD_DELAY", "&": "ADD_DELAY", "NOP": "ADD_DELAY", "=": "ADD_DELAY"}
+
+type BinExprBlock struct {
 	BodyComponent
 
 	Nr        int
@@ -16,15 +22,19 @@ type FuncBlock struct {
 	Oi *OperandInfo
 }
 
-var fbNr = 0
+type OperandInfo struct {
+	R, X, Y *variable.VariableInfo
+}
 
-func NewFuncBlock(op string, vi *OperandInfo, parent *Block) *FuncBlock {
+var bebNr = 0
+
+func NewBinExprBlock(op string, vi *OperandInfo, parent *Block) *BinExprBlock {
 	nr := bebNr
 	bebNr++
 
 	name := strings.ToLower(binexprblockprefix + strconv.Itoa(nr))
 
-	ret := &FuncBlock{
+	ret := &BinExprBlock{
 		BodyComponent: BodyComponent{
 			archName: archPrefix + name,
 
@@ -53,18 +63,18 @@ func NewFuncBlock(op string, vi *OperandInfo, parent *Block) *FuncBlock {
 	return ret
 }
 
-func (fb *FuncBlock) InChannel() *HandshakeChannel {
+func (fb *BinExprBlock) InChannel() *HandshakeChannel {
 	return fb.In
 }
 
-func (fb *FuncBlock) OutChannel() *HandshakeChannel {
+func (fb *BinExprBlock) OutChannel() *HandshakeChannel {
 	return fb.Out
 }
 
-func (fb *FuncBlock) ComponentStr() string {
+func (fb *BinExprBlock) ComponentStr() string {
 	name := binexprblockprefix + strconv.Itoa(fb.Nr)
 
-	return name + `: entity work.funcBlock(` + fb.archName + `)
+	return name + `: entity work.binExprBlock(` + fb.archName + `)
 	generic map(
 	  DATA_WIDTH => ` + strconv.Itoa(fb.GetVariableSize()) + `
 	)
@@ -81,7 +91,12 @@ func (fb *FuncBlock) ComponentStr() string {
 	`
 }
 
-func (fb *FuncBlock) getAliases() string {
+func getIndex(idxStd string) int {
+	idx, _ := strconv.Atoi(idxStd)
+	return idx
+}
+
+func (fb *BinExprBlock) getAliases() string {
 	ret := ""
 	if fb.Oi.X.IndexIdent == nil {
 		idx := getIndex(fb.Oi.X.Index)
@@ -113,7 +128,7 @@ func (fb *FuncBlock) getAliases() string {
 	return ret
 }
 
-func (fb *FuncBlock) getCalcProcess() string {
+func (fb *BinExprBlock) getCalcProcess() string {
 	x := ""
 	y := ""
 	delay := " after ADDER_DELAY"
@@ -173,10 +188,10 @@ func (fb *FuncBlock) getCalcProcess() string {
 	end process;`
 }
 
-func (fb *FuncBlock) Architecture() string {
+func (fb *BinExprBlock) Architecture() string {
 	// TODO: analyze delays
 
-	return `architecture ` + fb.archName + ` of funcBlock is
+	return `architecture ` + fb.archName + ` of binExprBlock is
 	` + fb.getAliases() + `
 	  
     --attribute dont_touch : string;

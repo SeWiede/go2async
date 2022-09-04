@@ -7,6 +7,7 @@ import (
 	"go/parser"
 	"go/token"
 	"go2async/internal/components"
+	"go2async/internal/globalArguments"
 	infoprinter "go2async/internal/infoPrinter"
 	"go2async/pkg/variable"
 	"io/ioutil"
@@ -37,7 +38,7 @@ func NewGenerator(intSize int) *Generator {
 	}
 }
 
-func (g *Generator) GenerateFuncBlock(s *ast.AssignStmt, parent *components.Block) (fb *components.FuncBlock, err error) {
+func (g *Generator) GenerateFuncBlock(s *ast.AssignStmt, parent *components.Block) (fb *components.BinExprBlock, err error) {
 	if len(s.Lhs) > 1 {
 		return nil, g.peb.NewParseError(s, errors.New("Expression lists are not allowed"))
 	}
@@ -104,7 +105,7 @@ func (g *Generator) GenerateFuncBlock(s *ast.AssignStmt, parent *components.Bloc
 			}
 		}
 
-		newFuncBlk := components.NewFuncBlock("=", &components.OperandInfo{
+		newFuncBlk := components.NewBinExprBlock("=", &components.OperandInfo{
 			R: lhsVar,
 			X: &variable.VariableInfo{
 				Const: rhsExpr.Value,
@@ -128,7 +129,7 @@ func (g *Generator) GenerateFuncBlock(s *ast.AssignStmt, parent *components.Bloc
 			}
 		}
 
-		newFuncBlk := components.NewFuncBlock("=", &components.OperandInfo{
+		newFuncBlk := components.NewBinExprBlock("=", &components.OperandInfo{
 			R: lhsVar,
 			X: v,
 		}, parent)
@@ -166,7 +167,7 @@ func (g *Generator) GenerateFuncBlock(s *ast.AssignStmt, parent *components.Bloc
 			}
 		}
 
-		newFuncBlk := components.NewFuncBlock("=", &components.OperandInfo{
+		newFuncBlk := components.NewBinExprBlock("=", &components.OperandInfo{
 			R: lhsVar,
 			X: v,
 		}, parent)
@@ -200,7 +201,7 @@ func (g *Generator) GenerateFuncBlock(s *ast.AssignStmt, parent *components.Bloc
 			return nil, g.peb.NewParseError(s, err)
 		}
 
-		newFuncBlk := components.NewFuncBlock("=", &components.OperandInfo{
+		newFuncBlk := components.NewBinExprBlock("=", &components.OperandInfo{
 			R: lhsVar,
 			X: tmpVar,
 		}, tmpBlock)
@@ -209,12 +210,67 @@ func (g *Generator) GenerateFuncBlock(s *ast.AssignStmt, parent *components.Bloc
 		parent.AddComponent(newFuncBlk)
 
 		return newFuncBlk, nil
+	case *ast.CallExpr:
+		fmt.Println("Fun ", rhsExpr.Fun)
+		fmt.Println("Fun ", rhsExpr.Lparen)
+		fmt.Println("Fun ", rhsExpr.Args)
+		fmt.Println("Fun ", rhsExpr.Ellipsis)
+		fmt.Println("Fun ", rhsExpr.Rparen)
+
+		funcNameIdent, ok := rhsExpr.Fun.(*ast.Ident)
+		if !ok {
+			return nil, g.peb.NewParseError(s, errors.New("funtion name is not an identifier"))
+		}
+		funcName := funcNameIdent.Name
+		fmt.Println("Fun ", funcName)
+
+		funcIntf, err := parent.GetAndAssignFunctionInterface(funcName)
+		if err != nil {
+			return nil, g.peb.NewParseError(s, err)
+		}
+
+		for i, fp := range rhsExpr.Args {
+			funcParamIdent, ok := fp.(*ast.Ident)
+			if !ok {
+				return nil, g.peb.NewParseError(s, errors.New("Call expression parameters have to be an Identifier"))
+			}
+
+			vi, err := parent.GetVariable(funcParamIdent.Name)
+			if err != nil {
+				return nil, g.peb.NewParseError(s, err)
+			}
+
+			correspondingFuncParamVar, err := funcIntf.Parameters.GetVariableInfoAt(i)
+			if err != nil {
+				return nil, g.peb.NewParseError(s, err)
+			}
+
+			if vi.Typ != correspondingFuncParamVar.Typ {
+				return nil, g.peb.NewParseError(s, errors.New("Call expression has type mismatch at parameter "+strconv.Itoa(i)))
+			}
+		}
+
+		vari, _ := parent.GetVariable("a")
+
+		newFuncBlk := components.NewBinExprBlock("=", &components.OperandInfo{
+			R: vari,
+			X: vari,
+		}, parent)
+
+		g.components[newFuncBlk.ArchName()] = newFuncBlk
+		parent.AddComponent(newFuncBlk)
+
+		return newFuncBlk, nil
+
+		// TOTO: Valid CallExpr: make block for expression
+
+		//return nil, g.peb.NewParseError(s, errors.New("Call expression in rhs not supported yet!"))
 	default:
 		return nil, g.peb.NewParseError(s, errors.New("Expression "+reflect.TypeOf(rhsExpr).String()+" in rhs not supported!"))
 	}
 }
 
-func (g *Generator) GenerateBinaryExpressionFuncBlock(result *variable.VariableInfo, be *ast.BinaryExpr, parent *components.Block) (fb *components.FuncBlock, err error) {
+func (g *Generator) GenerateBinaryExpressionFuncBlock(result *variable.VariableInfo, be *ast.BinaryExpr, parent *components.Block) (fb *components.BinExprBlock, err error) {
 	xexpr := be.X
 	yexpr := be.Y
 
@@ -317,7 +373,7 @@ func (g *Generator) GenerateBinaryExpressionFuncBlock(result *variable.VariableI
 
 	infoprinter.DebugPrintln("generating func: ", result.Name, " = ", x.Name, " ", operation, " ", y.Name, " const: ", y.Const)
 
-	newFuncBlk := components.NewFuncBlock(operation, &components.OperandInfo{
+	newFuncBlk := components.NewBinExprBlock(operation, &components.OperandInfo{
 		R: result,
 		X: x,
 		Y: y,
@@ -467,7 +523,7 @@ func (g *Generator) GenerateIfBlock(is *ast.IfStmt, parent *components.Block) (f
 	}
 
 	var elseBody components.BodyComponentType
-	elseBody = components.NewFuncBlock("NOP", &components.OperandInfo{
+	elseBody = components.NewBinExprBlock("NOP", &components.OperandInfo{
 		R: &variable.VariableInfo{
 			Position: 0,
 			Size:     8,
@@ -633,6 +689,27 @@ func (g *Generator) GenerateBlock(stmts []ast.Stmt, toplevelStatement bool, pare
 	return b, nil
 }
 
+func (g *Generator) parseVariableExpression(expr ast.Expr) (string, int, error) {
+	switch fieldType := expr.(type) {
+	case *ast.Ident:
+		return fieldType.Name, 1, nil
+	case *ast.ArrayType:
+		fieldTypeLenBasicLit, ok := fieldType.Len.(*ast.BasicLit)
+		if !ok {
+			return "", -1, g.peb.NewParseError(expr, errors.New("Slices are not supported: missing array length"))
+		}
+
+		len, err := strconv.Atoi(fieldTypeLenBasicLit.Value)
+		if err != nil {
+			return "", -1, g.peb.NewParseError(expr, err)
+		}
+
+		return fieldType.Elt.(*ast.Ident).Name, len, nil
+	default:
+		return "", -1, g.peb.NewParseError(expr, errors.New("Invalid variable expression"))
+	}
+}
+
 func (g *Generator) GenerateScope(f *ast.FuncDecl) (s *components.Scope, err error) {
 	params := make(map[string]*variable.VariableInfo)
 
@@ -642,27 +719,68 @@ func (g *Generator) GenerateScope(f *ast.FuncDecl) (s *components.Scope, err err
 	for _, field := range f.Type.Params.List {
 		for _, param := range field.Names {
 			switch fieldType := field.Type.(type) {
-			case *ast.Ident:
-				np, err := paramDummyBlock.NewVariable(param.Name, fieldType.Name, 1)
+			case *ast.Ident, *ast.ArrayType:
+				typeName, len, err := g.parseVariableExpression(fieldType)
+				if err != nil {
+					return nil, g.peb.NewParseError(f, err)
+				}
+
+				np, err := paramDummyBlock.NewVariable(param.Name, typeName, len)
 				if err != nil {
 					return nil, g.peb.NewParseError(f, err)
 				}
 
 				params[param.Name] = np
-			case *ast.ArrayType:
-				len, err := strconv.Atoi(fieldType.Len.(*ast.BasicLit).Value)
-				if err != nil {
-					return nil, g.peb.NewParseError(f, err)
+			case *ast.FuncType:
+				newFuncIntf := components.NewFuncInterface(param.Name)
+
+				if *globalArguments.Debug {
+					fmt.Printf("Adding functionInterface for function '%s'\n", newFuncIntf.Name)
 				}
 
-				np, err := paramDummyBlock.NewVariable(param.Name, fieldType.Elt.(*ast.Ident).Name, len)
-				if err != nil {
-					return nil, g.peb.NewParseError(f, err)
+				for _, p := range fieldType.Params.List {
+					typeName, leng, err := g.parseVariableExpression(p.Type)
+					if err != nil {
+						return nil, g.peb.NewParseError(f, err)
+					}
+
+					if len(p.Names) > 0 {
+						for _, n := range p.Names {
+							name := n.Name
+							newFuncIntf.Parameters.AddVariable(name, typeName, leng)
+						}
+					} else {
+						newFuncIntf.Parameters.AddVariable("", typeName, leng)
+					}
+
 				}
 
-				params[param.Name] = np
+				for _, p := range fieldType.Results.List {
+					typeName, leng, err := g.parseVariableExpression(p.Type)
+					if err != nil {
+						return nil, g.peb.NewParseError(f, err)
+					}
+
+					if len(p.Names) > 0 {
+						for _, n := range p.Names {
+							name := n.Name
+							newFuncIntf.Results.AddVariable(name, typeName, leng)
+						}
+					} else {
+						newFuncIntf.Results.AddVariable("", typeName, leng)
+					}
+
+				}
+
+				if *globalArguments.Debug {
+					fmt.Printf("Created new external interface declaration for function %s; Param len %d; Result len %d\n", newFuncIntf.Name, newFuncIntf.Parameters.GetSize(), newFuncIntf.Results.GetSize())
+				}
+
+				if err := paramDummyBlock.AddFunctionInterface(newFuncIntf); err != nil {
+					return nil, g.peb.NewParseError(f, err)
+				}
 			default:
-				return nil, g.peb.NewParseError(f, errors.New("Invalid field type in function param list"))
+				return nil, g.peb.NewParseError(f, errors.New("Type '"+reflect.TypeOf(fieldType).String()+"' is not supported in function param list"))
 			}
 		}
 	}
@@ -764,10 +882,23 @@ func (g *Generator) GenerateVHDL() string {
 	ret := ""
 
 	for _, c := range g.components {
+		if blk, ok := c.(*components.Block); ok {
+			ret = blk.Entity() + ret
+		}
+
 		ret += c.Architecture()
 	}
 
 	for sn, s := range g.scopes {
+		for _, externalIntf := range s.Block.ExternalInterfaces {
+			g.defs.ScopeProperties[externalIntf.Name] = &ScopeProperty{
+				paramSize:  externalIntf.Parameters.GetSize(),
+				returnSize: externalIntf.Results.GetSize(),
+			}
+		}
+
+		ret = s.Entity() + ret
+
 		ps, rs := 0, 0
 		for _, s := range s.Params {
 			ps += s.Size * s.Len
@@ -788,7 +919,6 @@ func (g *Generator) GenerateVHDL() string {
 			returnSize: rs,
 		}
 		ret += s.Architecture()
-
 	}
 
 	return g.defs.GetDefs() + ret
