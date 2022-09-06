@@ -421,7 +421,7 @@ END beh;
 
 ARCHITECTURE behavioural OF decoupled_hs_reg IS
 
-  SIGNAL phase_in, phase_out, in_req_d, out_ack_d : STD_LOGIC;
+  SIGNAL phase_in, phase_out, in_req_d, out_req_d : STD_LOGIC;
   SIGNAL data_sig : STD_LOGIC_VECTOR(DATA_WIDTH - 1 DOWNTO 0);
   SIGNAL click : STD_LOGIC;
 
@@ -429,10 +429,10 @@ ARCHITECTURE behavioural OF decoupled_hs_reg IS
   ATTRIBUTE dont_touch OF phase_in, phase_out : SIGNAL IS "true";
   ATTRIBUTE dont_touch OF data_sig : SIGNAL IS "true";
   ATTRIBUTE dont_touch OF click : SIGNAL IS "true";
-  ATTRIBUTE dont_touch OF in_req_d, out_ack_d : SIGNAL IS "true";
+  ATTRIBUTE dont_touch OF in_req_d, out_req_d : SIGNAL IS "true";
 
 BEGIN
-  out_req <= phase_out;
+  out_req <= out_req_d;
   in_ack <= phase_in;
   out_data <= data_sig;
 
@@ -449,7 +449,7 @@ BEGIN
     END IF;
   END PROCESS;
 
-  delay_req : ENTITY work.delay_element
+  delay_in_ack : ENTITY work.delay_element
     GENERIC MAP(
       NUM_LCELLS => 2 * LUT_CHAIN_SIZE -- Delay  size
     )
@@ -458,16 +458,16 @@ BEGIN
       o => in_req_d
     );
 
-  delay_ack : ENTITY work.delay_element
+  delay_out_req : ENTITY work.delay_element
     GENERIC MAP(
       NUM_LCELLS => 2 * LUT_CHAIN_SIZE -- Delay  size
     )
     PORT MAP(
-      i => out_ack,
-      o => out_ack_d
+      i => phase_out,
+      o => out_req_d
     );
 
-  click <= (in_req_d XOR phase_in) AND (out_ack_d XNOR phase_out) AFTER AND2_DELAY + XOR_DELAY;
+  click <= (in_req_d XOR phase_in) AND (out_ack XNOR phase_out) AFTER AND2_DELAY + XOR_DELAY;
 
 END behavioural;
 
