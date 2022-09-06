@@ -1,28 +1,38 @@
 package components
 
 import (
+	"go2async/pkg/variable"
 	"strconv"
 	"strings"
 )
 
 const funcblockprefix = "FB_"
+const defaultFuncBlockEntityName = "funcBlock"
 
 type FuncBlock struct {
 	BodyComponent
 
-	Nr        int
-	Operation string
+	Nr int
 
-	Oi *OperandInfo
+	paramVarList  []*variable.VariableInfo
+	resultVarList []*variable.VariableInfo
+
+	externalInterface *FuncInterface
 }
 
 var fbNr = 0
+var funcBlockEntitesTracker = make(map[string]interface{})
 
-func NewFuncBlock(op string, vi *OperandInfo, parent *Block) *FuncBlock {
+func NewFuncBlock(paramVarList []*variable.VariableInfo, resultVarList []*variable.VariableInfo, fi *FuncInterface, parent *Block) (*FuncBlock, error) {
 	nr := bebNr
 	bebNr++
 
 	name := strings.ToLower(binexprblockprefix + strconv.Itoa(nr))
+
+	f, err := parent.GetAndAssignFunctionInterface(fi.Name)
+	if err != nil {
+		return nil, err
+	}
 
 	ret := &FuncBlock{
 		BodyComponent: BodyComponent{
@@ -46,11 +56,12 @@ func NewFuncBlock(op string, vi *OperandInfo, parent *Block) *FuncBlock {
 
 		Nr: nr,
 
-		Operation: op,
-		Oi:        vi,
+		paramVarList:      paramVarList,
+		resultVarList:     resultVarList,
+		externalInterface: f.Copy(),
 	}
 
-	return ret
+	return ret, nil
 }
 
 func (fb *FuncBlock) InChannel() *HandshakeChannel {
@@ -61,143 +72,194 @@ func (fb *FuncBlock) OutChannel() *HandshakeChannel {
 	return fb.Out
 }
 
+func (fb *FuncBlock) entityName() string {
+	return defaultFuncBlockEntityName + "_" + fb.externalInterface.Name
+}
+
+func (fb *FuncBlock) Entity() string {
+	if _, ok := funcBlockEntitesTracker[fb.entityName()]; ok {
+		return ``
+	}
+	funcBlockEntitesTracker[fb.entityName()] = ""
+
+	return `LIBRARY IEEE;
+	USE IEEE.STD_LOGIC_1164.ALL;
+	USE ieee.std_logic_unsigned.ALL;
+	USE ieee.numeric_std.ALL;
+	USE work.click_element_library_constants.ALL;
+	
+	ENTITY ` + fb.entityName() + ` IS
+	  GENERIC (
+		DATA_WIDTH : NATURAL := 8;
+		` + fb.externalInterface.Name + `_DATA_IN_WIDTH : NATURAL := 8;
+		` + fb.externalInterface.Name + `_DATA_OUT_WIDTH : NATURAL := 8
+	  );
+	  PORT (
+		-- Input channel
+		in_data : IN STD_LOGIC_VECTOR(DATA_WIDTH - 1 DOWNTO 0);
+		in_req : IN STD_LOGIC;
+		in_ack : OUT STD_LOGIC;
+		-- Output channel
+		out_data : OUT STD_LOGIC_VECTOR(DATA_WIDTH - 1 DOWNTO 0);
+		out_req : OUT STD_LOGIC;
+		out_ack : IN STD_LOGIC;
+
+		-- External interfaces
+		` + fb.externalInterface.Name + `_in_data : OUT STD_LOGIC_VECTOR(` + fb.externalInterface.Name + `_DATA_IN_WIDTH - 1 DOWNTO 0);
+		` + fb.externalInterface.Name + `_in_req : OUT STD_LOGIC;
+		` + fb.externalInterface.Name + `_in_ack : IN STD_LOGIC;
+		-- Output channel
+		` + fb.externalInterface.Name + `_out_data : IN STD_LOGIC_VECTOR(` + fb.externalInterface.Name + `_DATA_OUT_WIDTH - 1 DOWNTO 0);
+		` + fb.externalInterface.Name + `_out_req : IN STD_LOGIC;
+		` + fb.externalInterface.Name + `_out_ack : OUT STD_LOGIC
+	  );
+	END ` + fb.entityName() + `;`
+}
+
 func (fb *FuncBlock) ComponentStr() string {
 	name := binexprblockprefix + strconv.Itoa(fb.Nr)
 
-	return name + `: entity work.funcBlock(` + fb.archName + `)
+	return name + `: entity work.` + fb.entityName() + `(` + fb.archName + `)
 	generic map(
-	  DATA_WIDTH => ` + strconv.Itoa(fb.GetVariableSize()) + `
+	  DATA_WIDTH => ` + strconv.Itoa(fb.GetVariableSize()) + `,
+	  ` + fb.externalInterface.Name + `_DATA_IN_WIDTH => ` + fb.externalInterface.Name + `_DATA_IN_WIDTH,
+	  ` + fb.externalInterface.Name + `_DATA_OUT_WIDTH => ` + fb.externalInterface.Name + `_DATA_OUT_WIDTH
 	)
 	port map (
-	  -- Input channel
-	  in_req  => ` + fb.In.Req + `,
-	  in_ack  => ` + fb.In.Ack + `, 
-	  in_data => std_logic_vector(resize(unsigned(` + fb.In.Data + `), ` + strconv.Itoa(fb.GetVariableSize()) + `)),
-	  -- Output channel
-	  out_req => ` + fb.Out.Req + `,
-	  out_ack => ` + fb.Out.Ack + `,
-	  out_data  => ` + fb.Out.Data + `
+		-- Input channel
+		in_req  => ` + fb.In.Req + `,
+		in_ack  => ` + fb.In.Ack + `, 
+		in_data => std_logic_vector(resize(unsigned(` + fb.In.Data + `), ` + strconv.Itoa(fb.GetVariableSize()) + `)),
+		-- Output channel
+		out_req => ` + fb.Out.Req + `,
+		out_ack => ` + fb.Out.Ack + `,
+		out_data  => ` + fb.Out.Data + `,
+
+		--External Interface
+		-- Input channel
+		` + fb.externalInterface.Name + `_in_data  => ` + fb.externalInterface.Name + `_in_data,
+		` + fb.externalInterface.Name + `_in_req => ` + fb.externalInterface.Name + `_in_req,
+		` + fb.externalInterface.Name + `_in_ack => ` + fb.externalInterface.Name + `_in_ack,
+		-- Output channel
+		` + fb.externalInterface.Name + `_out_data => ` + fb.externalInterface.Name + `_out_data,
+		` + fb.externalInterface.Name + `_out_req => ` + fb.externalInterface.Name + `_out_req,
+		` + fb.externalInterface.Name + `_out_ack => ` + fb.externalInterface.Name + `_out_ack
 	);
 	`
 }
 
 func (fb *FuncBlock) getAliases() string {
 	ret := ""
-	if fb.Oi.X.IndexIdent == nil {
-		idx := getIndex(fb.Oi.X.Index)
-		ret += "alias x      : std_logic_vector(" + strconv.Itoa(fb.Oi.X.Size) + " - 1 downto 0)  is in_data( " + strconv.Itoa(fb.Oi.X.Position+fb.Oi.X.Size*(idx+1)) + " - 1 downto " + strconv.Itoa(fb.Oi.X.Position+fb.Oi.X.Size*idx) + ");\n"
-	} else {
-		ret += "signal x : std_logic_vector(" + strconv.Itoa(fb.Oi.X.Size) + "- 1 downto 0);\n"
-		ret += "constant baseX      : integer := " + strconv.Itoa(fb.Oi.X.Position) + ";\n"
-		ret += "alias offsetX      : std_logic_vector(" + strconv.Itoa(fb.Oi.X.IndexIdent.Size) + " - 1 downto 0)  is in_data( " + strconv.Itoa(fb.Oi.X.IndexIdent.Position+fb.Oi.X.IndexIdent.Size) + " -1 downto " + strconv.Itoa(fb.Oi.X.IndexIdent.Position) + ");\n"
+
+	for i, paramVar := range fb.paramVarList {
+		is := strconv.Itoa(i)
+		if paramVar.IndexIdent == nil {
+			idx := getIndex(paramVar.Index)
+			ret += "alias x_" + is + "      : std_logic_vector(" + strconv.Itoa(paramVar.Size) + " - 1 downto 0)  is in_data( " + strconv.Itoa(paramVar.Position+paramVar.Size*(idx+1)) + " - 1 downto " + strconv.Itoa(paramVar.Position+paramVar.Size*idx) + ");\n"
+		} else {
+			ret += "signal x_" + is + " : std_logic_vector(" + strconv.Itoa(paramVar.Size) + "- 1 downto 0);\n"
+			ret += "constant baseX_" + is + "      : integer := " + strconv.Itoa(paramVar.Position) + ";\n"
+			ret += "alias offsetX_" + is + "      : std_logic_vector(" + strconv.Itoa(paramVar.IndexIdent.Size) + " - 1 downto 0)  is in_data( " + strconv.Itoa(paramVar.IndexIdent.Position+paramVar.IndexIdent.Size) + " -1 downto " + strconv.Itoa(paramVar.IndexIdent.Position) + ");\n"
+		}
 	}
 
-	if fb.Oi.Y != nil && fb.Oi.Y.IndexIdent == nil {
-		idx := getIndex(fb.Oi.Y.Index)
-		ret += "alias y      : std_logic_vector(" + strconv.Itoa(fb.Oi.Y.Size) + " - 1 downto 0)  is in_data( " + strconv.Itoa(fb.Oi.Y.Position+fb.Oi.Y.Size*(idx+1)) + " - 1 downto " + strconv.Itoa(fb.Oi.Y.Position+fb.Oi.Y.Size*idx) + ");\n"
-	} else if fb.Oi.Y != nil && fb.Oi.Y.IndexIdent != nil {
-		ret += "signal y  : std_logic_vector(" + strconv.Itoa(fb.Oi.Y.Size) + "- 1 downto 0);\n"
-		ret += "constant baseY      : integer := " + strconv.Itoa(fb.Oi.Y.Position) + ";\n"
-		ret += "alias offsetY      : std_logic_vector(" + strconv.Itoa(fb.Oi.Y.IndexIdent.Size) + " - 1 downto 0)  is in_data( " + strconv.Itoa(fb.Oi.Y.IndexIdent.Position+fb.Oi.Y.IndexIdent.Size) + " -1 downto " + strconv.Itoa(fb.Oi.Y.IndexIdent.Position) + ");\n"
-	}
-
-	if fb.Oi.R.IndexIdent == nil {
-		idx := getIndex(fb.Oi.R.Index)
-		ret += "alias result : std_logic_vector(" + strconv.Itoa(fb.Oi.R.Size) + " - 1 downto 0)  is out_data( " + strconv.Itoa(fb.Oi.R.Position+fb.Oi.R.Size*(idx+1)) + " - 1 downto " + strconv.Itoa(fb.Oi.R.Position+fb.Oi.R.Size*idx) + ");\n"
-	} else {
-		ret += "signal result : std_logic_vector(" + strconv.Itoa(fb.Oi.R.Size) + " - 1 downto 0);\n"
-		ret += "constant baseR      : integer := " + strconv.Itoa(fb.Oi.R.Position) + ";\n"
-		ret += "alias offsetR      : std_logic_vector(" + strconv.Itoa(fb.Oi.R.IndexIdent.Size) + " - 1 downto 0)  is in_data( " + strconv.Itoa(fb.Oi.R.IndexIdent.Position+fb.Oi.R.IndexIdent.Size) + " -1 downto " + strconv.Itoa(fb.Oi.R.IndexIdent.Position) + ");\n"
+	for i, resVar := range fb.resultVarList {
+		is := strconv.Itoa(i)
+		if resVar.IndexIdent == nil {
+			idx := getIndex(resVar.Index)
+			ret += "alias result_" + is + " : std_logic_vector(" + strconv.Itoa(resVar.Size) + " - 1 downto 0)  is out_data( " + strconv.Itoa(resVar.Position+resVar.Size*(idx+1)) + " - 1 downto " + strconv.Itoa(resVar.Position+resVar.Size*idx) + ");\n"
+		} else {
+			ret += "signal result_" + is + " : std_logic_vector(" + strconv.Itoa(resVar.Size) + " - 1 downto 0);\n"
+			ret += "constant baseR_" + is + "      : integer := " + strconv.Itoa(resVar.Position) + ";\n"
+			ret += "alias offsetR_" + is + "      : std_logic_vector(" + strconv.Itoa(resVar.IndexIdent.Size) + " - 1 downto 0)  is in_data( " + strconv.Itoa(resVar.IndexIdent.Position+resVar.IndexIdent.Size) + " -1 downto " + strconv.Itoa(resVar.IndexIdent.Position) + ");\n"
+		}
 	}
 
 	return ret
 }
 
-func (fb *FuncBlock) getCalcProcess() string {
-	x := ""
-	y := ""
-	delay := " after ADDER_DELAY"
+func (fb *FuncBlock) getProcess() string {
 
-	x = "unsigned(x)"
-	if fb.Oi.X.Const != "" {
-		x = "to_unsigned(" + fb.Oi.X.Const + ", x'length)"
-	}
-
-	if fb.Oi.Y != nil {
-		y = "unsigned(y)"
-		if fb.Oi.Y.Const != "" {
-			y = "to_unsigned(" + fb.Oi.Y.Const + ", y'length)"
+	variables := ""
+	for i, resVar := range fb.resultVarList {
+		if resVar.IndexIdent == nil {
+			is := strconv.Itoa(i)
+			variables += "variable offset_" + is + ": integer range 0 to out_data'length;\n"
 		}
-
-		if fb.Operation == "<<" || fb.Operation == ">>" {
-			y = "to_integer(" + y + ")"
-		}
-	}
-
-	if fb.Operation == "NOP" || fb.Operation == "=" || fb.Oi.Y == nil {
-		y = ""
-		delay = ""
 	}
 
 	processStart := `calc: process(all)
-	variable offset: integer range 0 to out_data'length;
+	` + variables + `
 	begin
 	out_data <= in_data; 
 	`
 
-	xcalc := ""
-	ycalc := ""
-	compute := ""
+	arrayParamMappings := ""
 	resultMap := ""
+	delay := " after ADDER_DELAY"
+	compute := ""
 
-	if fb.Operation != "NOP" {
-		if fb.Oi.X.IndexIdent != nil {
-			x = "unsigned(x)"
-			xcalc = "x <= in_data(baseX + (to_integer(unsigned(offsetX)) + 1) * x'length  - 1 downto baseX + to_integer(unsigned(offsetX)) * x'length);\n"
-		}
-
-		if fb.Oi.Y != nil && fb.Oi.Y.IndexIdent != nil {
-			y = "unsigned(y)"
-			ycalc = "y <= in_data(baseY + (to_integer(unsigned(offsetY)) + 1) * y'length - 1 downto baseY + to_integer(unsigned(offsetY)) * y'length);\n"
-
-		}
-
-		compute = "result <= std_logic_vector(resize(" + x + " " + SupportedOperations[fb.Operation] + " " + y + ", result'length)) " + delay + ";\n"
-
-		if fb.Oi.R.IndexIdent != nil {
-			resultMap = "offset := baseR + to_integer(unsigned(offsetR) * result'length);\n"
-			resultMap += "out_data(offset + result'length -1 downto offset) <= result;\n"
+	for i, paramVar := range fb.paramVarList {
+		if paramVar.IndexIdent != nil {
+			is := strconv.Itoa(i)
+			arrayParamMappings += "x_" + is + " <= in_data(baseX_" + is + " + (to_integer(unsigned(offsetX_" + is + ")) + 1) * x_" + is + "'length  - 1 downto baseX_" + is + " + to_integer(unsigned(offsetX_" + is + ")) * x_" + is + "'length);\n"
 		}
 	}
-	return processStart + xcalc + ycalc + compute + resultMap + `
+
+	resultSignalOffset := 0
+	for i, resVar := range fb.resultVarList {
+		is := strconv.Itoa(i)
+		if resVar.IndexIdent != nil {
+			resultMap += "offset_" + is + " := baseR_" + is + " + to_integer(unsigned(offsetR_" + is + ") * result_" + is + "'length);\n"
+			resultMap += "out_data(offset_" + is + " + result_" + is + "'length -1 downto offset_" + is + ") <= result_" + is + delay + ";\n"
+		}
+
+		compute += "result_" + is + " <=  " + fb.externalInterface.Name + "_out_data( " + strconv.Itoa(resultSignalOffset+resVar.Size) + " - 1 downto " + strconv.Itoa(resultSignalOffset) + ")" + delay + ";\n"
+		resultSignalOffset += resVar.Size
+	}
+
+	return processStart + arrayParamMappings + resultMap + compute + `
 	end process;`
 }
 
 func (fb *FuncBlock) Architecture() string {
 	// TODO: analyze delays
 
-	return `architecture ` + fb.archName + ` of funcBlock is
+	externalIntfInput := ""
+
+	if len(fb.paramVarList) > 0 {
+		externalIntfInput += fb.externalInterface.Name + "_in_data <= "
+		for i, _ := range fb.paramVarList {
+			is := strconv.Itoa(i)
+			externalIntfInput += "x_" + is
+
+			if i != len(fb.paramVarList)-1 {
+				externalIntfInput += " & "
+			}
+		}
+		externalIntfInput += ";"
+	}
+
+	return `architecture ` + fb.archName + ` of ` + fb.entityName() + ` is
 	` + fb.getAliases() + `
-	  
-    --attribute dont_touch : string;
-	--attribute dont_touch of  x, y, result: signal is "true";
-	  
-    --attribute keep : boolean;
-	--attribute keep of  x, y, result: signal is true;
   begin
-    in_ack <= out_ack;
+    ` + fb.externalInterface.Name + `_in_req <= in_req;
+    in_ack <= ` + fb.externalInterface.Name + `_in_ack;
+    ` + fb.externalInterface.Name + `_out_ack <= out_ack;
+
+	` + externalIntfInput + `
     
     delay_req: entity work.delay_element
       generic map(
-        NUM_LCELLS => ` + operationDelays[fb.Operation] + `  -- Delay  size
+        NUM_LCELLS => 0  -- Delay  size
       )
       port map (
-        i => in_req,
+        i => ` + fb.externalInterface.Name + `_out_req,
         o => out_req
 	  );
 	  
+	  ` + fb.getProcess() + `
 
-	  ` + fb.getCalcProcess() + `
   end ` + fb.archName + `;
   `
 }

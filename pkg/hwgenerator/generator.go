@@ -38,7 +38,7 @@ func NewGenerator(intSize int) *Generator {
 	}
 }
 
-func (g *Generator) GenerateFuncBlock(s *ast.AssignStmt, parent *components.Block) (fb *components.BinExprBlock, err error) {
+func (g *Generator) GenerateFuncBlock(s *ast.AssignStmt, parent *components.Block) (fb components.BodyComponentType, err error) {
 	if len(s.Lhs) > 1 {
 		return nil, g.peb.NewParseError(s, errors.New("Expression lists are not allowed"))
 	}
@@ -211,23 +211,18 @@ func (g *Generator) GenerateFuncBlock(s *ast.AssignStmt, parent *components.Bloc
 
 		return newFuncBlk, nil
 	case *ast.CallExpr:
-		fmt.Println("Fun ", rhsExpr.Fun)
-		fmt.Println("Fun ", rhsExpr.Lparen)
-		fmt.Println("Fun ", rhsExpr.Args)
-		fmt.Println("Fun ", rhsExpr.Ellipsis)
-		fmt.Println("Fun ", rhsExpr.Rparen)
-
 		funcNameIdent, ok := rhsExpr.Fun.(*ast.Ident)
 		if !ok {
 			return nil, g.peb.NewParseError(s, errors.New("funtion name is not an identifier"))
 		}
 		funcName := funcNameIdent.Name
-		fmt.Println("Fun ", funcName)
 
 		funcIntf, err := parent.GetAndAssignFunctionInterface(funcName)
 		if err != nil {
 			return nil, g.peb.NewParseError(s, err)
 		}
+
+		paramList := []*variable.VariableInfo{}
 
 		for i, fp := range rhsExpr.Args {
 			funcParamIdent, ok := fp.(*ast.Ident)
@@ -248,14 +243,22 @@ func (g *Generator) GenerateFuncBlock(s *ast.AssignStmt, parent *components.Bloc
 			if vi.Typ != correspondingFuncParamVar.Typ {
 				return nil, g.peb.NewParseError(s, errors.New("Call expression has type mismatch at parameter "+strconv.Itoa(i)))
 			}
+			paramList = append(paramList, vi)
 		}
 
-		vari, _ := parent.GetVariable("a")
+		if newVar {
+			firstResult, _ := funcIntf.Results.GetVariableInfoAt(0)
+			if lhsVar, err = parent.NewVariable(lhsExpr.(*ast.Ident).Name, firstResult.Typ, 1); err != nil {
+				return nil, g.peb.NewParseError(s, err)
+			}
+		}
 
-		newFuncBlk := components.NewBinExprBlock("=", &components.OperandInfo{
-			R: vari,
-			X: vari,
-		}, parent)
+		resultList := []*variable.VariableInfo{lhsVar}
+
+		newFuncBlk, err := components.NewFuncBlock(paramList, resultList, funcIntf, parent)
+		if err != nil {
+			return nil, err
+		}
 
 		g.components[newFuncBlk.ArchName()] = newFuncBlk
 		parent.AddComponent(newFuncBlk)
@@ -884,6 +887,9 @@ func (g *Generator) GenerateVHDL() string {
 	for _, c := range g.components {
 		if blk, ok := c.(*components.Block); ok {
 			ret = blk.Entity() + ret
+		}
+		if fb, ok := c.(*components.FuncBlock); ok {
+			ret = fb.Entity() + ret
 		}
 
 		ret += c.Architecture()
