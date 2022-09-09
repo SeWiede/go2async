@@ -155,7 +155,8 @@ func (fb *FuncBlock) getAliases() string {
 		is := strconv.Itoa(i)
 		if paramVar.IndexIdent == nil {
 			idx := getIndex(paramVar.Index)
-			ret += "alias x_" + is + "      : std_logic_vector(" + strconv.Itoa(paramVar.Size) + " - 1 downto 0)  is in_data( " + strconv.Itoa(paramVar.Position+paramVar.Size*(idx+1)) + " - 1 downto " + strconv.Itoa(paramVar.Position+paramVar.Size*idx) + ");\n"
+			totalSize := paramVar.Size * paramVar.Len
+			ret += "alias x_" + is + "      : std_logic_vector(" + strconv.Itoa(totalSize) + " - 1 downto 0)  is in_data( " + strconv.Itoa(paramVar.Position+totalSize*(idx+1)) + " - 1 downto " + strconv.Itoa(paramVar.Position+totalSize*idx) + ");\n"
 		} else {
 			ret += "signal x_" + is + " : std_logic_vector(" + strconv.Itoa(paramVar.Size) + "- 1 downto 0);\n"
 			ret += "constant baseX_" + is + "      : integer := " + strconv.Itoa(paramVar.Position) + ";\n"
@@ -167,7 +168,8 @@ func (fb *FuncBlock) getAliases() string {
 		is := strconv.Itoa(i)
 		if resVar.IndexIdent == nil {
 			idx := getIndex(resVar.Index)
-			ret += "alias result_" + is + " : std_logic_vector(" + strconv.Itoa(resVar.Size) + " - 1 downto 0)  is out_data( " + strconv.Itoa(resVar.Position+resVar.Size*(idx+1)) + " - 1 downto " + strconv.Itoa(resVar.Position+resVar.Size*idx) + ");\n"
+			totalSize := resVar.Size * resVar.Len
+			ret += "alias result_" + is + " : std_logic_vector(" + strconv.Itoa(totalSize) + " - 1 downto 0)  is out_data( " + strconv.Itoa(resVar.Position+totalSize*(idx+1)) + " - 1 downto " + strconv.Itoa(resVar.Position+totalSize*idx) + ");\n"
 		} else {
 			ret += "signal result_" + is + " : std_logic_vector(" + strconv.Itoa(resVar.Size) + " - 1 downto 0);\n"
 			ret += "constant baseR_" + is + "      : integer := " + strconv.Itoa(resVar.Position) + ";\n"
@@ -214,8 +216,9 @@ func (fb *FuncBlock) getProcess() string {
 			resultMap += "out_data(offset_" + is + " + result_" + is + "'length -1 downto offset_" + is + ") <= result_" + is + delay + ";\n"
 		}
 
-		compute += "result_" + is + " <=  " + fb.externalInterface.Name + "_out_data( " + strconv.Itoa(resultSignalOffset+resVar.Size) + " - 1 downto " + strconv.Itoa(resultSignalOffset) + ")" + delay + ";\n"
-		resultSignalOffset += resVar.Size
+		totalSize := resVar.Size * resVar.Len
+		compute += "result_" + is + " <=  " + fb.externalInterface.Name + "_out_data( " + strconv.Itoa(resultSignalOffset+totalSize) + " - 1 downto " + strconv.Itoa(resultSignalOffset) + ")" + delay + ";\n"
+		resultSignalOffset += totalSize
 	}
 
 	return processStart + arrayParamMappings + resultMap + compute + `
