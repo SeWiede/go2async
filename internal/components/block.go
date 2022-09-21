@@ -246,7 +246,6 @@ func (b *Block) ComponentStr() string {
 	` + externalInterfacesStr + `
   );
   `
-	//out_data => ` + b.Out.Data + `(` + b.Out.Data + `'length - 1 downto ` + b.Out.Data + `'length - ` + strconv.Itoa(*b.GetVariablesSize()) + `),
 }
 
 func (b *Block) signalDefs() string {
@@ -263,10 +262,6 @@ func (b *Block) signalDefs() string {
 		ret += SignalsString(c.Bc.OutChannel())
 	}
 
-	/* for _, extIntf := range b.externalInterfaces {
-		ret += SignalsString(extIntf.GetInChannel())
-	} */
-
 	return ret
 }
 
@@ -281,12 +276,6 @@ func (b *Block) ioChannels() string {
 		ret += b.OutChannel().Ack + " <= out_ack; \n"
 		ret += "out_data <= std_logic_vector(resize(unsigned(" + b.OutChannel().Data + "), out_data'length)); \n"
 	}
-
-	/* for _, extIntf := range b.externalInterfaces {
-		ret += extIntf.Name + "_out_req" + "; \n"
-		ret += extIntf.Name + "" + "; \n"
-		ret += extIntf.Name + "" + "; \n"
-	} */
 
 	return ret
 }
