@@ -1,6 +1,8 @@
 package components
 
 import (
+	"fmt"
+	"go2async/internal/globalArguments"
 	"go2async/pkg/variable"
 	"strconv"
 	"strings"
@@ -20,6 +22,8 @@ type BinExprBlock struct {
 	Operation string
 
 	Oi *OperandInfo
+
+	opDescription string // debug
 }
 
 type OperandInfo struct {
@@ -58,6 +62,20 @@ func NewBinExprBlock(op string, vi *OperandInfo, parent *Block) *BinExprBlock {
 
 		Operation: op,
 		Oi:        vi,
+	}
+
+	if *globalArguments.Debug {
+		opDescription := fmt.Sprintf("Creating binExprBlock %s [size %d, len %d, index %s; const %s] = %s [size %d, len %d, index %s; const %s]",
+			vi.R.Name, vi.R.Size, vi.R.Len, vi.R.Index, vi.R.Const, vi.X.Name, vi.X.Size, vi.X.Len, vi.X.Index, vi.X.Const)
+
+		if vi.Y != nil {
+			opDescription += fmt.Sprintf("%s %s [size %d, len %d, index %s; const %s]", op, vi.Y.Name, vi.Y.Size, vi.Y.Len, vi.Y.Index, vi.Y.Const)
+		}
+
+		opDescription += fmt.Sprintf("\n")
+
+		fmt.Print(opDescription)
+		ret.opDescription = opDescription
 	}
 
 	return ret
@@ -99,8 +117,14 @@ func getIndex(idxStd string) int {
 func (bep *BinExprBlock) getAliases() string {
 	ret := ""
 	if bep.Oi.X.IndexIdent == nil {
-		idx := getIndex(bep.Oi.X.Index)
-		ret += "alias x      : std_logic_vector(" + strconv.Itoa(bep.Oi.X.Size) + " - 1 downto 0)  is in_data( " + strconv.Itoa(bep.Oi.X.Position+bep.Oi.X.Size*(idx+1)) + " - 1 downto " + strconv.Itoa(bep.Oi.X.Position+bep.Oi.X.Size*idx) + ");\n"
+		if bep.Oi.X.Const == "" {
+			idx := getIndex(bep.Oi.X.Index)
+			totalSize := bep.Oi.X.Size * bep.Oi.X.Len
+			if idx > 0 {
+				totalSize = bep.Oi.X.Size
+			}
+			ret += "alias x : std_logic_vector(" + strconv.Itoa(totalSize) + " - 1 downto 0)  is in_data( " + strconv.Itoa(bep.Oi.X.Position+totalSize*(idx+1)) + " - 1 downto " + strconv.Itoa(bep.Oi.X.Position+totalSize*idx) + ");\n"
+		}
 	} else {
 		ret += "signal x : std_logic_vector(" + strconv.Itoa(bep.Oi.X.Size) + "- 1 downto 0);\n"
 		ret += "constant baseX      : integer := " + strconv.Itoa(bep.Oi.X.Position) + ";\n"
@@ -108,8 +132,14 @@ func (bep *BinExprBlock) getAliases() string {
 	}
 
 	if bep.Oi.Y != nil && bep.Oi.Y.IndexIdent == nil {
-		idx := getIndex(bep.Oi.Y.Index)
-		ret += "alias y      : std_logic_vector(" + strconv.Itoa(bep.Oi.Y.Size) + " - 1 downto 0)  is in_data( " + strconv.Itoa(bep.Oi.Y.Position+bep.Oi.Y.Size*(idx+1)) + " - 1 downto " + strconv.Itoa(bep.Oi.Y.Position+bep.Oi.Y.Size*idx) + ");\n"
+		if bep.Oi.Y.Const == "" {
+			idx := getIndex(bep.Oi.Y.Index)
+			totalSize := bep.Oi.Y.Size * bep.Oi.Y.Len
+			if idx > 0 {
+				totalSize = bep.Oi.Y.Size
+			}
+			ret += "alias y      : std_logic_vector(" + strconv.Itoa(totalSize) + " - 1 downto 0)  is in_data( " + strconv.Itoa(bep.Oi.Y.Position+totalSize*(idx+1)) + " - 1 downto " + strconv.Itoa(bep.Oi.Y.Position+totalSize*idx) + ");\n"
+		}
 	} else if bep.Oi.Y != nil && bep.Oi.Y.IndexIdent != nil {
 		ret += "signal y  : std_logic_vector(" + strconv.Itoa(bep.Oi.Y.Size) + "- 1 downto 0);\n"
 		ret += "constant baseY      : integer := " + strconv.Itoa(bep.Oi.Y.Position) + ";\n"
@@ -118,7 +148,11 @@ func (bep *BinExprBlock) getAliases() string {
 
 	if bep.Oi.R.IndexIdent == nil {
 		idx := getIndex(bep.Oi.R.Index)
-		ret += "alias result : std_logic_vector(" + strconv.Itoa(bep.Oi.R.Size) + " - 1 downto 0)  is out_data( " + strconv.Itoa(bep.Oi.R.Position+bep.Oi.R.Size*(idx+1)) + " - 1 downto " + strconv.Itoa(bep.Oi.R.Position+bep.Oi.R.Size*idx) + ");\n"
+		totalSize := bep.Oi.R.Size * bep.Oi.R.Len
+		if idx > 0 {
+			totalSize = bep.Oi.R.Size
+		}
+		ret += "alias result : std_logic_vector(" + strconv.Itoa(totalSize) + " - 1 downto 0)  is out_data( " + strconv.Itoa(bep.Oi.R.Position+totalSize*(idx+1)) + " - 1 downto " + strconv.Itoa(bep.Oi.R.Position+totalSize*idx) + ");\n"
 	} else {
 		ret += "signal result : std_logic_vector(" + strconv.Itoa(bep.Oi.R.Size) + " - 1 downto 0);\n"
 		ret += "constant baseR      : integer := " + strconv.Itoa(bep.Oi.R.Position) + ";\n"
@@ -135,13 +169,13 @@ func (bep *BinExprBlock) getCalcProcess() string {
 
 	x = "unsigned(x)"
 	if bep.Oi.X.Const != "" {
-		x = "to_unsigned(" + bep.Oi.X.Const + ", x'length)"
+		x = "to_unsigned(" + bep.Oi.X.Const + ", result'length)"
 	}
 
 	if bep.Oi.Y != nil {
 		y = "unsigned(y)"
 		if bep.Oi.Y.Const != "" {
-			y = "to_unsigned(" + bep.Oi.Y.Const + ", y'length)"
+			y = "to_unsigned(" + bep.Oi.Y.Const + ", result'length)"
 		}
 
 		if bep.Operation == "<<" || bep.Operation == ">>" {
@@ -194,6 +228,8 @@ func (bep *BinExprBlock) Architecture() string {
 	return `architecture ` + bep.archName + ` of binExprBlock is
 	` + bep.getAliases() + `
 	  
+	-- ` + bep.opDescription + `
+
     --attribute dont_touch : string;
 	--attribute dont_touch of  x, y, result: signal is "true";
 	  
