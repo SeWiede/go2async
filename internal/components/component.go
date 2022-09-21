@@ -16,6 +16,8 @@ type Component interface {
 	ArchName() string
 	ComponentStr() string
 	Architecture() string
+	Entity() string
+	EntityName() string
 }
 
 type BodyComponentType interface {

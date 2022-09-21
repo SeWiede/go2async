@@ -171,3 +171,31 @@ func (sb *SelectorBlock) Architecture() string {
   end ` + sb.archName + `;
   `
 }
+
+func (sb *SelectorBlock) EntityName() string {
+	return "Selector"
+}
+
+func (sb *SelectorBlock) Entity() string {
+	return `LIBRARY IEEE;
+USE IEEE.STD_LOGIC_1164.ALL;
+USE ieee.std_logic_unsigned.ALL;
+USE ieee.numeric_std.ALL;
+USE work.click_element_library_constants.ALL;
+
+ENTITY ` + sb.EntityName() + ` IS
+  GENERIC (
+    DATA_WIDTH : NATURAL := 8
+  );
+  PORT (
+    -- Data
+    in_data : IN STD_LOGIC_VECTOR(DATA_WIDTH - 1 DOWNTO 0);
+    in_req : IN STD_LOGIC;
+    in_ack : OUT STD_LOGIC;
+    -- Selector
+    selector : OUT STD_LOGIC_VECTOR(0 DOWNTO 0);
+    out_req : OUT STD_LOGIC;
+    out_ack : IN STD_LOGIC
+  );
+END ` + sb.EntityName() + `;`
+}

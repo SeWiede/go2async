@@ -884,12 +884,14 @@ func (g *Generator) ParseGoFile(file string) error {
 func (g *Generator) GenerateVHDL() string {
 	ret := ""
 
+	entityTracker := map[string]bool{}
+
 	for _, c := range g.components {
-		if blk, ok := c.(*components.Block); ok {
-			ret = blk.Entity() + ret
-		}
-		if fb, ok := c.(*components.FuncBlock); ok {
-			ret = fb.Entity() + ret
+		if _, ok := entityTracker[c.EntityName()]; !ok {
+			entityTracker[c.EntityName()] = true
+
+			// prefix entity if not already added
+			ret = c.Entity() + ret
 		}
 
 		ret += c.Architecture()

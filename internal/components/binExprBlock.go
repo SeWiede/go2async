@@ -63,30 +63,30 @@ func NewBinExprBlock(op string, vi *OperandInfo, parent *Block) *BinExprBlock {
 	return ret
 }
 
-func (fb *BinExprBlock) InChannel() *HandshakeChannel {
-	return fb.In
+func (bep *BinExprBlock) InChannel() *HandshakeChannel {
+	return bep.In
 }
 
-func (fb *BinExprBlock) OutChannel() *HandshakeChannel {
-	return fb.Out
+func (bep *BinExprBlock) OutChannel() *HandshakeChannel {
+	return bep.Out
 }
 
-func (fb *BinExprBlock) ComponentStr() string {
-	name := binexprblockprefix + strconv.Itoa(fb.Nr)
+func (bep *BinExprBlock) ComponentStr() string {
+	name := binexprblockprefix + strconv.Itoa(bep.Nr)
 
-	return name + `: entity work.binExprBlock(` + fb.archName + `)
+	return name + `: entity work.binExprBlock(` + bep.archName + `)
 	generic map(
-	  DATA_WIDTH => ` + strconv.Itoa(fb.GetVariableSize()) + `
+	  DATA_WIDTH => ` + strconv.Itoa(bep.GetVariableSize()) + `
 	)
 	port map (
 	  -- Input channel
-	  in_req  => ` + fb.In.Req + `,
-	  in_ack  => ` + fb.In.Ack + `, 
-	  in_data => std_logic_vector(resize(unsigned(` + fb.In.Data + `), ` + strconv.Itoa(fb.GetVariableSize()) + `)),
+	  in_req  => ` + bep.In.Req + `,
+	  in_ack  => ` + bep.In.Ack + `, 
+	  in_data => std_logic_vector(resize(unsigned(` + bep.In.Data + `), ` + strconv.Itoa(bep.GetVariableSize()) + `)),
 	  -- Output channel
-	  out_req => ` + fb.Out.Req + `,
-	  out_ack => ` + fb.Out.Ack + `,
-	  out_data  => ` + fb.Out.Data + `
+	  out_req => ` + bep.Out.Req + `,
+	  out_ack => ` + bep.Out.Ack + `,
+	  out_data  => ` + bep.Out.Data + `
 	);
 	`
 }
@@ -96,60 +96,60 @@ func getIndex(idxStd string) int {
 	return idx
 }
 
-func (fb *BinExprBlock) getAliases() string {
+func (bep *BinExprBlock) getAliases() string {
 	ret := ""
-	if fb.Oi.X.IndexIdent == nil {
-		idx := getIndex(fb.Oi.X.Index)
-		ret += "alias x      : std_logic_vector(" + strconv.Itoa(fb.Oi.X.Size) + " - 1 downto 0)  is in_data( " + strconv.Itoa(fb.Oi.X.Position+fb.Oi.X.Size*(idx+1)) + " - 1 downto " + strconv.Itoa(fb.Oi.X.Position+fb.Oi.X.Size*idx) + ");\n"
+	if bep.Oi.X.IndexIdent == nil {
+		idx := getIndex(bep.Oi.X.Index)
+		ret += "alias x      : std_logic_vector(" + strconv.Itoa(bep.Oi.X.Size) + " - 1 downto 0)  is in_data( " + strconv.Itoa(bep.Oi.X.Position+bep.Oi.X.Size*(idx+1)) + " - 1 downto " + strconv.Itoa(bep.Oi.X.Position+bep.Oi.X.Size*idx) + ");\n"
 	} else {
-		ret += "signal x : std_logic_vector(" + strconv.Itoa(fb.Oi.X.Size) + "- 1 downto 0);\n"
-		ret += "constant baseX      : integer := " + strconv.Itoa(fb.Oi.X.Position) + ";\n"
-		ret += "alias offsetX      : std_logic_vector(" + strconv.Itoa(fb.Oi.X.IndexIdent.Size) + " - 1 downto 0)  is in_data( " + strconv.Itoa(fb.Oi.X.IndexIdent.Position+fb.Oi.X.IndexIdent.Size) + " -1 downto " + strconv.Itoa(fb.Oi.X.IndexIdent.Position) + ");\n"
+		ret += "signal x : std_logic_vector(" + strconv.Itoa(bep.Oi.X.Size) + "- 1 downto 0);\n"
+		ret += "constant baseX      : integer := " + strconv.Itoa(bep.Oi.X.Position) + ";\n"
+		ret += "alias offsetX      : std_logic_vector(" + strconv.Itoa(bep.Oi.X.IndexIdent.Size) + " - 1 downto 0)  is in_data( " + strconv.Itoa(bep.Oi.X.IndexIdent.Position+bep.Oi.X.IndexIdent.Size) + " -1 downto " + strconv.Itoa(bep.Oi.X.IndexIdent.Position) + ");\n"
 	}
 
-	if fb.Oi.Y != nil && fb.Oi.Y.IndexIdent == nil {
-		idx := getIndex(fb.Oi.Y.Index)
-		ret += "alias y      : std_logic_vector(" + strconv.Itoa(fb.Oi.Y.Size) + " - 1 downto 0)  is in_data( " + strconv.Itoa(fb.Oi.Y.Position+fb.Oi.Y.Size*(idx+1)) + " - 1 downto " + strconv.Itoa(fb.Oi.Y.Position+fb.Oi.Y.Size*idx) + ");\n"
-	} else if fb.Oi.Y != nil && fb.Oi.Y.IndexIdent != nil {
-		ret += "signal y  : std_logic_vector(" + strconv.Itoa(fb.Oi.Y.Size) + "- 1 downto 0);\n"
-		ret += "constant baseY      : integer := " + strconv.Itoa(fb.Oi.Y.Position) + ";\n"
-		ret += "alias offsetY      : std_logic_vector(" + strconv.Itoa(fb.Oi.Y.IndexIdent.Size) + " - 1 downto 0)  is in_data( " + strconv.Itoa(fb.Oi.Y.IndexIdent.Position+fb.Oi.Y.IndexIdent.Size) + " -1 downto " + strconv.Itoa(fb.Oi.Y.IndexIdent.Position) + ");\n"
+	if bep.Oi.Y != nil && bep.Oi.Y.IndexIdent == nil {
+		idx := getIndex(bep.Oi.Y.Index)
+		ret += "alias y      : std_logic_vector(" + strconv.Itoa(bep.Oi.Y.Size) + " - 1 downto 0)  is in_data( " + strconv.Itoa(bep.Oi.Y.Position+bep.Oi.Y.Size*(idx+1)) + " - 1 downto " + strconv.Itoa(bep.Oi.Y.Position+bep.Oi.Y.Size*idx) + ");\n"
+	} else if bep.Oi.Y != nil && bep.Oi.Y.IndexIdent != nil {
+		ret += "signal y  : std_logic_vector(" + strconv.Itoa(bep.Oi.Y.Size) + "- 1 downto 0);\n"
+		ret += "constant baseY      : integer := " + strconv.Itoa(bep.Oi.Y.Position) + ";\n"
+		ret += "alias offsetY      : std_logic_vector(" + strconv.Itoa(bep.Oi.Y.IndexIdent.Size) + " - 1 downto 0)  is in_data( " + strconv.Itoa(bep.Oi.Y.IndexIdent.Position+bep.Oi.Y.IndexIdent.Size) + " -1 downto " + strconv.Itoa(bep.Oi.Y.IndexIdent.Position) + ");\n"
 	}
 
-	if fb.Oi.R.IndexIdent == nil {
-		idx := getIndex(fb.Oi.R.Index)
-		ret += "alias result : std_logic_vector(" + strconv.Itoa(fb.Oi.R.Size) + " - 1 downto 0)  is out_data( " + strconv.Itoa(fb.Oi.R.Position+fb.Oi.R.Size*(idx+1)) + " - 1 downto " + strconv.Itoa(fb.Oi.R.Position+fb.Oi.R.Size*idx) + ");\n"
+	if bep.Oi.R.IndexIdent == nil {
+		idx := getIndex(bep.Oi.R.Index)
+		ret += "alias result : std_logic_vector(" + strconv.Itoa(bep.Oi.R.Size) + " - 1 downto 0)  is out_data( " + strconv.Itoa(bep.Oi.R.Position+bep.Oi.R.Size*(idx+1)) + " - 1 downto " + strconv.Itoa(bep.Oi.R.Position+bep.Oi.R.Size*idx) + ");\n"
 	} else {
-		ret += "signal result : std_logic_vector(" + strconv.Itoa(fb.Oi.R.Size) + " - 1 downto 0);\n"
-		ret += "constant baseR      : integer := " + strconv.Itoa(fb.Oi.R.Position) + ";\n"
-		ret += "alias offsetR      : std_logic_vector(" + strconv.Itoa(fb.Oi.R.IndexIdent.Size) + " - 1 downto 0)  is in_data( " + strconv.Itoa(fb.Oi.R.IndexIdent.Position+fb.Oi.R.IndexIdent.Size) + " -1 downto " + strconv.Itoa(fb.Oi.R.IndexIdent.Position) + ");\n"
+		ret += "signal result : std_logic_vector(" + strconv.Itoa(bep.Oi.R.Size) + " - 1 downto 0);\n"
+		ret += "constant baseR      : integer := " + strconv.Itoa(bep.Oi.R.Position) + ";\n"
+		ret += "alias offsetR      : std_logic_vector(" + strconv.Itoa(bep.Oi.R.IndexIdent.Size) + " - 1 downto 0)  is in_data( " + strconv.Itoa(bep.Oi.R.IndexIdent.Position+bep.Oi.R.IndexIdent.Size) + " -1 downto " + strconv.Itoa(bep.Oi.R.IndexIdent.Position) + ");\n"
 	}
 
 	return ret
 }
 
-func (fb *BinExprBlock) getCalcProcess() string {
+func (bep *BinExprBlock) getCalcProcess() string {
 	x := ""
 	y := ""
 	delay := " after ADDER_DELAY"
 
 	x = "unsigned(x)"
-	if fb.Oi.X.Const != "" {
-		x = "to_unsigned(" + fb.Oi.X.Const + ", x'length)"
+	if bep.Oi.X.Const != "" {
+		x = "to_unsigned(" + bep.Oi.X.Const + ", x'length)"
 	}
 
-	if fb.Oi.Y != nil {
+	if bep.Oi.Y != nil {
 		y = "unsigned(y)"
-		if fb.Oi.Y.Const != "" {
-			y = "to_unsigned(" + fb.Oi.Y.Const + ", y'length)"
+		if bep.Oi.Y.Const != "" {
+			y = "to_unsigned(" + bep.Oi.Y.Const + ", y'length)"
 		}
 
-		if fb.Operation == "<<" || fb.Operation == ">>" {
+		if bep.Operation == "<<" || bep.Operation == ">>" {
 			y = "to_integer(" + y + ")"
 		}
 	}
 
-	if fb.Operation == "NOP" || fb.Operation == "=" || fb.Oi.Y == nil {
+	if bep.Operation == "NOP" || bep.Operation == "=" || bep.Oi.Y == nil {
 		y = ""
 		delay = ""
 	}
@@ -165,21 +165,21 @@ func (fb *BinExprBlock) getCalcProcess() string {
 	compute := ""
 	resultMap := ""
 
-	if fb.Operation != "NOP" {
-		if fb.Oi.X.IndexIdent != nil {
+	if bep.Operation != "NOP" {
+		if bep.Oi.X.IndexIdent != nil {
 			x = "unsigned(x)"
 			xcalc = "x <= in_data(baseX + (to_integer(unsigned(offsetX)) + 1) * x'length  - 1 downto baseX + to_integer(unsigned(offsetX)) * x'length);\n"
 		}
 
-		if fb.Oi.Y != nil && fb.Oi.Y.IndexIdent != nil {
+		if bep.Oi.Y != nil && bep.Oi.Y.IndexIdent != nil {
 			y = "unsigned(y)"
 			ycalc = "y <= in_data(baseY + (to_integer(unsigned(offsetY)) + 1) * y'length - 1 downto baseY + to_integer(unsigned(offsetY)) * y'length);\n"
 
 		}
 
-		compute = "result <= std_logic_vector(resize(" + x + " " + SupportedOperations[fb.Operation] + " " + y + ", result'length)) " + delay + ";\n"
+		compute = "result <= std_logic_vector(resize(" + x + " " + SupportedOperations[bep.Operation] + " " + y + ", result'length)) " + delay + ";\n"
 
-		if fb.Oi.R.IndexIdent != nil {
+		if bep.Oi.R.IndexIdent != nil {
 			resultMap = "offset := baseR + to_integer(unsigned(offsetR) * result'length);\n"
 			resultMap += "out_data(offset + result'length -1 downto offset) <= result;\n"
 		}
@@ -188,11 +188,11 @@ func (fb *BinExprBlock) getCalcProcess() string {
 	end process;`
 }
 
-func (fb *BinExprBlock) Architecture() string {
+func (bep *BinExprBlock) Architecture() string {
 	// TODO: analyze delays
 
-	return `architecture ` + fb.archName + ` of binExprBlock is
-	` + fb.getAliases() + `
+	return `architecture ` + bep.archName + ` of binExprBlock is
+	` + bep.getAliases() + `
 	  
     --attribute dont_touch : string;
 	--attribute dont_touch of  x, y, result: signal is "true";
@@ -204,7 +204,7 @@ func (fb *BinExprBlock) Architecture() string {
     
     delay_req: entity work.delay_element
       generic map(
-        NUM_LCELLS => ` + operationDelays[fb.Operation] + `  -- Delay  size
+        NUM_LCELLS => ` + operationDelays[bep.Operation] + `  -- Delay  size
       )
       port map (
         i => in_req,
@@ -212,7 +212,33 @@ func (fb *BinExprBlock) Architecture() string {
 	  );
 	  
 
-	  ` + fb.getCalcProcess() + `
-  end ` + fb.archName + `;
+	  ` + bep.getCalcProcess() + `
+  end ` + bep.archName + `;
   `
+}
+
+func (bep *BinExprBlock) EntityName() string {
+	return "binExprBlock"
+}
+
+func (bep *BinExprBlock) Entity() string {
+	return `LIBRARY IEEE;
+	USE IEEE.STD_LOGIC_1164.ALL;
+	USE ieee.std_logic_unsigned.ALL;
+	USE ieee.numeric_std.ALL;
+	USE work.click_element_library_constants.ALL;
+	
+	ENTITY ` + bep.EntityName() + ` IS
+	  GENERIC (
+		DATA_WIDTH : NATURAL := 8
+	  );
+	  PORT (-- Input channel
+		in_req : IN STD_LOGIC;
+		in_ack : OUT STD_LOGIC;
+		in_data : IN STD_LOGIC_VECTOR(DATA_WIDTH - 1 DOWNTO 0);
+		-- Output channel
+		out_req : OUT STD_LOGIC;
+		out_ack : IN STD_LOGIC;
+		out_data : OUT STD_LOGIC_VECTOR(DATA_WIDTH - 1 DOWNTO 0));
+	END ` + bep.EntityName() + `;`
 }

@@ -145,3 +145,31 @@ func (ib *IfBlock) Architecture() string {
 	`
 	return ret
 }
+
+func (ib *IfBlock) EntityName() string {
+	return "ifBlock"
+}
+
+func (ib *IfBlock) Entity() string {
+	return `LIBRARY IEEE;
+USE IEEE.STD_LOGIC_1164.ALL;
+USE ieee.std_logic_unsigned.ALL;
+USE ieee.numeric_std.ALL;
+USE work.click_element_library_constants.ALL;
+ENTITY ` + ib.EntityName() + ` IS
+GENERIC (
+	DATA_WIDTH : NATURAL := 8
+);
+PORT (
+	rst : IN STD_LOGIC; -- input channel
+	in_req : IN STD_LOGIC;
+	in_ack : OUT STD_LOGIC;
+	in_data : IN STD_LOGIC_VECTOR(DATA_WIDTH - 1 DOWNTO 0);
+	-- Output channel
+	out_req : OUT STD_LOGIC;
+	out_ack : IN STD_LOGIC;
+	out_data : OUT STD_LOGIC_VECTOR(DATA_WIDTH - 1 DOWNTO 0)
+);
+END ` + ib.EntityName() + `;`
+
+}

@@ -11,8 +11,6 @@ import (
 const scopePrefix = "SC_"
 const defaultScopeEntityName = "Scope"
 
-var scopeEntitesTracker = make(map[string]bool)
-
 type Scope struct {
 	Nr       int
 	archName string
@@ -89,11 +87,6 @@ func (s *Scope) entityName() string {
 }
 
 func (s *Scope) Entity() string {
-	if _, ok := scopeEntitesTracker[s.entityName()]; ok {
-		return ``
-	}
-	blockEntitesTracker[s.entityName()] = ""
-
 	if *globalArguments.Debug {
 		fmt.Printf("Generating unique block entity '%s'\n", s.entityName())
 	}

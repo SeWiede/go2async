@@ -176,3 +176,31 @@ func (lb *LoopBlock) Architecture() string {
 	`
 	return ret
 }
+
+func (lb *LoopBlock) EntityName() string {
+	return "LoopBlock"
+}
+
+func (lb *LoopBlock) Entity() string {
+	return `LIBRARY IEEE;
+USE IEEE.STD_LOGIC_1164.ALL;
+USE ieee.std_logic_unsigned.ALL;
+USE ieee.numeric_std.ALL;
+USE work.click_element_library_constants.ALL;
+
+ENTITY ` + lb.EntityName() + ` IS
+  GENERIC (
+    DATA_WIDTH : NATURAL := 8
+  );
+  PORT (
+    rst : IN STD_LOGIC;
+    -- Input channel
+    in_req : IN STD_LOGIC;
+    in_ack : OUT STD_LOGIC;
+    in_data : IN STD_LOGIC_VECTOR(DATA_WIDTH - 1 DOWNTO 0);
+    -- Output channel
+    out_req : OUT STD_LOGIC;
+    out_ack : IN STD_LOGIC;
+    out_data : OUT STD_LOGIC_VECTOR(DATA_WIDTH - 1 DOWNTO 0));
+END ` + lb.EntityName() + `;`
+}

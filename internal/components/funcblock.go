@@ -21,7 +21,6 @@ type FuncBlock struct {
 }
 
 var fbNr = 0
-var funcBlockEntitesTracker = make(map[string]interface{})
 
 func NewFuncBlock(paramVarList []*variable.VariableInfo, resultVarList []*variable.VariableInfo, fi *FuncInterface, parent *Block) (*FuncBlock, error) {
 	nr := bebNr
@@ -72,23 +71,18 @@ func (fb *FuncBlock) OutChannel() *HandshakeChannel {
 	return fb.Out
 }
 
-func (fb *FuncBlock) entityName() string {
+func (fb *FuncBlock) EntityName() string {
 	return defaultFuncBlockEntityName + "_" + fb.externalInterface.Name
 }
 
 func (fb *FuncBlock) Entity() string {
-	if _, ok := funcBlockEntitesTracker[fb.entityName()]; ok {
-		return ``
-	}
-	funcBlockEntitesTracker[fb.entityName()] = ""
-
 	return `LIBRARY IEEE;
 	USE IEEE.STD_LOGIC_1164.ALL;
 	USE ieee.std_logic_unsigned.ALL;
 	USE ieee.numeric_std.ALL;
 	USE work.click_element_library_constants.ALL;
 	
-	ENTITY ` + fb.entityName() + ` IS
+	ENTITY ` + fb.EntityName() + ` IS
 	  GENERIC (
 		DATA_WIDTH : NATURAL := 8;
 		` + fb.externalInterface.Name + `_DATA_IN_WIDTH : NATURAL := 8;
@@ -113,13 +107,13 @@ func (fb *FuncBlock) Entity() string {
 		` + fb.externalInterface.Name + `_out_req : IN STD_LOGIC;
 		` + fb.externalInterface.Name + `_out_ack : OUT STD_LOGIC
 	  );
-	END ` + fb.entityName() + `;`
+	END ` + fb.EntityName() + `;`
 }
 
 func (fb *FuncBlock) ComponentStr() string {
 	name := binexprblockprefix + strconv.Itoa(fb.Nr)
 
-	return name + `: entity work.` + fb.entityName() + `(` + fb.archName + `)
+	return name + `: entity work.` + fb.EntityName() + `(` + fb.archName + `)
 	generic map(
 	  DATA_WIDTH => ` + strconv.Itoa(fb.GetVariableSize()) + `,
 	  ` + fb.externalInterface.Name + `_DATA_IN_WIDTH => ` + fb.externalInterface.Name + `_DATA_IN_WIDTH,
@@ -243,7 +237,7 @@ func (fb *FuncBlock) Architecture() string {
 		externalIntfInput += ";"
 	}
 
-	return `architecture ` + fb.archName + ` of ` + fb.entityName() + ` is
+	return `architecture ` + fb.archName + ` of ` + fb.EntityName() + ` is
 	` + fb.getAliases() + `
   begin
     ` + fb.externalInterface.Name + `_in_req <= in_req;

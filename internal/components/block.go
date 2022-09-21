@@ -12,8 +12,6 @@ import (
 const blockPrefix = "B_"
 const defaultBlockEntityName = "BlockC"
 
-var blockEntitesTracker = make(map[string]interface{})
-
 type regBodyPair struct {
 	Reg *Reg
 	Bc  BodyComponentType
@@ -188,7 +186,7 @@ func (b *Block) AddComponent(bodyComponent BodyComponentType) {
 	}
 }
 
-func (b *Block) entityName() string {
+func (b *Block) EntityName() string {
 	return defaultBlockEntityName + "_" + strconv.Itoa(len(b.ExternalInterfaces))
 }
 
@@ -231,7 +229,7 @@ func (b *Block) ComponentStr() string {
 		i++
 	}
 
-	return name + `: entity work.` + b.entityName() + `(` + b.archName + `)
+	return name + `: entity work.` + b.EntityName() + `(` + b.archName + `)
   generic map(
    DATA_IN_WIDTH => ` + dataInWidth + `,
    DATA_OUT_WIDTH => ` + dataOutWidth + comma + `
@@ -309,13 +307,8 @@ func (b *Block) componentsString() string {
 }
 
 func (b *Block) Entity() string {
-	if _, ok := blockEntitesTracker[b.entityName()]; ok {
-		return ``
-	}
-	blockEntitesTracker[b.entityName()] = ""
-
 	if *globalArguments.Debug {
-		fmt.Printf("Generating unique block entity '%s'\n", b.entityName())
+		fmt.Printf("Generating unique block entity '%s'\n", b.EntityName())
 	}
 
 	externalInterfacesStr := ``
@@ -354,7 +347,7 @@ func (b *Block) Entity() string {
 	USE ieee.numeric_std.ALL;
 	USE work.click_element_library_constants.ALL;
 	
-	ENTITY ` + b.entityName() + ` IS
+	ENTITY ` + b.EntityName() + ` IS
 	  GENERIC (
 		DATA_IN_WIDTH : NATURAL := 8;
 		DATA_OUT_WIDTH : NATURAL := 8` + semiColon + `
@@ -375,14 +368,14 @@ func (b *Block) Entity() string {
 		` + externalInterfacesStr +
 		`
 	  );
-	END ` + b.entityName() + `;`
+	END ` + b.EntityName() + `;`
 
 	return ret
 }
 
 func (b *Block) Architecture() string {
 	// TODO: add inner components
-	ret := `architecture ` + b.archName + ` of ` + b.entityName() + ` is
+	ret := `architecture ` + b.archName + ` of ` + b.EntityName() + ` is
 	`
 
 	ret += b.signalDefs()
