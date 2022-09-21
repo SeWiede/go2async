@@ -21,15 +21,17 @@ To test the circuit you have to instantiate a 'Scope' entity which the function 
 	  IN_DATA_WIDTH => <function name>_IN_DATA_WIDTH
   )
   port map (
-   rst => not res_n,
+   rst => <reset pin>,
+
    -- Input channel
-   in_ack => <out pin>,
    in_req => <in pin>,
+   in_ack => <out pin>,
    in_data => <parameters in a vector>,
+
    -- Output channel
+   out_ack => <in pin>
    out_req => <out pin>,
    out_data => <return values in a vector>,
-   out_ack => <in pin>
   );
 ```
 
