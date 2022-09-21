@@ -127,9 +127,6 @@ func NewBlock(toplevel bool, parent *Block) *Block {
 		ExternalInterfaces: make(map[string]*FuncInterface),
 	}
 
-	// TODO: handle datawidths in block
-	// b.Out.DataWidth = b.GetVariablesSize()
-
 	return b
 }
 
@@ -374,7 +371,6 @@ func (b *Block) Entity() string {
 }
 
 func (b *Block) Architecture() string {
-	// TODO: add inner components
 	ret := `architecture ` + b.archName + ` of ` + b.EntityName() + ` is
 	`
 

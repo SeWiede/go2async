@@ -113,7 +113,6 @@ func (ib *IfBlock) signalDefs() string {
 }
 
 func (ib *IfBlock) Architecture() string {
-	// TODO: add inner components
 	ret := `architecture ` + ib.archName + ` of IfBlock is
 	`
 

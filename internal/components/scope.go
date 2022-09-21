@@ -219,7 +219,6 @@ func (s *Scope) signalDefs() string {
 }
 
 func (s *Scope) Architecture() string {
-	// TODO: add inner components
 	ret := `architecture ` + s.archName + ` of ` + s.entityName() + ` is
 	`
 

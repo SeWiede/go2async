@@ -797,7 +797,6 @@ func (g *Generator) GenerateScope(f *ast.FuncDecl) (s *components.Scope, err err
 		return nil, g.peb.NewParseError(f, errors.New("At least one top-level statement + return expected"))
 	}
 
-	// TODO: assign toplevelstatement bool true again later
 	block, err := g.GenerateBlock(f.Body.List[0:fields-1], false, paramDummyBlock, true)
 	if err != nil {
 		return nil, g.peb.NewParseError(f, err)
