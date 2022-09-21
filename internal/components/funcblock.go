@@ -150,11 +150,11 @@ func (fb *FuncBlock) getAliases() string {
 		if paramVar.IndexIdent == nil {
 			idx := getIndex(paramVar.Index)
 			totalSize := paramVar.Size * paramVar.Len
-			ret += "alias x_" + is + "      : std_logic_vector(" + strconv.Itoa(totalSize) + " - 1 downto 0)  is in_data( " + strconv.Itoa(paramVar.Position+totalSize*(idx+1)) + " - 1 downto " + strconv.Itoa(paramVar.Position+totalSize*idx) + ");\n"
+			ret += "alias x_" + is + " : std_logic_vector(" + strconv.Itoa(totalSize) + " - 1 downto 0)  is in_data( " + strconv.Itoa(paramVar.Position+totalSize*(idx+1)) + " - 1 downto " + strconv.Itoa(paramVar.Position+totalSize*idx) + ");\n"
 		} else {
 			ret += "signal x_" + is + " : std_logic_vector(" + strconv.Itoa(paramVar.Size) + "- 1 downto 0);\n"
-			ret += "constant baseX_" + is + "      : integer := " + strconv.Itoa(paramVar.Position) + ";\n"
-			ret += "alias offsetX_" + is + "      : std_logic_vector(" + strconv.Itoa(paramVar.IndexIdent.Size) + " - 1 downto 0)  is in_data( " + strconv.Itoa(paramVar.IndexIdent.Position+paramVar.IndexIdent.Size) + " -1 downto " + strconv.Itoa(paramVar.IndexIdent.Position) + ");\n"
+			ret += "constant baseX_" + is + " : integer := " + strconv.Itoa(paramVar.Position) + ";\n"
+			ret += "alias offsetX_" + is + " : std_logic_vector(" + strconv.Itoa(paramVar.IndexIdent.Size) + " - 1 downto 0)  is in_data( " + strconv.Itoa(paramVar.IndexIdent.Position+paramVar.IndexIdent.Size) + " -1 downto " + strconv.Itoa(paramVar.IndexIdent.Position) + ");\n"
 		}
 	}
 
@@ -166,8 +166,8 @@ func (fb *FuncBlock) getAliases() string {
 			ret += "alias result_" + is + " : std_logic_vector(" + strconv.Itoa(totalSize) + " - 1 downto 0)  is out_data( " + strconv.Itoa(resVar.Position+totalSize*(idx+1)) + " - 1 downto " + strconv.Itoa(resVar.Position+totalSize*idx) + ");\n"
 		} else {
 			ret += "signal result_" + is + " : std_logic_vector(" + strconv.Itoa(resVar.Size) + " - 1 downto 0);\n"
-			ret += "constant baseR_" + is + "      : integer := " + strconv.Itoa(resVar.Position) + ";\n"
-			ret += "alias offsetR_" + is + "      : std_logic_vector(" + strconv.Itoa(resVar.IndexIdent.Size) + " - 1 downto 0)  is in_data( " + strconv.Itoa(resVar.IndexIdent.Position+resVar.IndexIdent.Size) + " -1 downto " + strconv.Itoa(resVar.IndexIdent.Position) + ");\n"
+			ret += "constant baseR_" + is + " : integer := " + strconv.Itoa(resVar.Position) + ";\n"
+			ret += "alias offsetR_" + is + " : std_logic_vector(" + strconv.Itoa(resVar.IndexIdent.Size) + " - 1 downto 0)  is in_data( " + strconv.Itoa(resVar.IndexIdent.Position+resVar.IndexIdent.Size) + " -1 downto " + strconv.Itoa(resVar.IndexIdent.Position) + ");\n"
 		}
 	}
 
