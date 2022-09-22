@@ -38,7 +38,7 @@ func NewGenerator(intSize int) *Generator {
 	}
 }
 
-func (g *Generator) GenerateFuncBlock(s *ast.AssignStmt, parent *components.Block) (fb components.BodyComponentType, err error) {
+func (g *Generator) HandleAssignmentStmt(s *ast.AssignStmt, parent *components.Block) (fb components.BodyComponentType, err error) {
 	if len(s.Lhs) > 1 {
 		return nil, g.peb.NewParseError(s, errors.New("Expression lists are not allowed"))
 	}
@@ -654,7 +654,7 @@ func (g *Generator) GenerateBodyBlock(s ast.Stmt, parent *components.Block) (c c
 
 		return nil, nil
 	case *ast.AssignStmt:
-		return g.GenerateFuncBlock(sType, parent)
+		return g.HandleAssignmentStmt(sType, parent)
 	case *ast.ForStmt:
 		return g.GenerateLoopBlock(sType, parent)
 	case *ast.IfStmt:
