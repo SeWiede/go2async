@@ -264,10 +264,6 @@ func (g *Generator) HandleAssignmentStmt(s *ast.AssignStmt, parent *components.B
 		parent.AddComponent(newFuncBlk)
 
 		return newFuncBlk, nil
-
-		// TOTO: Valid CallExpr: make block for expression
-
-		//return nil, g.peb.NewParseError(s, errors.New("Call expression in rhs not supported yet!"))
 	default:
 		return nil, g.peb.NewParseError(s, errors.New("Expression "+reflect.TypeOf(rhsExpr).String()+" in rhs not supported!"))
 	}
