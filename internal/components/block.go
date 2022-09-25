@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"go2async/internal/globalArguments"
+	infoprinter "go2async/internal/infoPrinter"
 	"go2async/pkg/variable"
 	"strconv"
 	"strings"
@@ -16,68 +17,6 @@ type regBodyPair struct {
 	Reg *Reg
 	Bc  BodyComponentType
 }
-
-type FuncInterface struct {
-	Name       string
-	Parameters *ScopedVariables
-	Results    *ScopedVariables
-
-	In  *HandshakeChannel
-	Out *HandshakeChannel
-}
-
-func NewFuncInterface(name string) *FuncInterface {
-	return &FuncInterface{
-		Name:       name,
-		Parameters: NewScopedVariables(nil),
-		Results:    NewScopedVariables(nil),
-
-		// External interface: in is output and out is input
-		In: &HandshakeChannel{
-			Req:  name + "_in_req",
-			Ack:  name + "_in_ack",
-			Data: name + "_in_data",
-			Out:  true,
-		},
-		Out: &HandshakeChannel{
-			Req:  name + "_out_req",
-			Ack:  name + "_out_ack",
-			Data: name + "_out_data",
-			Out:  false,
-		},
-	}
-}
-
-func (fi *FuncInterface) GetOutChannel() *HandshakeChannel {
-	return fi.Out
-}
-
-func (fi *FuncInterface) GetInChannel() *HandshakeChannel {
-	return fi.In
-}
-
-func (fi *FuncInterface) Copy() *FuncInterface {
-	return &FuncInterface{
-		Name:       fi.Name,
-		Parameters: fi.Parameters,
-		Results:    fi.Results,
-
-		// External interface: in is output and out is input
-		In: &HandshakeChannel{
-			Req:  fi.Name + "_in_req",
-			Ack:  fi.Name + "_in_ack",
-			Data: fi.Name + "_in_data",
-			Out:  true,
-		},
-		Out: &HandshakeChannel{
-			Req:  fi.Name + "_out_req",
-			Ack:  fi.Name + "_out_ack",
-			Data: fi.Name + "_out_data",
-			Out:  false,
-		},
-	}
-}
-
 type Block struct {
 	BodyComponent
 	Nr int
@@ -86,11 +25,25 @@ type Block struct {
 	RegBlockPairs  []*regBodyPair
 	BodyComponents []BodyComponentType
 
-	scopedVariables *ScopedVariables
+	scopedVariables *variable.ScopedVariables
 
-	ExternalInterfaces map[string]*FuncInterface
+	ExternalInterfaces map[string]*variable.VariableInfo
 
 	OutputSize int
+}
+
+func NewScopedVariables(parent *Block) *variable.ScopedVariables {
+	parentSize := 0
+	if parent != nil {
+		parentSize = parent.ScopedVariables().Size
+	}
+
+	return &variable.ScopedVariables{
+		Variables:    make(map[string]*variable.VariableInfo),
+		VariableList: []*variable.VariableInfo{},
+		Size:         parentSize,
+		ParamPos:     0,
+	}
 }
 
 var blockNr = 0
@@ -124,7 +77,7 @@ func NewBlock(toplevel bool, parent *Block) *Block {
 
 		scopedVariables: NewScopedVariables(parent),
 
-		ExternalInterfaces: make(map[string]*FuncInterface),
+		ExternalInterfaces: make(map[string]*variable.VariableInfo),
 	}
 
 	return b
@@ -132,17 +85,17 @@ func NewBlock(toplevel bool, parent *Block) *Block {
 
 func NewParamDummyBlock(params map[string]*variable.VariableInfo) *Block {
 	ret := &Block{
-		ExternalInterfaces: make(map[string]*FuncInterface),
+		ExternalInterfaces: make(map[string]*variable.VariableInfo),
 	}
 
 	ret.parent = nil
-	ret.scopedVariables = &ScopedVariables{
-		variables: params,
+	ret.scopedVariables = &variable.ScopedVariables{
+		Variables: params,
 	}
 
-	ret.scopedVariables.size = 0
+	ret.scopedVariables.Size = 0
 	for _, v := range params {
-		ret.scopedVariables.size += v.Len * v.Size
+		ret.scopedVariables.Size += v.Len * v.Size
 	}
 
 	return ret
@@ -204,20 +157,20 @@ func (b *Block) ComponentStr() string {
 	}
 
 	i := 0
-	for _, extIntf := range b.ExternalInterfaces {
-		externalIntferacesGenericsStr += extIntf.Name + `_DATA_IN_WIDTH => ` + extIntf.Name + "_DATA_IN_WIDTH,\n"
-		externalIntferacesGenericsStr += extIntf.Name + `_DATA_OUT_WIDTH => ` + extIntf.Name + `_DATA_OUT_WIDTH`
+	for fName, _ := range b.ExternalInterfaces {
+		externalIntferacesGenericsStr += fName + `_DATA_IN_WIDTH => ` + fName + "_DATA_IN_WIDTH,\n"
+		externalIntferacesGenericsStr += fName + `_DATA_OUT_WIDTH => ` + fName + `_DATA_OUT_WIDTH`
 
-		externalInterfacesStr += `-- Interface for ` + extIntf.Name
+		externalInterfacesStr += `-- Interface for ` + fName
 		externalInterfacesStr += `
 		-- Input channel
-		` + extIntf.Name + `_in_data  => ` + extIntf.Name + `_in_data,
-		` + extIntf.Name + `_in_req => ` + extIntf.Name + `_in_req,
-		` + extIntf.Name + `_in_ack => ` + extIntf.Name + `_in_ack,
+		` + fName + `_in_data  => ` + fName + `_in_data,
+		` + fName + `_in_req => ` + fName + `_in_req,
+		` + fName + `_in_ack => ` + fName + `_in_ack,
 		-- Output channel
-		` + extIntf.Name + `_out_data => ` + extIntf.Name + `_out_data,
-		` + extIntf.Name + `_out_req => ` + extIntf.Name + `_out_req,
-		` + extIntf.Name + `_out_ack => ` + extIntf.Name + `_out_ack`
+		` + fName + `_out_data => ` + fName + `_out_data,
+		` + fName + `_out_req => ` + fName + `_out_req,
+		` + fName + `_out_ack => ` + fName + `_out_ack`
 
 		if i != len(b.ExternalInterfaces)-1 {
 			externalInterfacesStr += ",\n"
@@ -305,20 +258,20 @@ func (b *Block) Entity() string {
 	}
 
 	i := 0
-	for _, extIntf := range b.ExternalInterfaces {
-		externalIntferacesGenericsStr += extIntf.Name + "_DATA_IN_WIDTH : NATURAL := 8;\n"
-		externalIntferacesGenericsStr += extIntf.Name + `_DATA_OUT_WIDTH : NATURAL := 8`
+	for fName, _ := range b.ExternalInterfaces {
+		externalIntferacesGenericsStr += fName + "_DATA_IN_WIDTH : NATURAL := 8;\n"
+		externalIntferacesGenericsStr += fName + `_DATA_OUT_WIDTH : NATURAL := 8`
 
-		externalInterfacesStr += `-- Interface for ` + extIntf.Name
+		externalInterfacesStr += `-- Interface for ` + fName
 		externalInterfacesStr += `
 		-- Input channel
-		` + extIntf.Name + `_in_data : OUT STD_LOGIC_VECTOR(` + extIntf.Name + `_DATA_IN_WIDTH - 1 DOWNTO 0);
-		` + extIntf.Name + `_in_req : OUT STD_LOGIC;
-		` + extIntf.Name + `_in_ack : IN STD_LOGIC;
+		` + fName + `_in_data : OUT STD_LOGIC_VECTOR(` + fName + `_DATA_IN_WIDTH - 1 DOWNTO 0);
+		` + fName + `_in_req : OUT STD_LOGIC;
+		` + fName + `_in_ack : IN STD_LOGIC;
 		-- Output channel
-		` + extIntf.Name + `_out_data : IN STD_LOGIC_VECTOR(` + extIntf.Name + `_DATA_OUT_WIDTH - 1 DOWNTO 0);
-		` + extIntf.Name + `_out_req : IN STD_LOGIC;
-		` + extIntf.Name + `_out_ack : OUT STD_LOGIC`
+		` + fName + `_out_data : IN STD_LOGIC_VECTOR(` + fName + `_DATA_OUT_WIDTH - 1 DOWNTO 0);
+		` + fName + `_out_req : IN STD_LOGIC;
+		` + fName + `_out_ack : OUT STD_LOGIC`
 
 		if i != len(b.ExternalInterfaces)-1 {
 			externalIntferacesGenericsStr += ";\n"
@@ -379,16 +332,16 @@ func (b *Block) Architecture() string {
 	return ret
 }
 
-func (b *Block) ScopedVariables() *ScopedVariables {
+func (b *Block) ScopedVariables() *variable.ScopedVariables {
 	return b.scopedVariables
 }
 
 func (b *Block) GetCurrentVariableSize() int {
-	return b.scopedVariables.size
+	return b.scopedVariables.Size
 }
 
-func (b *Block) NewVariable(name string, typ string, len int) (*variable.VariableInfo, error) {
-	return b.ScopedVariables().AddVariable(name, typ, len)
+func (b *Block) NewVariable(decl *variable.VariableTypeDecl) (*variable.VariableInfo, error) {
+	return b.ScopedVariables().NewVariable(decl)
 }
 
 func (b *Block) GetVariable(name string) (*variable.VariableInfo, error) {
@@ -404,17 +357,19 @@ func (b *Block) GetVariable(name string) (*variable.VariableInfo, error) {
 	}
 }
 
-func (b *Block) AddFunctionInterface(f *FuncInterface) error {
+func (b *Block) AddFunctionInterface(f *variable.VariableInfo) error {
 	if _, ok := b.ExternalInterfaces[f.Name]; ok {
 		return errors.New("Functionpointer already decalred")
 	}
 
-	b.ExternalInterfaces[f.Name] = f
+	b.ExternalInterfaces[f.Name] = f.Copy()
+
+	infoprinter.DebugPrintf("added func %s to block %s\n", f.Name, b.archName)
 
 	return nil
 }
 
-func (b *Block) GetAndAssignFunctionInterface(fname string) (*FuncInterface, error) {
+func (b *Block) GetAndAssignFunctionInterface(fname string) (*variable.VariableInfo, error) {
 	if f, ok := b.ExternalInterfaces[fname]; ok {
 		return f, nil
 	}
@@ -434,7 +389,7 @@ func (b *Block) GetAndAssignFunctionInterface(fname string) (*FuncInterface, err
 				fmt.Printf("Found function '%s' on parent stack and registerd function '%s' at block %s\n", f.Name, f.Name, b.archName)
 			}
 
-			return f, nil
+			return fiCopy, nil
 		}
 	}
 

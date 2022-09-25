@@ -1,13 +1,9 @@
 package components
 
-import (
-	"strconv"
-)
+import "go2async/pkg/variable"
 
 const archPrefix = "beh_"
 const defaultArch = "behavioural"
-
-var SupportedTypes map[string]int = map[string]int{"int": strconv.IntSize, "int8": 8, "int16": 16, "int32": 32, "int64": 64, "uint": strconv.IntSize, "uint8": 8, "uint16": 16, "uint32": 32, "uint64": 64, "byte": 8}
 
 var zero = 0
 var one = 1
@@ -44,7 +40,7 @@ func (bc *BodyComponent) ArchName() string {
 	return bc.archName
 }
 
-func (bc *BodyComponent) ScopedVariables() *ScopedVariables {
+func (bc *BodyComponent) ScopedVariables() *variable.ScopedVariables {
 	return bc.Parent().ScopedVariables()
 }
 

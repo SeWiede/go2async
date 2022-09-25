@@ -2,6 +2,48 @@ package variable
 
 import "strconv"
 
+type FuncInterface struct {
+	Parameters *ScopedVariables
+	Results    *ScopedVariables
+}
+
+func NewFuncIntf() *FuncInterface {
+	return &FuncInterface{
+		Parameters: NewScopedVariables(),
+		Results:    NewScopedVariables(),
+	}
+}
+
+func (fi *FuncInterface) Copy() *FuncInterface {
+	return &FuncInterface{
+		Parameters: fi.Parameters.Copy(),
+		Results:    fi.Results.Copy(),
+	}
+}
+
+type VariableTypeDecl struct {
+	Name string
+	Typ  string
+	Len  int
+
+	FuncIntf *FuncInterface
+}
+
+func (vTd *VariableTypeDecl) Copy() *VariableTypeDecl {
+	var copiedFuncIntf *FuncInterface
+	if vTd.FuncIntf != nil {
+		copiedFuncIntf = vTd.FuncIntf.Copy()
+	}
+
+	return &VariableTypeDecl{
+		Name: vTd.Name,
+		Typ:  vTd.Typ,
+		Len:  vTd.Len,
+
+		FuncIntf: copiedFuncIntf,
+	}
+}
+
 type VariableInfo struct {
 	Name       string
 	Position   int
@@ -11,9 +53,21 @@ type VariableInfo struct {
 	Len        int
 	Index      string
 	IndexIdent *VariableInfo
+
+	FuncIntf *FuncInterface
 }
 
 func (vi *VariableInfo) Copy() *VariableInfo {
+	var copiedIndexIdent *VariableInfo
+	if vi.IndexIdent != nil {
+		copiedIndexIdent = vi.IndexIdent.Copy()
+	}
+
+	var copiedFuncIntf *FuncInterface
+	if vi.FuncIntf != nil {
+		copiedFuncIntf = vi.FuncIntf.Copy()
+	}
+
 	return &VariableInfo{
 		Name:       vi.Name,
 		Position:   vi.Position,
@@ -22,7 +76,9 @@ func (vi *VariableInfo) Copy() *VariableInfo {
 		Const:      vi.Const,
 		Len:        vi.Len,
 		Index:      vi.Index,
-		IndexIdent: vi.IndexIdent,
+		IndexIdent: copiedIndexIdent,
+
+		FuncIntf: copiedFuncIntf,
 	}
 }
 

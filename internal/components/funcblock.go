@@ -1,6 +1,7 @@
 package components
 
 import (
+	"errors"
 	"go2async/pkg/variable"
 	"strconv"
 	"strings"
@@ -14,15 +15,18 @@ type FuncBlock struct {
 
 	Nr int
 
-	paramVarList  []*variable.VariableInfo
-	resultVarList []*variable.VariableInfo
+	paramsResults *variable.FuncInterface
 
-	externalInterface *FuncInterface
+	externalInterface *variable.VariableInfo
 }
 
 var fbNr = 0
 
-func NewFuncBlock(paramVarList []*variable.VariableInfo, resultVarList []*variable.VariableInfo, fi *FuncInterface, parent *Block) (*FuncBlock, error) {
+func NewFuncBlock(paramsResults *variable.FuncInterface, fi *variable.VariableInfo, parent *Block) (*FuncBlock, error) {
+	if fi.FuncIntf == nil {
+		return nil, errors.New("invalid function variable '" + fi.Name + "'")
+	}
+
 	nr := bebNr
 	bebNr++
 
@@ -55,8 +59,8 @@ func NewFuncBlock(paramVarList []*variable.VariableInfo, resultVarList []*variab
 
 		Nr: nr,
 
-		paramVarList:      paramVarList,
-		resultVarList:     resultVarList,
+		paramsResults: paramsResults,
+
 		externalInterface: f.Copy(),
 	}
 
@@ -145,7 +149,7 @@ func (fb *FuncBlock) ComponentStr() string {
 func (fb *FuncBlock) getAliases() string {
 	ret := ""
 
-	for i, paramVar := range fb.paramVarList {
+	for i, paramVar := range fb.paramsResults.Parameters.VariableList {
 		is := strconv.Itoa(i)
 		if paramVar.IndexIdent == nil {
 			idx := getIndex(paramVar.Index)
@@ -158,7 +162,7 @@ func (fb *FuncBlock) getAliases() string {
 		}
 	}
 
-	for i, resVar := range fb.resultVarList {
+	for i, resVar := range fb.paramsResults.Results.VariableList {
 		is := strconv.Itoa(i)
 		if resVar.IndexIdent == nil {
 			idx := getIndex(resVar.Index)
@@ -177,7 +181,7 @@ func (fb *FuncBlock) getAliases() string {
 func (fb *FuncBlock) getProcess() string {
 
 	variables := ""
-	for i, resVar := range fb.resultVarList {
+	for i, resVar := range fb.paramsResults.Results.VariableList {
 		if resVar.IndexIdent == nil {
 			is := strconv.Itoa(i)
 			variables += "variable offset_" + is + ": integer range 0 to out_data'length;\n"
@@ -195,7 +199,7 @@ func (fb *FuncBlock) getProcess() string {
 	delay := " after ADDER_DELAY"
 	compute := ""
 
-	for i, paramVar := range fb.paramVarList {
+	for i, paramVar := range fb.paramsResults.Parameters.VariableList {
 		if paramVar.IndexIdent != nil {
 			is := strconv.Itoa(i)
 			arrayParamMappings += "x_" + is + " <= in_data(baseX_" + is + " + (to_integer(unsigned(offsetX_" + is + ")) + 1) * x_" + is + "'length  - 1 downto baseX_" + is + " + to_integer(unsigned(offsetX_" + is + ")) * x_" + is + "'length);\n"
@@ -203,7 +207,7 @@ func (fb *FuncBlock) getProcess() string {
 	}
 
 	resultSignalOffset := 0
-	for i, resVar := range fb.resultVarList {
+	for i, resVar := range fb.paramsResults.Results.VariableList {
 		is := strconv.Itoa(i)
 		if resVar.IndexIdent != nil {
 			resultMap += "offset_" + is + " := baseR_" + is + " + to_integer(unsigned(offsetR_" + is + ") * result_" + is + "'length);\n"
@@ -224,13 +228,13 @@ func (fb *FuncBlock) Architecture() string {
 
 	externalIntfInput := ""
 
-	if len(fb.paramVarList) > 0 {
+	if len(fb.paramsResults.Parameters.VariableList) > 0 {
 		externalIntfInput += fb.externalInterface.Name + "_in_data <= "
-		for i, _ := range fb.paramVarList {
+		for i, _ := range fb.paramsResults.Parameters.VariableList {
 			is := strconv.Itoa(i)
 			externalIntfInput += "x_" + is
 
-			if i != len(fb.paramVarList)-1 {
+			if i != len(fb.paramsResults.Parameters.VariableList)-1 {
 				externalIntfInput += " & "
 			}
 		}

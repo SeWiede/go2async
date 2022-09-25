@@ -7,7 +7,6 @@ import (
 	"go/parser"
 	"go/token"
 	"go2async/internal/components"
-	"go2async/internal/globalArguments"
 	infoprinter "go2async/internal/infoPrinter"
 	"go2async/pkg/variable"
 	"io/ioutil"
@@ -19,7 +18,10 @@ import (
 type Generator struct {
 	components map[string]components.Component
 	scopes     map[string]*components.Scope
-	defs       *Defs
+
+	functions map[string]*variable.VariableTypeDecl
+
+	defs *Defs
 
 	peb *parseErrorBuilder
 }
@@ -28,13 +30,16 @@ type Generator struct {
 var cvp = 0
 
 func NewGenerator(intSize int) *Generator {
-	components.SupportedTypes["int"] = intSize
-	components.SupportedTypes["uint"] = intSize
+	variable.SupportedTypes["int"] = intSize
+	variable.SupportedTypes["uint"] = intSize
 
 	return &Generator{
 		components: make(map[string]components.Component),
 		scopes:     make(map[string]*components.Scope),
-		defs:       NewDefs(intSize),
+
+		functions: make(map[string]*variable.VariableTypeDecl),
+
+		defs: NewDefs(intSize),
 	}
 }
 
@@ -100,7 +105,13 @@ func (g *Generator) HandleAssignmentStmt(s *ast.AssignStmt, parent *components.B
 		if newVar {
 			typ := getTypeOfString(rhsExpr.Value)
 
-			if lhsVar, err = parent.NewVariable(lhsExpr.(*ast.Ident).Name, typ, 1); err != nil {
+			varDecl := &variable.VariableTypeDecl{
+				Name: lhsExpr.(*ast.Ident).Name,
+				Typ:  typ,
+				Len:  1,
+			}
+
+			if lhsVar, err = parent.NewVariable(varDecl); err != nil {
 				return nil, g.peb.NewParseError(s, err)
 			}
 		}
@@ -124,7 +135,13 @@ func (g *Generator) HandleAssignmentStmt(s *ast.AssignStmt, parent *components.B
 		}
 
 		if newVar {
-			if lhsVar, err = parent.NewVariable(lhsExpr.(*ast.Ident).Name, v.Typ, 1); err != nil {
+			varDecl := &variable.VariableTypeDecl{
+				Name: lhsExpr.(*ast.Ident).Name,
+				Typ:  v.Typ,
+				Len:  1,
+			}
+
+			if lhsVar, err = parent.NewVariable(varDecl); err != nil {
 				return nil, g.peb.NewParseError(s, err)
 			}
 		}
@@ -162,7 +179,13 @@ func (g *Generator) HandleAssignmentStmt(s *ast.AssignStmt, parent *components.B
 		}
 
 		if newVar {
-			if lhsVar, err = parent.NewVariable(lhsExpr.(*ast.Ident).Name, v.Typ, 1); err != nil {
+			varDecl := &variable.VariableTypeDecl{
+				Name: lhsExpr.(*ast.Ident).Name,
+				Typ:  v.Typ,
+				Len:  1,
+			}
+
+			if lhsVar, err = parent.NewVariable(varDecl); err != nil {
 				return nil, g.peb.NewParseError(s, err)
 			}
 		}
@@ -188,7 +211,13 @@ func (g *Generator) HandleAssignmentStmt(s *ast.AssignStmt, parent *components.B
 			return nil, g.peb.NewParseError(s, err)
 		}
 
-		tmpVar, err := tmpBlock.NewVariable("__g2a_tempVar", lhsVar.Typ, lhsVar.Len)
+		varDecl := &variable.VariableTypeDecl{
+			Name: "__g2a_tempVar",
+			Typ:  lhsVar.Typ,
+			Len:  lhsVar.Len,
+		}
+
+		tmpVar, err := tmpBlock.NewVariable(varDecl)
 		if err != nil {
 			return nil, g.peb.NewParseError(s, err)
 		}
@@ -222,7 +251,7 @@ func (g *Generator) HandleAssignmentStmt(s *ast.AssignStmt, parent *components.B
 			return nil, g.peb.NewParseError(s, err)
 		}
 
-		paramList := []*variable.VariableInfo{}
+		paramsResults := variable.NewFuncIntf()
 
 		for i, fp := range rhsExpr.Args {
 			funcParamIdent, ok := fp.(*ast.Ident)
@@ -235,7 +264,10 @@ func (g *Generator) HandleAssignmentStmt(s *ast.AssignStmt, parent *components.B
 				return nil, g.peb.NewParseError(s, err)
 			}
 
-			correspondingFuncParamVar, err := funcIntf.Parameters.GetVariableInfoAt(i)
+			infoprinter.DebugPrintf("funcIntf %s ", funcIntf.Name, funcIntf.FuncIntf, "\n")
+
+			// TODO: error handling
+			correspondingFuncParamVar, err := funcIntf.FuncIntf.Parameters.GetVariableInfoAt(i)
 			if err != nil {
 				return nil, g.peb.NewParseError(s, err)
 			}
@@ -243,19 +275,34 @@ func (g *Generator) HandleAssignmentStmt(s *ast.AssignStmt, parent *components.B
 			if vi.Typ != correspondingFuncParamVar.Typ {
 				return nil, g.peb.NewParseError(s, errors.New("Call expression has type mismatch at parameter "+strconv.Itoa(i)))
 			}
-			paramList = append(paramList, vi)
-		}
 
-		if newVar {
-			firstResult, _ := funcIntf.Results.GetVariableInfoAt(0)
-			if lhsVar, err = parent.NewVariable(lhsExpr.(*ast.Ident).Name, firstResult.Typ, 1); err != nil {
+			if _, err := paramsResults.Parameters.NewVariableFromInfo(vi); err != nil {
 				return nil, g.peb.NewParseError(s, err)
 			}
 		}
 
-		resultList := []*variable.VariableInfo{lhsVar}
+		if newVar {
+			firstResult, err := funcIntf.FuncIntf.Results.GetVariableInfoAt(0)
+			if err != nil {
+				return nil, g.peb.NewParseError(s, err)
+			}
 
-		newFuncBlk, err := components.NewFuncBlock(paramList, resultList, funcIntf, parent)
+			varDecl := &variable.VariableTypeDecl{
+				Name: lhsExpr.(*ast.Ident).Name,
+				Typ:  firstResult.Typ,
+				Len:  1,
+			}
+
+			if lhsVar, err = parent.NewVariable(varDecl); err != nil {
+				return nil, g.peb.NewParseError(s, err)
+			}
+		}
+
+		if _, err := paramsResults.Results.NewVariableFromInfo(lhsVar); err != nil {
+			return nil, g.peb.NewParseError(s, err)
+		}
+
+		newFuncBlk, err := components.NewFuncBlock(paramsResults, funcIntf, parent)
 		if err != nil {
 			return nil, err
 		}
@@ -282,7 +329,7 @@ func (g *Generator) GenerateBinaryExpressionFuncBlock(result *variable.VariableI
 
 	switch t := xexpr.(type) {
 	case *ast.BinaryExpr:
-		infoprinter.DebugPrintln("nexted binary expression left: ", t.X, t.Op.String(), t.Y)
+		infoprinter.DebugPrintln("nested binary expression left: ", t.X, t.Op.String(), t.Y)
 
 		g.GenerateBinaryExpressionFuncBlock(result, t, parent)
 		x = result
@@ -618,7 +665,11 @@ func (g *Generator) GenerateBodyBlock(s ast.Stmt, parent *components.Block) (c c
 		for _, spec := range decl.Specs[0].(*ast.ValueSpec).Names {
 			switch declType := decl.Specs[0].(*ast.ValueSpec).Type.(type) {
 			case *ast.Ident:
-				if _, err := parent.NewVariable(spec.Name, declType.Name, 1); err != nil {
+				if _, err := parent.NewVariable(&variable.VariableTypeDecl{
+					Name: spec.Name,
+					Typ:  declType.Name,
+					Len:  1,
+				}); err != nil {
 					return nil, g.peb.NewParseError(s, err)
 				}
 			case *ast.ArrayType:
@@ -640,7 +691,11 @@ func (g *Generator) GenerateBodyBlock(s ast.Stmt, parent *components.Block) (c c
 					return nil, g.peb.NewParseError(s, err)
 				}
 
-				if _, err := parent.NewVariable(spec.Name, elt.Name, leni); err != nil {
+				if _, err := parent.NewVariable(&variable.VariableTypeDecl{
+					Name: spec.Name,
+					Typ:  elt.Name,
+					Len:  leni,
+				}); err != nil {
 					return nil, g.peb.NewParseError(s, err)
 				}
 			default:
@@ -688,24 +743,95 @@ func (g *Generator) GenerateBlock(stmts []ast.Stmt, toplevelStatement bool, pare
 	return b, nil
 }
 
-func (g *Generator) parseVariableExpression(expr ast.Expr) (string, int, error) {
+func (g *Generator) parseVariableFieldList(fl *ast.FieldList) ([]*variable.VariableTypeDecl, error) {
+	ret := []*variable.VariableTypeDecl{}
+
+	infoprinter.DebugPrintf("Parsing variableFieldList\n")
+
+	for _, param := range fl.List {
+		if len(param.Names) > 0 {
+			for _, p := range param.Names {
+				paramVar, err := g.parseVariableExpression(param.Type)
+				if err != nil {
+					return nil, err
+				}
+
+				paramVar.Name = p.Name
+
+				infoprinter.DebugPrintf("Got var %s len %d type %s\n", paramVar.Name, paramVar.Len, paramVar.Typ)
+
+				ret = append(ret, paramVar)
+			}
+		} else {
+			paramVar, err := g.parseVariableExpression(param.Type)
+			if err != nil {
+				return nil, err
+			}
+
+			infoprinter.DebugPrintf("Got var %s len %d type %s\n", paramVar.Name, paramVar.Len, paramVar.Typ)
+			ret = append(ret, paramVar)
+		}
+	}
+
+	infoprinter.DebugPrintf("Done parsing variableFieldList\n")
+
+	return ret, nil
+}
+
+func (g *Generator) parseVariableExpression(expr ast.Expr) (*variable.VariableTypeDecl, error) {
 	switch fieldType := expr.(type) {
 	case *ast.Ident:
-		return fieldType.Name, 1, nil
+		return &variable.VariableTypeDecl{
+			Typ: fieldType.Name,
+			Len: 1,
+		}, nil
 	case *ast.ArrayType:
 		fieldTypeLenBasicLit, ok := fieldType.Len.(*ast.BasicLit)
 		if !ok {
-			return "", -1, g.peb.NewParseError(expr, errors.New("Slices are not supported: missing array length"))
+			return nil, g.peb.NewParseError(expr, errors.New("Slices are not supported: missing array length"))
 		}
 
 		len, err := strconv.Atoi(fieldTypeLenBasicLit.Value)
 		if err != nil {
-			return "", -1, g.peb.NewParseError(expr, err)
+			return nil, g.peb.NewParseError(expr, err)
 		}
 
-		return fieldType.Elt.(*ast.Ident).Name, len, nil
+		return &variable.VariableTypeDecl{
+			Typ: fieldType.Elt.(*ast.Ident).Name,
+			Len: len,
+		}, nil
+	case *ast.FuncType:
+		funcIntf := variable.NewFuncIntf()
+
+		listDecl, err := g.parseVariableFieldList(fieldType.Params)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, ld := range listDecl {
+			_, err := funcIntf.Parameters.NewVariable(ld)
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		listDecl, err = g.parseVariableFieldList(fieldType.Results)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, ld := range listDecl {
+			_, err := funcIntf.Results.NewVariable(ld)
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		return &variable.VariableTypeDecl{
+			FuncIntf: funcIntf,
+		}, nil
 	default:
-		return "", -1, g.peb.NewParseError(expr, errors.New("Invalid variable expression"))
+		return nil, g.peb.NewParseError(expr, errors.New("Invalid variable expression"))
 	}
 }
 
@@ -719,63 +845,36 @@ func (g *Generator) GenerateScope(f *ast.FuncDecl) (s *components.Scope, err err
 		for _, param := range field.Names {
 			switch fieldType := field.Type.(type) {
 			case *ast.Ident, *ast.ArrayType:
-				typeName, len, err := g.parseVariableExpression(fieldType)
+				vi, err := g.parseVariableExpression(fieldType)
 				if err != nil {
 					return nil, g.peb.NewParseError(f, err)
 				}
 
-				np, err := paramDummyBlock.NewVariable(param.Name, typeName, len)
+				vi.Name = param.Name
+
+				np, err := paramDummyBlock.NewVariable(vi)
 				if err != nil {
 					return nil, g.peb.NewParseError(f, err)
 				}
 
 				params[param.Name] = np
+
 			case *ast.FuncType:
-				newFuncIntf := components.NewFuncInterface(param.Name)
-
-				if *globalArguments.Debug {
-					fmt.Printf("Adding functionInterface for function '%s'\n", newFuncIntf.Name)
+				vi, err := g.parseVariableExpression(fieldType)
+				if err != nil {
+					return nil, g.peb.NewParseError(f, err)
 				}
 
-				for _, p := range fieldType.Params.List {
-					typeName, leng, err := g.parseVariableExpression(p.Type)
-					if err != nil {
-						return nil, g.peb.NewParseError(f, err)
-					}
+				vi.Name = param.Name
 
-					if len(p.Names) > 0 {
-						for _, n := range p.Names {
-							name := n.Name
-							newFuncIntf.Parameters.AddVariable(name, typeName, leng)
-						}
-					} else {
-						newFuncIntf.Parameters.AddVariable("", typeName, leng)
-					}
-
+				np, err := paramDummyBlock.NewVariable(vi)
+				if err != nil {
+					return nil, g.peb.NewParseError(f, err)
 				}
 
-				for _, p := range fieldType.Results.List {
-					typeName, leng, err := g.parseVariableExpression(p.Type)
-					if err != nil {
-						return nil, g.peb.NewParseError(f, err)
-					}
+				params[param.Name] = np
 
-					if len(p.Names) > 0 {
-						for _, n := range p.Names {
-							name := n.Name
-							newFuncIntf.Results.AddVariable(name, typeName, leng)
-						}
-					} else {
-						newFuncIntf.Results.AddVariable("", typeName, leng)
-					}
-
-				}
-
-				if *globalArguments.Debug {
-					fmt.Printf("Created new external interface declaration for function %s; Param len %d; Result len %d\n", newFuncIntf.Name, newFuncIntf.Parameters.GetSize(), newFuncIntf.Results.GetSize())
-				}
-
-				if err := paramDummyBlock.AddFunctionInterface(newFuncIntf); err != nil {
+				if err := paramDummyBlock.AddFunctionInterface(np); err != nil {
 					return nil, g.peb.NewParseError(f, err)
 				}
 			default:
@@ -861,6 +960,29 @@ func (g *Generator) ParseGoFile(file string) error {
 	}
 
 	//ast.Print(fset, f)
+
+	// fetch function prototypes first
+
+	infoprinter.DebugPrintf("Parsing functions\n")
+
+	for _, decl := range f.Decls {
+		switch x := decl.(type) {
+		case *ast.FuncDecl:
+			vi, err := g.parseVariableExpression(x.Type)
+			if err != nil {
+				return g.peb.NewParseError(decl, err)
+			}
+
+			vi.Name = x.Name.Name
+
+			g.functions[vi.Name] = vi
+
+			infoprinter.DebugPrintf("Added function %s paramSize %d resultSize %d\n", vi.Name, vi.FuncIntf.Parameters.Size, vi.FuncIntf.Results.Size)
+		}
+	}
+
+	infoprinter.DebugPrintf("Parsing functions done\n")
+
 	for _, decl := range f.Decls {
 		switch x := decl.(type) {
 		case *ast.FuncDecl:
@@ -895,8 +1017,8 @@ func (g *Generator) GenerateVHDL() string {
 	for sn, s := range g.scopes {
 		for _, externalIntf := range s.Block.ExternalInterfaces {
 			g.defs.ScopeProperties[externalIntf.Name] = &ScopeProperty{
-				paramSize:  externalIntf.Parameters.GetSize(),
-				returnSize: externalIntf.Results.GetSize(),
+				paramSize:  externalIntf.FuncIntf.Parameters.GetSize(),
+				returnSize: externalIntf.FuncIntf.Results.GetSize(),
 			}
 		}
 
