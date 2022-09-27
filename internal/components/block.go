@@ -95,7 +95,7 @@ func NewParamDummyBlock(params map[string]*variable.VariableInfo) *Block {
 
 	ret.scopedVariables.Size = 0
 	for _, v := range params {
-		ret.scopedVariables.Size += v.Len * v.Size
+		ret.scopedVariables.Size += v.Len_ * v.Size_
 	}
 
 	return ret
@@ -358,13 +358,13 @@ func (b *Block) GetVariable(name string) (*variable.VariableInfo, error) {
 }
 
 func (b *Block) AddFunctionInterface(f *variable.VariableInfo) error {
-	if _, ok := b.ExternalInterfaces[f.Name]; ok {
+	if _, ok := b.ExternalInterfaces[f.Name_]; ok {
 		return errors.New("Functionpointer already decalred")
 	}
 
-	b.ExternalInterfaces[f.Name] = f.Copy()
+	b.ExternalInterfaces[f.Name_] = f.Copy()
 
-	infoprinter.DebugPrintf("added func %s to block %s\n", f.Name, b.archName)
+	infoprinter.DebugPrintf("added func %s to block %s\n", f.Name_, b.archName)
 
 	return nil
 }
@@ -383,10 +383,10 @@ func (b *Block) GetAndAssignFunctionInterface(fname string) (*variable.VariableI
 		if err == nil {
 			// parent-stack had the function defined: add the interface to block
 			fiCopy := f.Copy()
-			b.ExternalInterfaces[f.Name] = fiCopy
+			b.ExternalInterfaces[f.Name_] = fiCopy
 
 			if *globalArguments.Debug {
-				fmt.Printf("Found function '%s' on parent stack and registerd function '%s' at block %s\n", f.Name, f.Name, b.archName)
+				fmt.Printf("Found function '%s' on parent stack and registerd function '%s' at block %s\n", f.Name_, f.Name_, b.archName)
 			}
 
 			return fiCopy, nil

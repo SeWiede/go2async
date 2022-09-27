@@ -66,10 +66,10 @@ func NewBinExprBlock(op string, vi *OperandInfo, parent *Block) *BinExprBlock {
 
 	if *globalArguments.Debug {
 		opDescription := fmt.Sprintf("Creating binExprBlock %s [size %d, len %d, index %s; const %s] = %s [size %d, len %d, index %s; const %s]",
-			vi.R.Name, vi.R.Size, vi.R.Len, vi.R.Index, vi.R.Const, vi.X.Name, vi.X.Size, vi.X.Len, vi.X.Index, vi.X.Const)
+			vi.R.Name_, vi.R.Size_, vi.R.Len_, vi.R.Index_, vi.R.Const_, vi.X.Name_, vi.X.Size_, vi.X.Len_, vi.X.Index_, vi.X.Const_)
 
 		if vi.Y != nil {
-			opDescription += fmt.Sprintf("%s %s [size %d, len %d, index %s; const %s]", op, vi.Y.Name, vi.Y.Size, vi.Y.Len, vi.Y.Index, vi.Y.Const)
+			opDescription += fmt.Sprintf("%s %s [size %d, len %d, index %s; const %s]", op, vi.Y.Name_, vi.Y.Size_, vi.Y.Len_, vi.Y.Index_, vi.Y.Const_)
 		}
 
 		opDescription += fmt.Sprintf("\n")
@@ -116,47 +116,47 @@ func getIndex(idxStd string) int {
 
 func (bep *BinExprBlock) getAliases() string {
 	ret := ""
-	if bep.Oi.X.IndexIdent == nil {
-		if bep.Oi.X.Const == "" {
-			idx := getIndex(bep.Oi.X.Index)
-			totalSize := bep.Oi.X.Size * bep.Oi.X.Len
+	if bep.Oi.X.IndexIdent_ == nil {
+		if bep.Oi.X.Const_ == "" {
+			idx := getIndex(bep.Oi.X.Index_)
+			totalSize := bep.Oi.X.Size_ * bep.Oi.X.Len_
 			if idx > 0 {
-				totalSize = bep.Oi.X.Size
+				totalSize = bep.Oi.X.Size_
 			}
-			ret += "alias x : std_logic_vector(" + strconv.Itoa(totalSize) + " - 1 downto 0)  is in_data( " + strconv.Itoa(bep.Oi.X.Position+totalSize*(idx+1)) + " - 1 downto " + strconv.Itoa(bep.Oi.X.Position+totalSize*idx) + ");\n"
+			ret += "alias x : std_logic_vector(" + strconv.Itoa(totalSize) + " - 1 downto 0)  is in_data( " + strconv.Itoa(bep.Oi.X.Position_+totalSize*(idx+1)) + " - 1 downto " + strconv.Itoa(bep.Oi.X.Position_+totalSize*idx) + ");\n"
 		}
 	} else {
-		ret += "signal x : std_logic_vector(" + strconv.Itoa(bep.Oi.X.Size) + "- 1 downto 0);\n"
-		ret += "constant baseX      : integer := " + strconv.Itoa(bep.Oi.X.Position) + ";\n"
-		ret += "alias offsetX      : std_logic_vector(" + strconv.Itoa(bep.Oi.X.IndexIdent.Size) + " - 1 downto 0)  is in_data( " + strconv.Itoa(bep.Oi.X.IndexIdent.Position+bep.Oi.X.IndexIdent.Size) + " -1 downto " + strconv.Itoa(bep.Oi.X.IndexIdent.Position) + ");\n"
+		ret += "signal x : std_logic_vector(" + strconv.Itoa(bep.Oi.X.Size_) + "- 1 downto 0);\n"
+		ret += "constant baseX      : integer := " + strconv.Itoa(bep.Oi.X.Position_) + ";\n"
+		ret += "alias offsetX      : std_logic_vector(" + strconv.Itoa(bep.Oi.X.IndexIdent_.Size_) + " - 1 downto 0)  is in_data( " + strconv.Itoa(bep.Oi.X.IndexIdent_.Position_+bep.Oi.X.IndexIdent_.Size_) + " -1 downto " + strconv.Itoa(bep.Oi.X.IndexIdent_.Position_) + ");\n"
 	}
 
-	if bep.Oi.Y != nil && bep.Oi.Y.IndexIdent == nil {
-		if bep.Oi.Y.Const == "" {
-			idx := getIndex(bep.Oi.Y.Index)
-			totalSize := bep.Oi.Y.Size * bep.Oi.Y.Len
+	if bep.Oi.Y != nil && bep.Oi.Y.IndexIdent_ == nil {
+		if bep.Oi.Y.Const_ == "" {
+			idx := getIndex(bep.Oi.Y.Index_)
+			totalSize := bep.Oi.Y.Size_ * bep.Oi.Y.Len_
 			if idx > 0 {
-				totalSize = bep.Oi.Y.Size
+				totalSize = bep.Oi.Y.Size_
 			}
-			ret += "alias y      : std_logic_vector(" + strconv.Itoa(totalSize) + " - 1 downto 0)  is in_data( " + strconv.Itoa(bep.Oi.Y.Position+totalSize*(idx+1)) + " - 1 downto " + strconv.Itoa(bep.Oi.Y.Position+totalSize*idx) + ");\n"
+			ret += "alias y      : std_logic_vector(" + strconv.Itoa(totalSize) + " - 1 downto 0)  is in_data( " + strconv.Itoa(bep.Oi.Y.Position_+totalSize*(idx+1)) + " - 1 downto " + strconv.Itoa(bep.Oi.Y.Position_+totalSize*idx) + ");\n"
 		}
-	} else if bep.Oi.Y != nil && bep.Oi.Y.IndexIdent != nil {
-		ret += "signal y  : std_logic_vector(" + strconv.Itoa(bep.Oi.Y.Size) + "- 1 downto 0);\n"
-		ret += "constant baseY      : integer := " + strconv.Itoa(bep.Oi.Y.Position) + ";\n"
-		ret += "alias offsetY      : std_logic_vector(" + strconv.Itoa(bep.Oi.Y.IndexIdent.Size) + " - 1 downto 0)  is in_data( " + strconv.Itoa(bep.Oi.Y.IndexIdent.Position+bep.Oi.Y.IndexIdent.Size) + " -1 downto " + strconv.Itoa(bep.Oi.Y.IndexIdent.Position) + ");\n"
+	} else if bep.Oi.Y != nil && bep.Oi.Y.IndexIdent_ != nil {
+		ret += "signal y  : std_logic_vector(" + strconv.Itoa(bep.Oi.Y.Size_) + "- 1 downto 0);\n"
+		ret += "constant baseY      : integer := " + strconv.Itoa(bep.Oi.Y.Position_) + ";\n"
+		ret += "alias offsetY      : std_logic_vector(" + strconv.Itoa(bep.Oi.Y.IndexIdent_.Size_) + " - 1 downto 0)  is in_data( " + strconv.Itoa(bep.Oi.Y.IndexIdent_.Position_+bep.Oi.Y.IndexIdent_.Size_) + " -1 downto " + strconv.Itoa(bep.Oi.Y.IndexIdent_.Position_) + ");\n"
 	}
 
-	if bep.Oi.R.IndexIdent == nil {
-		idx := getIndex(bep.Oi.R.Index)
-		totalSize := bep.Oi.R.Size * bep.Oi.R.Len
+	if bep.Oi.R.IndexIdent_ == nil {
+		idx := getIndex(bep.Oi.R.Index_)
+		totalSize := bep.Oi.R.Size_ * bep.Oi.R.Len_
 		if idx > 0 {
-			totalSize = bep.Oi.R.Size
+			totalSize = bep.Oi.R.Size_
 		}
-		ret += "alias result : std_logic_vector(" + strconv.Itoa(totalSize) + " - 1 downto 0)  is out_data( " + strconv.Itoa(bep.Oi.R.Position+totalSize*(idx+1)) + " - 1 downto " + strconv.Itoa(bep.Oi.R.Position+totalSize*idx) + ");\n"
+		ret += "alias result : std_logic_vector(" + strconv.Itoa(totalSize) + " - 1 downto 0)  is out_data( " + strconv.Itoa(bep.Oi.R.Position_+totalSize*(idx+1)) + " - 1 downto " + strconv.Itoa(bep.Oi.R.Position_+totalSize*idx) + ");\n"
 	} else {
-		ret += "signal result : std_logic_vector(" + strconv.Itoa(bep.Oi.R.Size) + " - 1 downto 0);\n"
-		ret += "constant baseR      : integer := " + strconv.Itoa(bep.Oi.R.Position) + ";\n"
-		ret += "alias offsetR      : std_logic_vector(" + strconv.Itoa(bep.Oi.R.IndexIdent.Size) + " - 1 downto 0)  is in_data( " + strconv.Itoa(bep.Oi.R.IndexIdent.Position+bep.Oi.R.IndexIdent.Size) + " -1 downto " + strconv.Itoa(bep.Oi.R.IndexIdent.Position) + ");\n"
+		ret += "signal result : std_logic_vector(" + strconv.Itoa(bep.Oi.R.Size_) + " - 1 downto 0);\n"
+		ret += "constant baseR      : integer := " + strconv.Itoa(bep.Oi.R.Position_) + ";\n"
+		ret += "alias offsetR      : std_logic_vector(" + strconv.Itoa(bep.Oi.R.IndexIdent_.Size_) + " - 1 downto 0)  is in_data( " + strconv.Itoa(bep.Oi.R.IndexIdent_.Position_+bep.Oi.R.IndexIdent_.Size_) + " -1 downto " + strconv.Itoa(bep.Oi.R.IndexIdent_.Position_) + ");\n"
 	}
 
 	return ret
@@ -168,14 +168,14 @@ func (bep *BinExprBlock) getCalcProcess() string {
 	delay := " after ADDER_DELAY"
 
 	x = "unsigned(x)"
-	if bep.Oi.X.Const != "" {
-		x = "to_unsigned(" + bep.Oi.X.Const + ", result'length)"
+	if bep.Oi.X.Const_ != "" {
+		x = "to_unsigned(" + bep.Oi.X.Const_ + ", result'length)"
 	}
 
 	if bep.Oi.Y != nil {
 		y = "unsigned(y)"
-		if bep.Oi.Y.Const != "" {
-			y = "to_unsigned(" + bep.Oi.Y.Const + ", result'length)"
+		if bep.Oi.Y.Const_ != "" {
+			y = "to_unsigned(" + bep.Oi.Y.Const_ + ", result'length)"
 		}
 
 		if bep.Operation == "<<" || bep.Operation == ">>" {
@@ -200,12 +200,12 @@ func (bep *BinExprBlock) getCalcProcess() string {
 	resultMap := ""
 
 	if bep.Operation != "NOP" {
-		if bep.Oi.X.IndexIdent != nil {
+		if bep.Oi.X.IndexIdent_ != nil {
 			x = "unsigned(x)"
 			xcalc = "x <= in_data(baseX + (to_integer(unsigned(offsetX)) + 1) * x'length  - 1 downto baseX + to_integer(unsigned(offsetX)) * x'length);\n"
 		}
 
-		if bep.Oi.Y != nil && bep.Oi.Y.IndexIdent != nil {
+		if bep.Oi.Y != nil && bep.Oi.Y.IndexIdent_ != nil {
 			y = "unsigned(y)"
 			ycalc = "y <= in_data(baseY + (to_integer(unsigned(offsetY)) + 1) * y'length - 1 downto baseY + to_integer(unsigned(offsetY)) * y'length);\n"
 
@@ -213,7 +213,7 @@ func (bep *BinExprBlock) getCalcProcess() string {
 
 		compute = "result <= std_logic_vector(resize(" + x + " " + SupportedOperations[bep.Operation] + " " + y + ", result'length)) " + delay + ";\n"
 
-		if bep.Oi.R.IndexIdent != nil {
+		if bep.Oi.R.IndexIdent_ != nil {
 			resultMap = "offset := baseR + to_integer(unsigned(offsetR) * result'length);\n"
 			resultMap += "out_data(offset + result'length -1 downto offset) <= result;\n"
 		}

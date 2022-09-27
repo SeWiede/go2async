@@ -82,63 +82,56 @@ func (sv *ScopedVariables) GetVariableInfoAt(pos int) (*VariableInfo, error) {
 	return sv.VariableList[pos].Copy(), nil
 }
 
-func (sv *ScopedVariables) AddVariableFromInfo(vi *VariableInfo) (*VariableInfo, error) {
-	return sv.AddVariable(&VariableTypeDecl{
-		Name:     vi.Name,
-		Typ:      vi.Typ,
-		Len:      vi.Len,
-		FuncIntf: vi.FuncIntf,
-	})
-}
-
-func (sv *ScopedVariables) AddVariable(decl *VariableTypeDecl) (*VariableInfo, error) {
-	if decl == nil {
+func (sv *ScopedVariables) AddVariable(v VariableDef) (*VariableInfo, error) {
+	if v == nil {
 		return nil, ErrNilDecl
 	}
 
 	typeSize := -1
 
-	funcIntf := decl.FuncIntf
+	funcIntf := v.FuncIntf()
 
-	if decl.FuncIntf == nil {
-		if decl.Len <= 0 {
+	if v.FuncIntf() == nil {
+		if v.Len() <= 0 {
 			return nil, ErrInvalidVariableLength
 		}
 
 		var ok bool
-		typeSize, ok = SupportedTypes[decl.Typ]
+		typeSize, ok = SupportedTypes[v.Typ()]
 		if !ok {
-			return nil, ErrUnsupportedVariableTypeFn(decl.Typ)
+			return nil, ErrUnsupportedVariableTypeFn(v.Typ())
 		}
 	} else {
 		// typeSize if result size
-		typeSize = decl.FuncIntf.Results.GetSize()
+		typeSize = v.FuncIntf().Results.GetSize()
 		funcIntf = funcIntf.Copy()
 	}
 
-	if decl.Name == "" {
-		decl.Name = emptyNamePrefix + strconv.Itoa(sv.ParamPos)
+	name := v.Name()
+
+	if name == "" {
+		name = emptyNamePrefix + strconv.Itoa(sv.ParamPos)
 		sv.ParamPos++
 	}
 
 	newV := &VariableInfo{
-		Name:     decl.Name,
-		Position: sv.Size,
-		Size:     typeSize,
-		Typ:      decl.Typ,
-		Len:      decl.Len,
-		FuncIntf: funcIntf,
+		Name_:     v.Name(),
+		Position_: sv.Size,
+		Size_:     typeSize,
+		Typ_:      v.Typ(),
+		Len_:      v.Len(),
+		FuncIntf_: funcIntf,
 	}
 
-	if _, ok := sv.Variables[decl.Name]; ok {
-		return nil, ErrVariableAlreadyDeclaredFn(decl.Name)
+	if _, ok := sv.Variables[v.Name()]; ok {
+		return nil, ErrVariableAlreadyDeclaredFn(v.Name())
 	}
 
-	sv.Variables[decl.Name] = newV
+	sv.Variables[v.Name()] = newV
 
-	infoprinter.VerbosePrintf("Allocated %s at pos %d downto %d\n", decl.Name, (sv.Size)+(decl.Len*typeSize)-1, (sv.Size))
+	infoprinter.VerbosePrintf("Allocated %s at pos %d downto %d\n", v.Name(), (sv.Size)+(v.Len()*typeSize)-1, (sv.Size))
 
-	sv.Size += typeSize * decl.Len
+	sv.Size += typeSize * v.Len()
 
 	sv.VariableList = append(sv.VariableList, newV)
 

@@ -19,7 +19,7 @@ type Generator struct {
 	components map[string]components.Component
 	scopes     map[string]*components.Scope
 
-	functions map[string]*variable.VariableTypeDecl
+	functions map[string]variable.VariableDef
 
 	defs *Defs
 
@@ -37,7 +37,7 @@ func NewGenerator(intSize int) *Generator {
 		components: make(map[string]components.Component),
 		scopes:     make(map[string]*components.Scope),
 
-		functions: make(map[string]*variable.VariableTypeDecl),
+		functions: make(map[string]variable.VariableDef),
 
 		defs: NewDefs(intSize),
 	}
@@ -82,14 +82,14 @@ func (g *Generator) HandleAssignmentStmt(s *ast.AssignStmt, parent *components.B
 				if indexNode.Kind != token.INT {
 					return nil, g.peb.NewParseError(s, errors.New("Invalid indexing value kind '"+indexNode.Kind.String()+"'"))
 				}
-				lhsVar.Index = indexNode.Value
+				lhsVar.Index_ = indexNode.Value
 			case *ast.Ident:
 				v, err := parent.GetVariable(indexNode.Name)
 				if err != nil {
 					return nil, g.peb.NewParseError(s, err)
 				}
 
-				lhsVar.IndexIdent = v
+				lhsVar.IndexIdent_ = v
 			default:
 				return nil, g.peb.NewParseError(s, errors.New("Invalid indexing"))
 			}
@@ -106,9 +106,9 @@ func (g *Generator) HandleAssignmentStmt(s *ast.AssignStmt, parent *components.B
 			typ := getTypeOfString(rhsExpr.Value)
 
 			varDecl := &variable.VariableTypeDecl{
-				Name: lhsExpr.(*ast.Ident).Name,
-				Typ:  typ,
-				Len:  1,
+				Name_: lhsExpr.(*ast.Ident).Name,
+				Typ_:  typ,
+				Len_:  1,
 			}
 
 			if lhsVar, err = parent.NewVariable(varDecl); err != nil {
@@ -119,8 +119,8 @@ func (g *Generator) HandleAssignmentStmt(s *ast.AssignStmt, parent *components.B
 		newFuncBlk := components.NewBinExprBlock("=", &components.OperandInfo{
 			R: lhsVar,
 			X: &variable.VariableInfo{
-				Const: rhsExpr.Value,
-				Size:  lhsVar.Size,
+				Const_: rhsExpr.Value,
+				Size_:  lhsVar.Size_,
 			},
 		}, parent)
 
@@ -136,9 +136,9 @@ func (g *Generator) HandleAssignmentStmt(s *ast.AssignStmt, parent *components.B
 
 		if newVar {
 			varDecl := &variable.VariableTypeDecl{
-				Name: lhsExpr.(*ast.Ident).Name,
-				Typ:  v.Typ,
-				Len:  1,
+				Name_: lhsExpr.(*ast.Ident).Name,
+				Typ_:  v.Typ_,
+				Len_:  1,
 			}
 
 			if lhsVar, err = parent.NewVariable(varDecl); err != nil {
@@ -166,23 +166,23 @@ func (g *Generator) HandleAssignmentStmt(s *ast.AssignStmt, parent *components.B
 			if indexNode.Kind != token.INT {
 				return nil, g.peb.NewParseError(s, errors.New("Invalid indexing value kind '"+indexNode.Kind.String()+"'"))
 			}
-			v.Index = indexNode.Value
+			v.Index_ = indexNode.Value
 		case *ast.Ident:
 			vn, err := parent.GetVariable(indexNode.Name)
 			if err != nil {
 				return nil, g.peb.NewParseError(s, err)
 			}
 
-			v.IndexIdent = vn
+			v.IndexIdent_ = vn
 		default:
 			return nil, g.peb.NewParseError(s, errors.New("Invalid indexing"))
 		}
 
 		if newVar {
 			varDecl := &variable.VariableTypeDecl{
-				Name: lhsExpr.(*ast.Ident).Name,
-				Typ:  v.Typ,
-				Len:  1,
+				Name_: lhsExpr.(*ast.Ident).Name,
+				Typ_:  v.Typ_,
+				Len_:  1,
 			}
 
 			if lhsVar, err = parent.NewVariable(varDecl); err != nil {
@@ -212,9 +212,9 @@ func (g *Generator) HandleAssignmentStmt(s *ast.AssignStmt, parent *components.B
 		}
 
 		varDecl := &variable.VariableTypeDecl{
-			Name: "__g2a_tempVar",
-			Typ:  lhsVar.Typ,
-			Len:  lhsVar.Len,
+			Name_: "__g2a_tempVar",
+			Typ_:  lhsVar.Typ_,
+			Len_:  lhsVar.Len_,
 		}
 
 		tmpVar, err := tmpBlock.NewVariable(varDecl)
@@ -264,33 +264,32 @@ func (g *Generator) HandleAssignmentStmt(s *ast.AssignStmt, parent *components.B
 				return nil, g.peb.NewParseError(s, err)
 			}
 
-			infoprinter.DebugPrintf("funcIntf %s ", funcIntf.Name, funcIntf.FuncIntf, "\n")
+			infoprinter.DebugPrintf("funcIntf %s ", funcIntf.Name(), funcIntf.FuncIntf(), "\n")
 
-			// TODO: error handling
-			correspondingFuncParamVar, err := funcIntf.FuncIntf.Parameters.GetVariableInfoAt(i)
+			correspondingFuncParamVar, err := funcIntf.FuncIntf().Parameters.GetVariableInfoAt(i)
 			if err != nil {
 				return nil, g.peb.NewParseError(s, err)
 			}
 
-			if vi.Typ != correspondingFuncParamVar.Typ {
+			if vi.Typ_ != correspondingFuncParamVar.Typ_ {
 				return nil, g.peb.NewParseError(s, errors.New("Call expression has type mismatch at parameter "+strconv.Itoa(i)))
 			}
 
-			if _, err := paramsResults.Parameters.AddVariableFromInfo(vi); err != nil {
+			if _, err := paramsResults.Parameters.AddVariable(vi); err != nil {
 				return nil, g.peb.NewParseError(s, err)
 			}
 		}
 
 		if newVar {
-			firstResult, err := funcIntf.FuncIntf.Results.GetVariableInfoAt(0)
+			firstResult, err := funcIntf.FuncIntf().Results.GetVariableInfoAt(0)
 			if err != nil {
 				return nil, g.peb.NewParseError(s, err)
 			}
 
 			varDecl := &variable.VariableTypeDecl{
-				Name: lhsExpr.(*ast.Ident).Name,
-				Typ:  firstResult.Typ,
-				Len:  1,
+				Name_: lhsExpr.(*ast.Ident).Name,
+				Typ_:  firstResult.Typ_,
+				Len_:  1,
 			}
 
 			if lhsVar, err = parent.NewVariable(varDecl); err != nil {
@@ -298,7 +297,7 @@ func (g *Generator) HandleAssignmentStmt(s *ast.AssignStmt, parent *components.B
 			}
 		}
 
-		if _, err := paramsResults.Results.AddVariableFromInfo(lhsVar); err != nil {
+		if _, err := paramsResults.Results.AddVariable(lhsVar); err != nil {
 			return nil, g.peb.NewParseError(s, err)
 		}
 
@@ -335,8 +334,8 @@ func (g *Generator) GenerateBinaryExpressionFuncBlock(result *variable.VariableI
 		x = result
 	case *ast.BasicLit:
 		x = &variable.VariableInfo{
-			Const: t.Value,
-			Size:  result.Size,
+			Const_: t.Value,
+			Size_:  result.Size_,
 		}
 	case *ast.Ident:
 		x, err = parent.GetVariable(t.Name)
@@ -354,14 +353,14 @@ func (g *Generator) GenerateBinaryExpressionFuncBlock(result *variable.VariableI
 			if indexNode.Kind != token.INT {
 				return nil, g.peb.NewParseError(be, errors.New("Invalid indexing value kind '"+indexNode.Kind.String()+"'"))
 			}
-			x.Index = indexNode.Value
+			x.Index_ = indexNode.Value
 		case *ast.Ident:
 			v, err := parent.GetVariable(t.X.(*ast.Ident).Name)
 			if err != nil {
 				return nil, g.peb.NewParseError(be, err)
 			}
 
-			x.IndexIdent = v
+			x.IndexIdent_ = v
 		default:
 			return nil, g.peb.NewParseError(be, errors.New("Invalid indexing"))
 		}
@@ -379,8 +378,8 @@ func (g *Generator) GenerateBinaryExpressionFuncBlock(result *variable.VariableI
 		return nil, g.peb.NewParseError(be, errors.New("Binary expression in right side of binary expression not allowed"))
 	case *ast.BasicLit:
 		y = &variable.VariableInfo{
-			Const: t.Value,
-			Size:  result.Size,
+			Const_: t.Value,
+			Size_:  result.Size_,
 		}
 	case *ast.Ident:
 		y, err = parent.GetVariable(t.Name)
@@ -398,14 +397,14 @@ func (g *Generator) GenerateBinaryExpressionFuncBlock(result *variable.VariableI
 			if indexNode.Kind != token.INT {
 				return nil, g.peb.NewParseError(be, errors.New("Invalid indexing value kind '"+indexNode.Kind.String()+"'"))
 			}
-			y.Index = indexNode.Value
+			y.Index_ = indexNode.Value
 		case *ast.Ident:
 			v, err := parent.GetVariable(indexNode.Name)
 			if err != nil {
 				return nil, g.peb.NewParseError(be, err)
 			}
 
-			y.IndexIdent = v
+			y.IndexIdent_ = v
 		default:
 			return nil, g.peb.NewParseError(be, errors.New("Invalid indexing"))
 		}
@@ -417,7 +416,7 @@ func (g *Generator) GenerateBinaryExpressionFuncBlock(result *variable.VariableI
 		return nil, g.peb.NewParseError(be, errors.New("Invalid type in binary expression: "+ref.String()))
 	}
 
-	infoprinter.DebugPrintln("generating func: ", result.Name, " = ", x.Name, " ", operation, " ", y.Name, " const: ", y.Const)
+	infoprinter.DebugPrintln("generating func: ", result.Name_, " = ", x.Name_, " ", operation, " ", y.Name_, " const: ", y.Const_)
 
 	newFuncBlk := components.NewBinExprBlock(operation, &components.OperandInfo{
 		R: result,
@@ -445,7 +444,7 @@ func (g *Generator) GenerateSelectorBlock(be *ast.BinaryExpr, inverted bool, par
 	switch t := xexpr.(type) {
 	case *ast.BasicLit:
 		x = &variable.VariableInfo{
-			Const: t.Value,
+			Const_: t.Value,
 		}
 	case *ast.Ident:
 		x, err = parent.GetVariable(t.Name)
@@ -463,14 +462,14 @@ func (g *Generator) GenerateSelectorBlock(be *ast.BinaryExpr, inverted bool, par
 			if indexNode.Kind != token.INT {
 				return nil, g.peb.NewParseError(be, errors.New("Invalid indexing value kind '"+indexNode.Kind.String()+"'"))
 			}
-			x.Index = indexNode.Value
+			x.Index_ = indexNode.Value
 		case *ast.Ident:
 			v, err := parent.GetVariable(indexNode.Name)
 			if err != nil {
 				return nil, g.peb.NewParseError(be, err)
 			}
 
-			x.IndexIdent = v
+			x.IndexIdent_ = v
 		default:
 			return nil, g.peb.NewParseError(be, errors.New("Invalid indexing"))
 		}
@@ -485,8 +484,8 @@ func (g *Generator) GenerateSelectorBlock(be *ast.BinaryExpr, inverted bool, par
 	switch t := yexpr.(type) {
 	case *ast.BasicLit:
 		y = &variable.VariableInfo{
-			Const: t.Value,
-			Size:  x.Size,
+			Const_: t.Value,
+			Size_:  x.Size_,
 		}
 	case *ast.Ident:
 		y, err = parent.GetVariable(t.Name)
@@ -504,14 +503,14 @@ func (g *Generator) GenerateSelectorBlock(be *ast.BinaryExpr, inverted bool, par
 			if indexNode.Kind != token.INT {
 				return nil, g.peb.NewParseError(be, errors.New("Invalid indexing value kind '"+indexNode.Kind.String()+"'"))
 			}
-			y.Index = indexNode.Value
+			y.Index_ = indexNode.Value
 		case *ast.Ident:
 			v, err := parent.GetVariable(indexNode.Name)
 			if err != nil {
 				return nil, g.peb.NewParseError(be, err)
 			}
 
-			y.IndexIdent = v
+			y.IndexIdent_ = v
 		default:
 			return nil, g.peb.NewParseError(be, errors.New("Invalid indexing"))
 		}
@@ -523,8 +522,8 @@ func (g *Generator) GenerateSelectorBlock(be *ast.BinaryExpr, inverted bool, par
 		return nil, g.peb.NewParseError(be, errors.New("Invalid type in binary expression: "+ref.String()))
 	}
 
-	if x.Const != "" {
-		x.Size = y.Size
+	if x.Const_ != "" {
+		x.Size_ = y.Size_
 	}
 
 	return components.NewSelectorBlock(comp, &components.OperandInfo{
@@ -571,12 +570,12 @@ func (g *Generator) GenerateIfBlock(is *ast.IfStmt, parent *components.Block) (f
 	var elseBody components.BodyComponentType
 	elseBody = components.NewBinExprBlock("NOP", &components.OperandInfo{
 		R: &variable.VariableInfo{
-			Position: 0,
-			Size:     8,
+			Position_: 0,
+			Size_:     8,
 		},
 		X: &variable.VariableInfo{
-			Position: 0,
-			Size:     8,
+			Position_: 0,
+			Size_:     8,
 		},
 	}, parent)
 	if is.Else != nil {
@@ -666,9 +665,9 @@ func (g *Generator) GenerateBodyBlock(s ast.Stmt, parent *components.Block) (c c
 			switch declType := decl.Specs[0].(*ast.ValueSpec).Type.(type) {
 			case *ast.Ident:
 				if _, err := parent.NewVariable(&variable.VariableTypeDecl{
-					Name: spec.Name,
-					Typ:  declType.Name,
-					Len:  1,
+					Name_: spec.Name,
+					Typ_:  declType.Name,
+					Len_:  1,
 				}); err != nil {
 					return nil, g.peb.NewParseError(s, err)
 				}
@@ -692,9 +691,9 @@ func (g *Generator) GenerateBodyBlock(s ast.Stmt, parent *components.Block) (c c
 				}
 
 				if _, err := parent.NewVariable(&variable.VariableTypeDecl{
-					Name: spec.Name,
-					Typ:  elt.Name,
-					Len:  leni,
+					Name_: spec.Name,
+					Typ_:  elt.Name,
+					Len_:  leni,
 				}); err != nil {
 					return nil, g.peb.NewParseError(s, err)
 				}
@@ -756,9 +755,9 @@ func (g *Generator) parseVariableFieldList(fl *ast.FieldList) ([]*variable.Varia
 					return nil, err
 				}
 
-				paramVar.Name = p.Name
+				paramVar.Name_ = p.Name
 
-				infoprinter.DebugPrintf("Got var %s len %d type %s\n", paramVar.Name, paramVar.Len, paramVar.Typ)
+				infoprinter.DebugPrintf("Got var %s len %d type %s\n", paramVar.Name_, paramVar.Len_, paramVar.Typ_)
 
 				ret = append(ret, paramVar)
 			}
@@ -768,7 +767,7 @@ func (g *Generator) parseVariableFieldList(fl *ast.FieldList) ([]*variable.Varia
 				return nil, err
 			}
 
-			infoprinter.DebugPrintf("Got var %s len %d type %s\n", paramVar.Name, paramVar.Len, paramVar.Typ)
+			infoprinter.DebugPrintf("Got var %s len %d type %s\n", paramVar.Name_, paramVar.Len_, paramVar.Typ_)
 			ret = append(ret, paramVar)
 		}
 	}
@@ -782,8 +781,8 @@ func (g *Generator) parseVariableExpression(expr ast.Expr) (*variable.VariableTy
 	switch fieldType := expr.(type) {
 	case *ast.Ident:
 		return &variable.VariableTypeDecl{
-			Typ: fieldType.Name,
-			Len: 1,
+			Typ_: fieldType.Name,
+			Len_: 1,
 		}, nil
 	case *ast.ArrayType:
 		fieldTypeLenBasicLit, ok := fieldType.Len.(*ast.BasicLit)
@@ -797,8 +796,8 @@ func (g *Generator) parseVariableExpression(expr ast.Expr) (*variable.VariableTy
 		}
 
 		return &variable.VariableTypeDecl{
-			Typ: fieldType.Elt.(*ast.Ident).Name,
-			Len: len,
+			Typ_: fieldType.Elt.(*ast.Ident).Name,
+			Len_: len,
 		}, nil
 	case *ast.FuncType:
 		funcIntf := variable.NewFuncIntf()
@@ -828,7 +827,7 @@ func (g *Generator) parseVariableExpression(expr ast.Expr) (*variable.VariableTy
 		}
 
 		return &variable.VariableTypeDecl{
-			FuncIntf: funcIntf,
+			FuncIntf_: funcIntf,
 		}, nil
 	default:
 		return nil, g.peb.NewParseError(expr, errors.New("Invalid variable expression"))
@@ -850,7 +849,7 @@ func (g *Generator) GenerateScope(f *ast.FuncDecl) (s *components.Scope, err err
 					return nil, g.peb.NewParseError(f, err)
 				}
 
-				vi.Name = param.Name
+				vi.Name_ = param.Name
 
 				np, err := paramDummyBlock.NewVariable(vi)
 				if err != nil {
@@ -865,7 +864,7 @@ func (g *Generator) GenerateScope(f *ast.FuncDecl) (s *components.Scope, err err
 					return nil, g.peb.NewParseError(f, err)
 				}
 
-				vi.Name = param.Name
+				vi.Name_ = param.Name
 
 				np, err := paramDummyBlock.NewVariable(vi)
 				if err != nil {
@@ -921,7 +920,7 @@ func (g *Generator) GenerateScope(f *ast.FuncDecl) (s *components.Scope, err err
 
 			switch indexType := x.Index.(type) {
 			case *ast.BasicLit:
-				vi.Index = indexType.Value
+				vi.Index_ = indexType.Value
 			case *ast.Ident:
 				return nil, g.peb.NewParseError(f, errors.New("No identifier in index in returns allowed"))
 			default:
@@ -973,11 +972,11 @@ func (g *Generator) ParseGoFile(file string) error {
 				return g.peb.NewParseError(decl, err)
 			}
 
-			vi.Name = x.Name.Name
+			vi.Name_ = x.Name.Name
 
-			g.functions[vi.Name] = vi
+			g.functions[vi.Name_] = vi
 
-			infoprinter.DebugPrintf("Added function %s paramSize %d resultSize %d\n", vi.Name, vi.FuncIntf.Parameters.Size, vi.FuncIntf.Results.Size)
+			infoprinter.DebugPrintf("Added function %s paramSize %d resultSize %d\n", vi.Name_, vi.FuncIntf_.Parameters.Size, vi.FuncIntf_.Results.Size)
 		}
 	}
 
@@ -1016,9 +1015,9 @@ func (g *Generator) GenerateVHDL() string {
 
 	for sn, s := range g.scopes {
 		for _, externalIntf := range s.Block.ExternalInterfaces {
-			g.defs.ScopeProperties[externalIntf.Name] = &ScopeProperty{
-				paramSize:  externalIntf.FuncIntf.Parameters.GetSize(),
-				returnSize: externalIntf.FuncIntf.Results.GetSize(),
+			g.defs.ScopeProperties[externalIntf.Name_] = &ScopeProperty{
+				paramSize:  externalIntf.FuncIntf_.Parameters.GetSize(),
+				returnSize: externalIntf.FuncIntf_.Results.GetSize(),
 			}
 		}
 
@@ -1026,7 +1025,7 @@ func (g *Generator) GenerateVHDL() string {
 
 		ps, rs := 0, 0
 		for _, s := range s.Params {
-			ps += s.Size * s.Len
+			ps += s.Size_ * s.Len_
 		}
 
 		for _, v := range s.Params {
@@ -1036,7 +1035,7 @@ func (g *Generator) GenerateVHDL() string {
 		for i, s := range s.ReturnVars {
 			fmt.Println(sn, ": ReturnVar(", i, ") ", s.String())
 
-			rs += s.Size * s.Len
+			rs += s.Size_ * s.Len_
 		}
 
 		g.defs.ScopeProperties[sn] = &ScopeProperty{

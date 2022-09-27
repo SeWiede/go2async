@@ -86,22 +86,22 @@ func (sb *SelectorBlock) ComponentStr() string {
 
 func (sb *SelectorBlock) getAliases() string {
 	ret := ""
-	if sb.Oi.X.IndexIdent == nil {
-		idx := getIndex(sb.Oi.X.Index)
-		ret += "alias x      : std_logic_vector(" + strconv.Itoa(sb.Oi.X.Size) + " - 1 downto 0)  is in_data( " + strconv.Itoa(sb.Oi.X.Position+sb.Oi.X.Size*(idx+1)) + " - 1 downto " + strconv.Itoa(sb.Oi.X.Position+sb.Oi.X.Size*idx) + ");\n"
+	if sb.Oi.X.IndexIdent_ == nil {
+		idx := getIndex(sb.Oi.X.Index_)
+		ret += "alias x      : std_logic_vector(" + strconv.Itoa(sb.Oi.X.Size_) + " - 1 downto 0)  is in_data( " + strconv.Itoa(sb.Oi.X.Position_+sb.Oi.X.Size_*(idx+1)) + " - 1 downto " + strconv.Itoa(sb.Oi.X.Position_+sb.Oi.X.Size_*idx) + ");\n"
 	} else {
-		ret += "signal x : std_logic_vector(" + strconv.Itoa(sb.Oi.X.Size) + "- 1 downto 0);\n"
-		ret += "constant baseX      : integer := " + strconv.Itoa(sb.Oi.X.Position) + ";\n"
-		ret += "alias offsetX      : std_logic_vector(" + strconv.Itoa(sb.Oi.X.IndexIdent.Size) + " - 1 downto 0)  is in_data( " + strconv.Itoa(sb.Oi.X.IndexIdent.Position+sb.Oi.X.IndexIdent.Size) + " -1 downto " + strconv.Itoa(sb.Oi.X.IndexIdent.Position) + ");\n"
+		ret += "signal x : std_logic_vector(" + strconv.Itoa(sb.Oi.X.Size_) + "- 1 downto 0);\n"
+		ret += "constant baseX      : integer := " + strconv.Itoa(sb.Oi.X.Position_) + ";\n"
+		ret += "alias offsetX      : std_logic_vector(" + strconv.Itoa(sb.Oi.X.IndexIdent_.Size_) + " - 1 downto 0)  is in_data( " + strconv.Itoa(sb.Oi.X.IndexIdent_.Position_+sb.Oi.X.IndexIdent_.Size_) + " -1 downto " + strconv.Itoa(sb.Oi.X.IndexIdent_.Position_) + ");\n"
 	}
 
-	if sb.Oi.Y != nil && sb.Oi.Y.IndexIdent == nil {
-		idx := getIndex(sb.Oi.Y.Index)
-		ret += "alias y      : std_logic_vector(" + strconv.Itoa(sb.Oi.Y.Size) + " - 1 downto 0)  is in_data( " + strconv.Itoa(sb.Oi.Y.Position+sb.Oi.Y.Size*(idx+1)) + " - 1 downto " + strconv.Itoa(sb.Oi.Y.Position+sb.Oi.Y.Size*idx) + ");\n"
-	} else if sb.Oi.Y != nil && sb.Oi.Y.IndexIdent != nil {
-		ret += "signal y  : std_logic_vector(" + strconv.Itoa(sb.Oi.Y.Size) + "- 1 downto 0);\n"
-		ret += "constant baseY      : integer := " + strconv.Itoa(sb.Oi.Y.Position) + ";\n"
-		ret += "alias offsetY      : std_logic_vector(" + strconv.Itoa(sb.Oi.Y.IndexIdent.Size) + " - 1 downto 0)  is in_data( " + strconv.Itoa(sb.Oi.Y.IndexIdent.Position+sb.Oi.Y.IndexIdent.Size) + " -1 downto " + strconv.Itoa(sb.Oi.Y.IndexIdent.Position) + ");\n"
+	if sb.Oi.Y != nil && sb.Oi.Y.IndexIdent_ == nil {
+		idx := getIndex(sb.Oi.Y.Index_)
+		ret += "alias y      : std_logic_vector(" + strconv.Itoa(sb.Oi.Y.Size_) + " - 1 downto 0)  is in_data( " + strconv.Itoa(sb.Oi.Y.Position_+sb.Oi.Y.Size_*(idx+1)) + " - 1 downto " + strconv.Itoa(sb.Oi.Y.Position_+sb.Oi.Y.Size_*idx) + ");\n"
+	} else if sb.Oi.Y != nil && sb.Oi.Y.IndexIdent_ != nil {
+		ret += "signal y  : std_logic_vector(" + strconv.Itoa(sb.Oi.Y.Size_) + "- 1 downto 0);\n"
+		ret += "constant baseY      : integer := " + strconv.Itoa(sb.Oi.Y.Position_) + ";\n"
+		ret += "alias offsetY      : std_logic_vector(" + strconv.Itoa(sb.Oi.Y.IndexIdent_.Size_) + " - 1 downto 0)  is in_data( " + strconv.Itoa(sb.Oi.Y.IndexIdent_.Position_+sb.Oi.Y.IndexIdent_.Size_) + " -1 downto " + strconv.Itoa(sb.Oi.Y.IndexIdent_.Position_) + ");\n"
 	}
 
 	return ret
@@ -112,25 +112,25 @@ func (sb *SelectorBlock) getCalcProcess() string {
 	y := ""
 
 	x = "unsigned(x)"
-	if sb.Oi.X.Const != "" {
-		x = "to_unsigned(" + sb.Oi.X.Const + ", " + strconv.Itoa(sb.Oi.X.Size) + ")"
+	if sb.Oi.X.Const_ != "" {
+		x = "to_unsigned(" + sb.Oi.X.Const_ + ", " + strconv.Itoa(sb.Oi.X.Size_) + ")"
 	}
 
 	y = "unsigned(y)"
-	if sb.Oi.Y.Const != "" {
-		y = "to_unsigned(" + sb.Oi.Y.Const + ", " + strconv.Itoa(sb.Oi.Y.Size) + ")"
+	if sb.Oi.Y.Const_ != "" {
+		y = "to_unsigned(" + sb.Oi.Y.Const_ + ", " + strconv.Itoa(sb.Oi.Y.Size_) + ")"
 	}
 
 	xcalc := ""
 	ycalc := ""
 
-	if sb.Oi.X.IndexIdent != nil {
+	if sb.Oi.X.IndexIdent_ != nil {
 		x = "unsigned(x)"
 		xcalc = "x <= in_data(baseX + (to_integer(unsigned(offsetX)) + 1) * x'length - 1 downto baseX + to_integer(unsigned(offsetX)) * x'length);\n"
 
 	}
 
-	if sb.Oi.Y != nil && sb.Oi.Y.IndexIdent != nil {
+	if sb.Oi.Y != nil && sb.Oi.Y.IndexIdent_ != nil {
 		y = "unsigned(y)"
 		ycalc = "y <= in_data(baseY + (to_integer(unsigned(offsetY)) + 1) * y'length - 1 downto baseY + to_integer(unsigned(offsetY)) * y'length);\n"
 	}

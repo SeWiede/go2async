@@ -58,7 +58,7 @@ func NewScope(name string, block *Block, params map[string]*variable.VariableInf
 
 	rs := 0
 	for _, s := range s.ReturnVars {
-		rs += s.Size
+		rs += s.Size_
 	}
 
 	s.OutReg = NewReg(s.Block.OutputSize, false, "0")
@@ -100,19 +100,19 @@ func (s *Scope) Entity() string {
 
 	i := 0
 	for _, extIntf := range s.Block.ExternalInterfaces {
-		externalIntferacesGenericsStr += extIntf.Name + "_DATA_IN_WIDTH : NATURAL := 8;\n"
-		externalIntferacesGenericsStr += extIntf.Name + `_DATA_OUT_WIDTH : NATURAL := 8`
+		externalIntferacesGenericsStr += extIntf.Name_ + "_DATA_IN_WIDTH : NATURAL := 8;\n"
+		externalIntferacesGenericsStr += extIntf.Name_ + `_DATA_OUT_WIDTH : NATURAL := 8`
 
-		externalInterfacesStr += `-- Interface for ` + extIntf.Name
+		externalInterfacesStr += `-- Interface for ` + extIntf.Name_
 		externalInterfacesStr += `
 		-- Input channel
-		` + extIntf.Name + `_in_data : OUT STD_LOGIC_VECTOR(` + extIntf.Name + `_DATA_IN_WIDTH - 1 DOWNTO 0);
-		` + extIntf.Name + `_in_req : OUT STD_LOGIC;
-		` + extIntf.Name + `_in_ack : IN STD_LOGIC;
+		` + extIntf.Name_ + `_in_data : OUT STD_LOGIC_VECTOR(` + extIntf.Name_ + `_DATA_IN_WIDTH - 1 DOWNTO 0);
+		` + extIntf.Name_ + `_in_req : OUT STD_LOGIC;
+		` + extIntf.Name_ + `_in_ack : IN STD_LOGIC;
 		-- Output channel
-		` + extIntf.Name + `_out_data : IN STD_LOGIC_VECTOR(` + extIntf.Name + `_DATA_OUT_WIDTH - 1 DOWNTO 0);
-		` + extIntf.Name + `_out_req : IN STD_LOGIC;
-		` + extIntf.Name + `_out_ack : OUT STD_LOGIC`
+		` + extIntf.Name_ + `_out_data : IN STD_LOGIC_VECTOR(` + extIntf.Name_ + `_DATA_OUT_WIDTH - 1 DOWNTO 0);
+		` + extIntf.Name_ + `_out_req : IN STD_LOGIC;
+		` + extIntf.Name_ + `_out_ack : OUT STD_LOGIC`
 
 		if i != len(s.Block.ExternalInterfaces)-1 {
 			externalIntferacesGenericsStr += ";\n"
@@ -166,19 +166,19 @@ func (s *Scope) Component() string {
 
 	i := 0
 	for _, extIntf := range s.Block.ExternalInterfaces {
-		externalIntferacesGenericsStr += extIntf.Name + `_DATA_IN_WIDTH => ` + extIntf.Name + "_DATA_IN_WIDTH,\n"
-		externalIntferacesGenericsStr += extIntf.Name + `_DATA_OUT_WIDTH => ` + extIntf.Name + `_DATA_OUT_WIDTH`
+		externalIntferacesGenericsStr += extIntf.Name_ + `_DATA_IN_WIDTH => ` + extIntf.Name_ + "_DATA_IN_WIDTH,\n"
+		externalIntferacesGenericsStr += extIntf.Name_ + `_DATA_OUT_WIDTH => ` + extIntf.Name_ + `_DATA_OUT_WIDTH`
 
-		externalInterfacesStr += `-- Interface for ` + extIntf.Name
+		externalInterfacesStr += `-- Interface for ` + extIntf.Name_
 		externalInterfacesStr += `
 		-- Input channel
-		` + extIntf.Name + `_in_data  => ` + extIntf.Name + `_in_data,
-		` + extIntf.Name + `_in_req => ` + extIntf.Name + `_in_req,
-		` + extIntf.Name + `_in_ack => ` + extIntf.Name + `_in_ack,
+		` + extIntf.Name_ + `_in_data  => ` + extIntf.Name_ + `_in_data,
+		` + extIntf.Name_ + `_in_req => ` + extIntf.Name_ + `_in_req,
+		` + extIntf.Name_ + `_in_ack => ` + extIntf.Name_ + `_in_ack,
 		-- Output channel
-		` + extIntf.Name + `_out_data => ` + extIntf.Name + `_out_data,
-		` + extIntf.Name + `_out_req => ` + extIntf.Name + `_out_req,
-		` + extIntf.Name + `_out_ack => ` + extIntf.Name + `_out_ack`
+		` + extIntf.Name_ + `_out_data => ` + extIntf.Name_ + `_out_data,
+		` + extIntf.Name_ + `_out_req => ` + extIntf.Name_ + `_out_req,
+		` + extIntf.Name_ + `_out_ack => ` + extIntf.Name_ + `_out_ack`
 
 		if i != len(s.Block.ExternalInterfaces)-1 {
 			externalInterfacesStr += ",\n"
@@ -231,12 +231,12 @@ func (s *Scope) Architecture() string {
 	ret += s.OutChannel().Ack + " <= out_ack; \n"
 	ret += "out_data <= "
 	for _, v := range s.ReturnVars {
-		if v.Len == 1 {
-			idx := getIndex(v.Index)
-			ret += s.OutReg.OutChannel().Data + "(" + strconv.Itoa(v.Position+v.Size*(idx+1)) + " -1 downto " + strconv.Itoa(v.Position+v.Size*idx) + ") & "
+		if v.Len_ == 1 {
+			idx := getIndex(v.Index_)
+			ret += s.OutReg.OutChannel().Data + "(" + strconv.Itoa(v.Position_+v.Size_*(idx+1)) + " -1 downto " + strconv.Itoa(v.Position_+v.Size_*idx) + ") & "
 		} else {
-			for idx := v.Len - 1; idx >= 0; idx-- {
-				ret += s.OutReg.OutChannel().Data + "(" + strconv.Itoa(v.Position+v.Size*(idx+1)) + " -1 downto " + strconv.Itoa(v.Position+v.Size*idx) + ") & "
+			for idx := v.Len_ - 1; idx >= 0; idx-- {
+				ret += s.OutReg.OutChannel().Data + "(" + strconv.Itoa(v.Position_+v.Size_*(idx+1)) + " -1 downto " + strconv.Itoa(v.Position_+v.Size_*idx) + ") & "
 			}
 		}
 	}
