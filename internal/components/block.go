@@ -341,7 +341,7 @@ func (b *Block) GetCurrentVariableSize() int {
 }
 
 func (b *Block) NewVariable(decl *variable.VariableTypeDecl) (*variable.VariableInfo, error) {
-	return b.ScopedVariables().NewVariable(decl)
+	return b.ScopedVariables().AddVariable(decl)
 }
 
 func (b *Block) GetVariable(name string) (*variable.VariableInfo, error) {

@@ -276,7 +276,7 @@ func (g *Generator) HandleAssignmentStmt(s *ast.AssignStmt, parent *components.B
 				return nil, g.peb.NewParseError(s, errors.New("Call expression has type mismatch at parameter "+strconv.Itoa(i)))
 			}
 
-			if _, err := paramsResults.Parameters.NewVariableFromInfo(vi); err != nil {
+			if _, err := paramsResults.Parameters.AddVariableFromInfo(vi); err != nil {
 				return nil, g.peb.NewParseError(s, err)
 			}
 		}
@@ -298,7 +298,7 @@ func (g *Generator) HandleAssignmentStmt(s *ast.AssignStmt, parent *components.B
 			}
 		}
 
-		if _, err := paramsResults.Results.NewVariableFromInfo(lhsVar); err != nil {
+		if _, err := paramsResults.Results.AddVariableFromInfo(lhsVar); err != nil {
 			return nil, g.peb.NewParseError(s, err)
 		}
 
@@ -809,7 +809,7 @@ func (g *Generator) parseVariableExpression(expr ast.Expr) (*variable.VariableTy
 		}
 
 		for _, ld := range listDecl {
-			_, err := funcIntf.Parameters.NewVariable(ld)
+			_, err := funcIntf.Parameters.AddVariable(ld)
 			if err != nil {
 				return nil, err
 			}
@@ -821,7 +821,7 @@ func (g *Generator) parseVariableExpression(expr ast.Expr) (*variable.VariableTy
 		}
 
 		for _, ld := range listDecl {
-			_, err := funcIntf.Results.NewVariable(ld)
+			_, err := funcIntf.Results.AddVariable(ld)
 			if err != nil {
 				return nil, err
 			}

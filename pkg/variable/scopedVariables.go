@@ -82,8 +82,8 @@ func (sv *ScopedVariables) GetVariableInfoAt(pos int) (*VariableInfo, error) {
 	return sv.VariableList[pos].Copy(), nil
 }
 
-func (sv *ScopedVariables) NewVariableFromInfo(vi *VariableInfo) (*VariableInfo, error) {
-	return sv.NewVariable(&VariableTypeDecl{
+func (sv *ScopedVariables) AddVariableFromInfo(vi *VariableInfo) (*VariableInfo, error) {
+	return sv.AddVariable(&VariableTypeDecl{
 		Name:     vi.Name,
 		Typ:      vi.Typ,
 		Len:      vi.Len,
@@ -91,7 +91,7 @@ func (sv *ScopedVariables) NewVariableFromInfo(vi *VariableInfo) (*VariableInfo,
 	})
 }
 
-func (sv *ScopedVariables) NewVariable(decl *VariableTypeDecl) (*VariableInfo, error) {
+func (sv *ScopedVariables) AddVariable(decl *VariableTypeDecl) (*VariableInfo, error) {
 	if decl == nil {
 		return nil, ErrNilDecl
 	}
