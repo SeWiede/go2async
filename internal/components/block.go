@@ -158,8 +158,8 @@ func (b *Block) ComponentStr() string {
 
 	i := 0
 	for fName, _ := range b.ExternalInterfaces {
-		externalIntferacesGenericsStr += fName + `_DATA_IN_WIDTH => ` + fName + "_DATA_IN_WIDTH,\n"
-		externalIntferacesGenericsStr += fName + `_DATA_OUT_WIDTH => ` + fName + `_DATA_OUT_WIDTH`
+		externalIntferacesGenericsStr += fName + `_IN_DATA_WIDTH => ` + fName + "_IN_DATA_WIDTH,\n"
+		externalIntferacesGenericsStr += fName + `_OUT_DATA_WIDTH => ` + fName + `_OUT_DATA_WIDTH`
 
 		externalInterfacesStr += `-- Interface for ` + fName
 		externalInterfacesStr += `
@@ -259,17 +259,17 @@ func (b *Block) Entity() string {
 
 	i := 0
 	for fName, _ := range b.ExternalInterfaces {
-		externalIntferacesGenericsStr += fName + "_DATA_IN_WIDTH : NATURAL := 8;\n"
-		externalIntferacesGenericsStr += fName + `_DATA_OUT_WIDTH : NATURAL := 8`
+		externalIntferacesGenericsStr += fName + "_IN_DATA_WIDTH : NATURAL := 8;\n"
+		externalIntferacesGenericsStr += fName + `_OUT_DATA_WIDTH : NATURAL := 8`
 
 		externalInterfacesStr += `-- Interface for ` + fName
 		externalInterfacesStr += `
 		-- Input channel
-		` + fName + `_in_data : OUT STD_LOGIC_VECTOR(` + fName + `_DATA_IN_WIDTH - 1 DOWNTO 0);
+		` + fName + `_in_data : OUT STD_LOGIC_VECTOR(` + fName + `_IN_DATA_WIDTH - 1 DOWNTO 0);
 		` + fName + `_in_req : OUT STD_LOGIC;
 		` + fName + `_in_ack : IN STD_LOGIC;
 		-- Output channel
-		` + fName + `_out_data : IN STD_LOGIC_VECTOR(` + fName + `_DATA_OUT_WIDTH - 1 DOWNTO 0);
+		` + fName + `_out_data : IN STD_LOGIC_VECTOR(` + fName + `_OUT_DATA_WIDTH - 1 DOWNTO 0);
 		` + fName + `_out_req : IN STD_LOGIC;
 		` + fName + `_out_ack : OUT STD_LOGIC`
 

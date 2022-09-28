@@ -5,7 +5,6 @@ import (
 	"go2async/internal/globalArguments"
 	"go2async/pkg/variable"
 	"strconv"
-	"strings"
 )
 
 const binexprblockprefix = "CL_"
@@ -36,7 +35,7 @@ func NewBinExprBlock(op string, vi *OperandInfo, parent *Block) *BinExprBlock {
 	nr := bebNr
 	bebNr++
 
-	name := strings.ToLower(binexprblockprefix + strconv.Itoa(nr))
+	name := binexprblockprefix + strconv.Itoa(nr)
 
 	ret := &BinExprBlock{
 		BodyComponent: BodyComponent{

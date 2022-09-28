@@ -78,7 +78,7 @@ func (s *Scope) OutChannel() *HandshakeChannel {
 	return s.Out
 }
 
-func (s *Scope) entityName() string {
+func (s *Scope) EntityName() string {
 	extIntfLen := len(s.Block.ExternalInterfaces)
 	if extIntfLen == 0 {
 		return defaultScopeEntityName
@@ -88,7 +88,7 @@ func (s *Scope) entityName() string {
 
 func (s *Scope) Entity() string {
 	if *globalArguments.Debug {
-		fmt.Printf("Generating unique block entity '%s'\n", s.entityName())
+		fmt.Printf("Generating unique block entity '%s'\n", s.EntityName())
 	}
 
 	externalInterfacesStr := ``
@@ -100,17 +100,17 @@ func (s *Scope) Entity() string {
 
 	i := 0
 	for _, extIntf := range s.Block.ExternalInterfaces {
-		externalIntferacesGenericsStr += extIntf.Name_ + "_DATA_IN_WIDTH : NATURAL := 8;\n"
-		externalIntferacesGenericsStr += extIntf.Name_ + `_DATA_OUT_WIDTH : NATURAL := 8`
+		externalIntferacesGenericsStr += extIntf.Name_ + "_IN_DATA_WIDTH : NATURAL := 8;\n"
+		externalIntferacesGenericsStr += extIntf.Name_ + `_OUT_DATA_WIDTH : NATURAL := 8`
 
 		externalInterfacesStr += `-- Interface for ` + extIntf.Name_
 		externalInterfacesStr += `
 		-- Input channel
-		` + extIntf.Name_ + `_in_data : OUT STD_LOGIC_VECTOR(` + extIntf.Name_ + `_DATA_IN_WIDTH - 1 DOWNTO 0);
+		` + extIntf.Name_ + `_in_data : OUT STD_LOGIC_VECTOR(` + extIntf.Name_ + `_IN_DATA_WIDTH - 1 DOWNTO 0);
 		` + extIntf.Name_ + `_in_req : OUT STD_LOGIC;
 		` + extIntf.Name_ + `_in_ack : IN STD_LOGIC;
 		-- Output channel
-		` + extIntf.Name_ + `_out_data : IN STD_LOGIC_VECTOR(` + extIntf.Name_ + `_DATA_OUT_WIDTH - 1 DOWNTO 0);
+		` + extIntf.Name_ + `_out_data : IN STD_LOGIC_VECTOR(` + extIntf.Name_ + `_OUT_DATA_WIDTH - 1 DOWNTO 0);
 		` + extIntf.Name_ + `_out_req : IN STD_LOGIC;
 		` + extIntf.Name_ + `_out_ack : OUT STD_LOGIC`
 
@@ -128,7 +128,7 @@ func (s *Scope) Entity() string {
 	USE ieee.numeric_std.ALL;
 	USE work.click_element_library_constants.ALL;
 	
-	ENTITY ` + s.entityName() + ` IS
+	ENTITY ` + s.EntityName() + ` IS
 	  GENERIC (
 		DATA_WIDTH : NATURAL := 8;
 		DATA_IN_WIDTH : NATURAL := 8;
@@ -149,7 +149,7 @@ func (s *Scope) Entity() string {
 		-- External interfaces
 		` + externalInterfacesStr + `
 	  );
-	END ` + s.entityName() + `;`
+	END ` + s.EntityName() + `;`
 
 	return ret
 }
@@ -166,8 +166,8 @@ func (s *Scope) Component() string {
 
 	i := 0
 	for _, extIntf := range s.Block.ExternalInterfaces {
-		externalIntferacesGenericsStr += extIntf.Name_ + `_DATA_IN_WIDTH => ` + extIntf.Name_ + "_DATA_IN_WIDTH,\n"
-		externalIntferacesGenericsStr += extIntf.Name_ + `_DATA_OUT_WIDTH => ` + extIntf.Name_ + `_DATA_OUT_WIDTH`
+		externalIntferacesGenericsStr += extIntf.Name_ + `_IN_DATA_WIDTH => ` + extIntf.Name_ + "_IN_DATA_WIDTH,\n"
+		externalIntferacesGenericsStr += extIntf.Name_ + `_OUT_DATA_WIDTH => ` + extIntf.Name_ + `_OUT_DATA_WIDTH`
 
 		externalInterfacesStr += `-- Interface for ` + extIntf.Name_
 		externalInterfacesStr += `
@@ -187,7 +187,7 @@ func (s *Scope) Component() string {
 		i++
 	}
 
-	return name + `: entity work.` + s.entityName() + `(` + s.archName + `)
+	return name + `: entity work.` + s.EntityName() + `(` + s.archName + `)
   generic map(
     DATA_WIDTH => ` + s.archName + `_DATA_WIDTH,
 	OUT_DATA_WIDTH => ` + s.archName + `_OUT_DATA_WIDTH,
@@ -219,7 +219,7 @@ func (s *Scope) signalDefs() string {
 }
 
 func (s *Scope) Architecture() string {
-	ret := `architecture ` + s.archName + ` of ` + s.entityName() + ` is
+	ret := `architecture ` + s.archName + ` of ` + s.EntityName() + ` is
 	`
 
 	ret += s.signalDefs()

@@ -246,9 +246,20 @@ func (g *Generator) HandleAssignmentStmt(s *ast.AssignStmt, parent *components.B
 		}
 		funcName := funcNameIdent.Name
 
-		funcIntf, err := parent.GetAndAssignFunctionInterface(funcName)
+		isPackageFunction := false
+
+		var funcIntf variable.VariableDef
+
+		// Prioritize functionPointer params - of course
+		funcIntf, err = parent.GetAndAssignFunctionInterface(funcName)
 		if err != nil {
-			return nil, g.peb.NewParseError(s, err)
+			funcIntf, ok = g.functions[funcName]
+			if ok {
+				infoprinter.DebugPrintf("func '%s' is a function in the package\n", funcName)
+				isPackageFunction = true
+			} else {
+				return nil, g.peb.NewParseError(s, err)
+			}
 		}
 
 		paramsResults := variable.NewFuncIntf()
@@ -263,8 +274,6 @@ func (g *Generator) HandleAssignmentStmt(s *ast.AssignStmt, parent *components.B
 			if err != nil {
 				return nil, g.peb.NewParseError(s, err)
 			}
-
-			infoprinter.DebugPrintf("funcIntf %s ", funcIntf.Name(), funcIntf.FuncIntf(), "\n")
 
 			correspondingFuncParamVar, err := funcIntf.FuncIntf().Parameters.GetVariableInfoAt(i)
 			if err != nil {
@@ -301,9 +310,19 @@ func (g *Generator) HandleAssignmentStmt(s *ast.AssignStmt, parent *components.B
 			return nil, g.peb.NewParseError(s, err)
 		}
 
-		newFuncBlk, err := components.NewFuncBlock(paramsResults, funcIntf, parent)
-		if err != nil {
-			return nil, err
+		infoprinter.DebugPrintf("Function params of '%s' were of correct type\n", funcIntf.Name())
+
+		var newFuncBlk components.BodyComponentType
+		if !isPackageFunction {
+			newFuncBlk, err = components.NewFuncBlock(paramsResults, funcIntf, parent)
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			newFuncBlk, err = components.NewCallBlock(paramsResults, funcIntf, parent)
+			if err != nil {
+				return nil, err
+			}
 		}
 
 		g.components[newFuncBlk.ArchName()] = newFuncBlk
@@ -876,6 +895,11 @@ func (g *Generator) GenerateScope(f *ast.FuncDecl) (s *components.Scope, err err
 				if err := paramDummyBlock.AddFunctionInterface(np); err != nil {
 					return nil, g.peb.NewParseError(f, err)
 				}
+
+				g.defs.ScopeProperties[np.Name()] = &ScopeProperty{
+					paramSize:  np.FuncIntf().Parameters.GetSize(),
+					returnSize: np.FuncIntf().Results.GetSize(),
+				}
 			default:
 				return nil, g.peb.NewParseError(f, errors.New("Type '"+reflect.TypeOf(fieldType).String()+"' is not supported in function param list"))
 			}
@@ -1006,6 +1030,8 @@ func (g *Generator) GenerateVHDL() string {
 		if _, ok := entityTracker[c.EntityName()]; !ok {
 			entityTracker[c.EntityName()] = true
 
+			infoprinter.DebugPrintf("Adding entity '%s'\n", c.EntityName())
+
 			// prefix entity if not already added
 			ret = c.Entity() + ret
 		}
@@ -1014,14 +1040,14 @@ func (g *Generator) GenerateVHDL() string {
 	}
 
 	for sn, s := range g.scopes {
-		for _, externalIntf := range s.Block.ExternalInterfaces {
-			g.defs.ScopeProperties[externalIntf.Name_] = &ScopeProperty{
-				paramSize:  externalIntf.FuncIntf_.Parameters.GetSize(),
-				returnSize: externalIntf.FuncIntf_.Results.GetSize(),
-			}
-		}
+		if _, ok := entityTracker[s.EntityName()]; !ok {
+			entityTracker[s.EntityName()] = true
 
-		ret = s.Entity() + ret
+			infoprinter.DebugPrintf("Adding entity '%s'\n", s.EntityName())
+
+			// prefix entity if not already added
+			ret = s.Entity() + ret
+		}
 
 		ps, rs := 0, 0
 		for _, s := range s.Params {

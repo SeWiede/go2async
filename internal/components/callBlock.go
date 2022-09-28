@@ -2,41 +2,37 @@ package components
 
 import (
 	"errors"
+	infoprinter "go2async/internal/infoPrinter"
 	"go2async/pkg/variable"
 	"strconv"
 )
 
-const funcBlockPrefix = "FB_"
-const defaultFuncBlockEntityName = "funcBlock"
+const callBlockPrefix = "CB_"
+const defaultCallBlockEntityName = "callBlock"
 
-type FuncBlock struct {
+type CallBlock struct {
 	BodyComponent
 
 	Nr int
 
 	paramsResults *variable.FuncInterface
 
-	externalInterface *variable.VariableInfo
+	funcIntf variable.VariableDef
 }
 
-var fbNr = 0
+var cbNr = 0
 
-func NewFuncBlock(paramsResults *variable.FuncInterface, fi variable.VariableDef, parent *Block) (*FuncBlock, error) {
+func NewCallBlock(paramsResults *variable.FuncInterface, fi variable.VariableDef, parent *Block) (*CallBlock, error) {
 	if fi.FuncIntf() == nil {
 		return nil, errors.New("invalid function variable '" + fi.Name() + "'")
 	}
 
-	nr := fbNr
-	fbNr++
+	nr := cbNr
+	cbNr++
 
-	name := funcBlockPrefix + strconv.Itoa(nr)
+	name := callBlockPrefix + strconv.Itoa(nr)
 
-	f, err := parent.GetAndAssignFunctionInterface(fi.Name())
-	if err != nil {
-		return nil, err
-	}
-
-	ret := &FuncBlock{
+	ret := &CallBlock{
 		BodyComponent: BodyComponent{
 			archName: archPrefix + name,
 
@@ -60,38 +56,41 @@ func NewFuncBlock(paramsResults *variable.FuncInterface, fi variable.VariableDef
 
 		paramsResults: paramsResults,
 
-		externalInterface: f.Copy(),
+		funcIntf: fi,
 	}
 
 	return ret, nil
 }
 
-func (fb *FuncBlock) InChannel() *HandshakeChannel {
-	return fb.In
+func (cb *CallBlock) InChannel() *HandshakeChannel {
+	return cb.In
 }
 
-func (fb *FuncBlock) OutChannel() *HandshakeChannel {
-	return fb.Out
+func (cb *CallBlock) OutChannel() *HandshakeChannel {
+	return cb.Out
 }
 
-func (fb *FuncBlock) EntityName() string {
-	return defaultFuncBlockEntityName + "_" + fb.externalInterface.Name()
+func (cb *CallBlock) EntityName() string {
+	return defaultCallBlockEntityName + "_" + cb.funcIntf.Name()
 }
 
-func (fb *FuncBlock) Entity() string {
+func (cb *CallBlock) Entity() string {
+	infoprinter.DebugPrintf("Generating unique callBlock entity '%s'\n", cb.EntityName())
+
 	return `LIBRARY IEEE;
 	USE IEEE.STD_LOGIC_1164.ALL;
 	USE ieee.std_logic_unsigned.ALL;
 	USE ieee.numeric_std.ALL;
 	USE work.click_element_library_constants.ALL;
 	
-	ENTITY ` + fb.EntityName() + ` IS
+	ENTITY ` + cb.EntityName() + ` IS
 	  GENERIC (
 		DATA_WIDTH : NATURAL := 8;
-		` + fb.externalInterface.Name() + `_IN_DATA_WIDTH : NATURAL := 8;
-		` + fb.externalInterface.Name() + `_OUT_DATA_WIDTH : NATURAL := 8
+		` + cb.funcIntf.Name() + `_IN_DATA_WIDTH : NATURAL := 8;
+		` + cb.funcIntf.Name() + `_OUT_DATA_WIDTH : NATURAL := 8
 	  );
 	  PORT (
+		rst : IN STD_LOGIC;
 		-- Input channel
 		in_data : IN STD_LOGIC_VECTOR(DATA_WIDTH - 1 DOWNTO 0);
 		in_req : IN STD_LOGIC;
@@ -99,56 +98,36 @@ func (fb *FuncBlock) Entity() string {
 		-- Output channel
 		out_data : OUT STD_LOGIC_VECTOR(DATA_WIDTH - 1 DOWNTO 0);
 		out_req : OUT STD_LOGIC;
-		out_ack : IN STD_LOGIC;
-
-		-- External interfaces
-		` + fb.externalInterface.Name() + `_in_data : OUT STD_LOGIC_VECTOR(` + fb.externalInterface.Name() + `_IN_DATA_WIDTH - 1 DOWNTO 0);
-		` + fb.externalInterface.Name() + `_in_req : OUT STD_LOGIC;
-		` + fb.externalInterface.Name() + `_in_ack : IN STD_LOGIC;
-		-- Output channel
-		` + fb.externalInterface.Name() + `_out_data : IN STD_LOGIC_VECTOR(` + fb.externalInterface.Name() + `_OUT_DATA_WIDTH - 1 DOWNTO 0);
-		` + fb.externalInterface.Name() + `_out_req : IN STD_LOGIC;
-		` + fb.externalInterface.Name() + `_out_ack : OUT STD_LOGIC
+		out_ack : IN STD_LOGIC
 	  );
-	END ` + fb.EntityName() + `;`
+	END ` + cb.EntityName() + `;`
 }
 
-func (fb *FuncBlock) ComponentStr() string {
-	name := funcBlockPrefix + strconv.Itoa(fb.Nr)
+func (cb *CallBlock) ComponentStr() string {
+	name := callBlockPrefix + strconv.Itoa(cb.Nr)
 
-	return name + `: entity work.` + fb.EntityName() + `(` + fb.archName + `)
+	return name + `: entity work.` + cb.EntityName() + `(` + cb.archName + `)
 	generic map(
-	  DATA_WIDTH => ` + strconv.Itoa(fb.GetVariableSize()) + `,
-	  ` + fb.externalInterface.Name() + `_IN_DATA_WIDTH => ` + fb.externalInterface.Name() + `_IN_DATA_WIDTH,
-	  ` + fb.externalInterface.Name() + `_OUT_DATA_WIDTH => ` + fb.externalInterface.Name() + `_OUT_DATA_WIDTH
+	  DATA_WIDTH => ` + strconv.Itoa(cb.GetVariableSize()) + `
 	)
 	port map (
+		rst => rst,
 		-- Input channel
-		in_req  => ` + fb.In.Req + `,
-		in_ack  => ` + fb.In.Ack + `, 
-		in_data => std_logic_vector(resize(unsigned(` + fb.In.Data + `), ` + strconv.Itoa(fb.GetVariableSize()) + `)),
+		in_req  => ` + cb.In.Req + `,
+		in_ack  => ` + cb.In.Ack + `, 
+		in_data => std_logic_vector(resize(unsigned(` + cb.In.Data + `), ` + strconv.Itoa(cb.GetVariableSize()) + `)),
 		-- Output channel
-		out_req => ` + fb.Out.Req + `,
-		out_ack => ` + fb.Out.Ack + `,
-		out_data  => ` + fb.Out.Data + `,
-
-		--External Interface
-		-- Input channel
-		` + fb.externalInterface.Name() + `_in_data  => ` + fb.externalInterface.Name() + `_in_data,
-		` + fb.externalInterface.Name() + `_in_req => ` + fb.externalInterface.Name() + `_in_req,
-		` + fb.externalInterface.Name() + `_in_ack => ` + fb.externalInterface.Name() + `_in_ack,
-		-- Output channel
-		` + fb.externalInterface.Name() + `_out_data => ` + fb.externalInterface.Name() + `_out_data,
-		` + fb.externalInterface.Name() + `_out_req => ` + fb.externalInterface.Name() + `_out_req,
-		` + fb.externalInterface.Name() + `_out_ack => ` + fb.externalInterface.Name() + `_out_ack
+		out_req => ` + cb.Out.Req + `,
+		out_ack => ` + cb.Out.Ack + `,
+		out_data  => ` + cb.Out.Data + `
 	);
 	`
 }
 
-func (fb *FuncBlock) getAliases() string {
+func (cb *CallBlock) getAliases() string {
 	ret := ""
 
-	for i, paramVar := range fb.paramsResults.Parameters.VariableList {
+	for i, paramVar := range cb.paramsResults.Parameters.VariableList {
 		is := strconv.Itoa(i)
 		if paramVar.IndexIdent_ == nil {
 			idx := getIndex(paramVar.Index_)
@@ -161,7 +140,7 @@ func (fb *FuncBlock) getAliases() string {
 		}
 	}
 
-	for i, resVar := range fb.paramsResults.Results.VariableList {
+	for i, resVar := range cb.paramsResults.Results.VariableList {
 		is := strconv.Itoa(i)
 		if resVar.IndexIdent_ == nil {
 			idx := getIndex(resVar.Index_)
@@ -177,10 +156,10 @@ func (fb *FuncBlock) getAliases() string {
 	return ret
 }
 
-func (fb *FuncBlock) getProcess() string {
+func (cb *CallBlock) getProcess() string {
 
 	variables := ""
-	for i, resVar := range fb.paramsResults.Results.VariableList {
+	for i, resVar := range cb.paramsResults.Results.VariableList {
 		if resVar.IndexIdent_ == nil {
 			is := strconv.Itoa(i)
 			variables += "variable offset_" + is + ": integer range 0 to out_data'length;\n"
@@ -198,7 +177,7 @@ func (fb *FuncBlock) getProcess() string {
 	delay := " after ADDER_DELAY"
 	compute := ""
 
-	for i, paramVar := range fb.paramsResults.Parameters.VariableList {
+	for i, paramVar := range cb.paramsResults.Parameters.VariableList {
 		if paramVar.IndexIdent_ != nil {
 			is := strconv.Itoa(i)
 			arrayParamMappings += "x_" + is + " <= in_data(baseX_" + is + " + (to_integer(unsigned(offsetX_" + is + ")) + 1) * x_" + is + "'length  - 1 downto baseX_" + is + " + to_integer(unsigned(offsetX_" + is + ")) * x_" + is + "'length);\n"
@@ -206,7 +185,7 @@ func (fb *FuncBlock) getProcess() string {
 	}
 
 	resultSignalOffset := 0
-	for i, resVar := range fb.paramsResults.Results.VariableList {
+	for i, resVar := range cb.paramsResults.Results.VariableList {
 		is := strconv.Itoa(i)
 		if resVar.IndexIdent_ != nil {
 			resultMap += "offset_" + is + " := baseR_" + is + " + to_integer(unsigned(offsetR_" + is + ") * result_" + is + "'length);\n"
@@ -214,7 +193,7 @@ func (fb *FuncBlock) getProcess() string {
 		}
 
 		totalSize := resVar.Size_ * resVar.Len_
-		compute += "result_" + is + " <=  " + fb.externalInterface.Name() + "_out_data( " + strconv.Itoa(resultSignalOffset+totalSize) + " - 1 downto " + strconv.Itoa(resultSignalOffset) + ")" + delay + ";\n"
+		compute += "result_" + is + " <=  scope_out_data( " + strconv.Itoa(resultSignalOffset+totalSize) + " - 1 downto " + strconv.Itoa(resultSignalOffset) + ")" + delay + ";\n"
 		resultSignalOffset += totalSize
 	}
 
@@ -222,44 +201,70 @@ func (fb *FuncBlock) getProcess() string {
 	end process;`
 }
 
-func (fb *FuncBlock) Architecture() string {
+func (cb *CallBlock) Architecture() string {
 	// TODO: analyze delays
+	// TODO: scopes with external interfaces?
 
-	externalIntfInput := ""
+	// TODO: instantiate scope + wirings
 
-	if len(fb.paramsResults.Parameters.VariableList) > 0 {
-		externalIntfInput += fb.externalInterface.Name() + "_in_data <= "
-		for i, _ := range fb.paramsResults.Parameters.VariableList {
+	scopeInput := ""
+
+	if len(cb.paramsResults.Parameters.VariableList) > 0 {
+		scopeInput += "scope_in_data <= "
+		for i, _ := range cb.paramsResults.Parameters.VariableList {
 			is := strconv.Itoa(i)
-			externalIntfInput += "x_" + is
+			scopeInput += "x_" + is
 
-			if i != len(fb.paramsResults.Parameters.VariableList)-1 {
-				externalIntfInput += " & "
+			if i != len(cb.paramsResults.Parameters.VariableList)-1 {
+				scopeInput += " & "
 			}
 		}
-		externalIntfInput += ";"
+		scopeInput += ";"
 	}
 
-	return `architecture ` + fb.archName + ` of ` + fb.EntityName() + ` is
-	` + fb.getAliases() + `
+	return `architecture ` + cb.archName + ` of ` + cb.EntityName() + ` is
+	` + cb.getAliases() + `
+	signal scope_in_req, scope_out_req, scope_in_ack, scope_out_ack : std_logic;
+	signal scope_in_data : std_logic_vector(` + strconv.Itoa(cb.funcIntf.FuncIntf().Results.Size) + ` - 1 downto 0);
+	signal scope_out_data : std_logic_vector(` + strconv.Itoa(cb.funcIntf.FuncIntf().Results.Size) + ` - 1 downto 0);
   begin
-    ` + fb.externalInterface.Name() + `_in_req <= in_req;
-    in_ack <= ` + fb.externalInterface.Name() + `_in_ack;
-    ` + fb.externalInterface.Name() + `_out_ack <= out_ack;
+    scope_in_req <= in_req;
+    in_ack <= scope_in_ack;
+	
+    out_req <= scope_out_req;
+    scope_out_ack <= out_ack;
 
-	` + externalIntfInput + `
+	` + scopeInput + `
+
+	` + cb.funcIntf.Name() + `: entity work.Scope(` + cb.funcIntf.Name() + `)
+    generic map(
+        DATA_IN_WIDTH => ` + strconv.Itoa(cb.funcIntf.FuncIntf().Parameters.Size) + `,
+        DATA_OUT_WIDTH => ` + strconv.Itoa(cb.funcIntf.FuncIntf().Results.Size) + `
+    )
+    port map (
+        rst => rst,
+        -- input channel
+        in_ack => scope_in_ack,
+        in_req => scope_in_req,
+        in_data => scope_in_Data,
+        -- Output channel
+        out_req => scope_out_req,
+        out_ack => scope_out_ack,
+        out_data => scope_out_data
+    );
+	 
     
     delay_req: entity work.delay_element
       generic map(
         NUM_LCELLS => 0  -- Delay  size
       )
       port map (
-        i => ` + fb.externalInterface.Name() + `_out_req,
+        i => scope_out_req,
         o => out_req
 	  );
 	  
-	  ` + fb.getProcess() + `
+	  ` + cb.getProcess() + `
 
-  end ` + fb.archName + `;
+  end ` + cb.archName + `;
   `
 }
