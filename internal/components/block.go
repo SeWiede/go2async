@@ -2,9 +2,7 @@ package components
 
 import (
 	"errors"
-	"fmt"
-	"go2async/internal/globalArguments"
-	infoprinter "go2async/internal/infoPrinter"
+	infoPrinter "go2async/internal/infoPrinter"
 	"go2async/pkg/variable"
 	"strconv"
 	"strings"
@@ -246,9 +244,7 @@ func (b *Block) componentsString() string {
 }
 
 func (b *Block) Entity() string {
-	if *globalArguments.Debug {
-		fmt.Printf("Generating unique block entity '%s'\n", b.EntityName())
-	}
+	infoPrinter.DebugPrintf("Generating unique block entity '%s'\n", b.EntityName())
 
 	externalInterfacesStr := ``
 	externalIntferacesGenericsStr := ``
@@ -364,7 +360,7 @@ func (b *Block) AddFunctionInterface(f *variable.VariableInfo) error {
 
 	b.ExternalInterfaces[f.Name_] = f.Copy()
 
-	infoprinter.DebugPrintf("added func %s to block %s\n", f.Name_, b.archName)
+	infoPrinter.DebugPrintf("added func %s to block %s\n", f.Name_, b.archName)
 
 	return nil
 }
@@ -374,9 +370,7 @@ func (b *Block) GetAndAssignFunctionInterface(fname string) (*variable.VariableI
 		return f, nil
 	}
 
-	if *globalArguments.Debug {
-		fmt.Printf("Function '%s' not found at block %s - searching parent\n", fname, b.archName)
-	}
+	infoPrinter.DebugPrintf("Function '%s' not found at block %s - searching parent\n", fname, b.archName)
 
 	if b.parent != nil {
 		f, err := b.parent.GetAndAssignFunctionInterface(fname)
@@ -385,9 +379,7 @@ func (b *Block) GetAndAssignFunctionInterface(fname string) (*variable.VariableI
 			fiCopy := f.Copy()
 			b.ExternalInterfaces[f.Name_] = fiCopy
 
-			if *globalArguments.Debug {
-				fmt.Printf("Found function '%s' on parent stack and registerd function '%s' at block %s\n", f.Name_, f.Name_, b.archName)
-			}
+			infoPrinter.DebugPrintf("Found function '%s' on parent stack and registerd function '%s' at block %s\n", f.Name_, f.Name_, b.archName)
 
 			return fiCopy, nil
 		}

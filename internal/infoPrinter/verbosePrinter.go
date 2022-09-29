@@ -1,4 +1,4 @@
-package infoprinter
+package infoPrinter
 
 import (
 	"fmt"
@@ -10,6 +10,10 @@ func VerbosePrintf(formatString string, a ...interface{}) (n int, err error) {
 		return fmt.Printf(formatString, a...)
 	}
 	return 0, nil
+}
+
+func VerbosePrintfln(formatString string, a ...interface{}) (n int, err error) {
+	return VerbosePrintf(formatString+"\n", a)
 }
 
 func VerbosePrintln(a ...interface{}) (n int, err error) {

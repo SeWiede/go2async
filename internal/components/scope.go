@@ -1,8 +1,7 @@
 package components
 
 import (
-	"fmt"
-	"go2async/internal/globalArguments"
+	infoPrinter "go2async/internal/infoPrinter"
 	"go2async/pkg/variable"
 	"strconv"
 	"strings"
@@ -87,9 +86,7 @@ func (s *Scope) EntityName() string {
 }
 
 func (s *Scope) Entity() string {
-	if *globalArguments.Debug {
-		fmt.Printf("Generating unique block entity '%s'\n", s.EntityName())
-	}
+	infoPrinter.DebugPrintf("Generating unique block entity '%s'\n", s.EntityName())
 
 	externalInterfacesStr := ``
 	externalIntferacesGenericsStr := ``

@@ -7,7 +7,7 @@ import (
 	"go/parser"
 	"go/token"
 	"go2async/internal/components"
-	infoprinter "go2async/internal/infoPrinter"
+	infoPrinter "go2async/internal/infoPrinter"
 	"go2async/pkg/variable"
 	"io/ioutil"
 	"os"
@@ -255,7 +255,7 @@ func (g *Generator) HandleAssignmentStmt(s *ast.AssignStmt, parent *components.B
 		if err != nil {
 			funcIntf, ok = g.functions[funcName]
 			if ok {
-				infoprinter.DebugPrintf("func '%s' is a function in the package\n", funcName)
+				infoPrinter.DebugPrintf("func '%s' is a function in the package\n", funcName)
 				isPackageFunction = true
 			} else {
 				return nil, g.peb.NewParseError(s, err)
@@ -310,7 +310,7 @@ func (g *Generator) HandleAssignmentStmt(s *ast.AssignStmt, parent *components.B
 			return nil, g.peb.NewParseError(s, err)
 		}
 
-		infoprinter.DebugPrintf("Function params of '%s' were of correct type\n", funcIntf.Name())
+		infoPrinter.DebugPrintf("Function params of '%s' were of correct type\n", funcIntf.Name())
 
 		var newFuncBlk components.BodyComponentType
 		if !isPackageFunction {
@@ -347,7 +347,7 @@ func (g *Generator) GenerateBinaryExpressionFuncBlock(result *variable.VariableI
 
 	switch t := xexpr.(type) {
 	case *ast.BinaryExpr:
-		infoprinter.DebugPrintln("nested binary expression left: ", t.X, t.Op.String(), t.Y)
+		infoPrinter.DebugPrintln("nested binary expression left: ", t.X, t.Op.String(), t.Y)
 
 		g.GenerateBinaryExpressionFuncBlock(result, t, parent)
 		x = result
@@ -393,7 +393,7 @@ func (g *Generator) GenerateBinaryExpressionFuncBlock(result *variable.VariableI
 
 	switch t := yexpr.(type) {
 	case *ast.BinaryExpr:
-		infoprinter.DebugPrintln("nested binary expression right: ", t.X, t.Op.String(), t.Y)
+		infoPrinter.DebugPrintln("nested binary expression right: ", t.X, t.Op.String(), t.Y)
 		return nil, g.peb.NewParseError(be, errors.New("Binary expression in right side of binary expression not allowed"))
 	case *ast.BasicLit:
 		y = &variable.VariableInfo{
@@ -435,7 +435,7 @@ func (g *Generator) GenerateBinaryExpressionFuncBlock(result *variable.VariableI
 		return nil, g.peb.NewParseError(be, errors.New("Invalid type in binary expression: "+ref.String()))
 	}
 
-	infoprinter.DebugPrintln("generating func: ", result.Name_, " = ", x.Name_, " ", operation, " ", y.Name_, " const: ", y.Const_)
+	infoPrinter.DebugPrintln("generating func: ", result.Name_, " = ", x.Name_, " ", operation, " ", y.Name_, " const: ", y.Const_)
 
 	newFuncBlk := components.NewBinExprBlock(operation, &components.OperandInfo{
 		R: result,
@@ -764,7 +764,7 @@ func (g *Generator) GenerateBlock(stmts []ast.Stmt, toplevelStatement bool, pare
 func (g *Generator) parseVariableFieldList(fl *ast.FieldList) ([]*variable.VariableTypeDecl, error) {
 	ret := []*variable.VariableTypeDecl{}
 
-	infoprinter.DebugPrintf("Parsing variableFieldList\n")
+	infoPrinter.DebugPrintf("Parsing variableFieldList\n")
 
 	for _, param := range fl.List {
 		if len(param.Names) > 0 {
@@ -776,7 +776,7 @@ func (g *Generator) parseVariableFieldList(fl *ast.FieldList) ([]*variable.Varia
 
 				paramVar.Name_ = p.Name
 
-				infoprinter.DebugPrintf("Got var %s len %d type %s\n", paramVar.Name_, paramVar.Len_, paramVar.Typ_)
+				infoPrinter.DebugPrintf("Got var %s len %d type %s\n", paramVar.Name_, paramVar.Len_, paramVar.Typ_)
 
 				ret = append(ret, paramVar)
 			}
@@ -786,12 +786,12 @@ func (g *Generator) parseVariableFieldList(fl *ast.FieldList) ([]*variable.Varia
 				return nil, err
 			}
 
-			infoprinter.DebugPrintf("Got var %s len %d type %s\n", paramVar.Name_, paramVar.Len_, paramVar.Typ_)
+			infoPrinter.DebugPrintf("Got var %s len %d type %s\n", paramVar.Name_, paramVar.Len_, paramVar.Typ_)
 			ret = append(ret, paramVar)
 		}
 	}
 
-	infoprinter.DebugPrintf("Done parsing variableFieldList\n")
+	infoPrinter.DebugPrintf("Done parsing variableFieldList\n")
 
 	return ret, nil
 }
@@ -986,7 +986,7 @@ func (g *Generator) ParseGoFile(file string) error {
 
 	// fetch function prototypes first
 
-	infoprinter.DebugPrintf("Parsing functions\n")
+	infoPrinter.DebugPrintf("Parsing functions\n")
 
 	for _, decl := range f.Decls {
 		switch x := decl.(type) {
@@ -1000,11 +1000,11 @@ func (g *Generator) ParseGoFile(file string) error {
 
 			g.functions[vi.Name_] = vi
 
-			infoprinter.DebugPrintf("Added function %s paramSize %d resultSize %d\n", vi.Name_, vi.FuncIntf_.Parameters.Size, vi.FuncIntf_.Results.Size)
+			infoPrinter.DebugPrintf("Added function %s paramSize %d resultSize %d\n", vi.Name_, vi.FuncIntf_.Parameters.Size, vi.FuncIntf_.Results.Size)
 		}
 	}
 
-	infoprinter.DebugPrintf("Parsing functions done\n")
+	infoPrinter.DebugPrintf("Parsing functions done\n")
 
 	for _, decl := range f.Decls {
 		switch x := decl.(type) {
@@ -1030,7 +1030,7 @@ func (g *Generator) GenerateVHDL() string {
 		if _, ok := entityTracker[c.EntityName()]; !ok {
 			entityTracker[c.EntityName()] = true
 
-			infoprinter.DebugPrintf("Adding entity '%s'\n", c.EntityName())
+			infoPrinter.DebugPrintf("Adding entity '%s'\n", c.EntityName())
 
 			// prefix entity if not already added
 			ret = c.Entity() + ret
@@ -1043,7 +1043,7 @@ func (g *Generator) GenerateVHDL() string {
 		if _, ok := entityTracker[s.EntityName()]; !ok {
 			entityTracker[s.EntityName()] = true
 
-			infoprinter.DebugPrintf("Adding entity '%s'\n", s.EntityName())
+			infoPrinter.DebugPrintf("Adding entity '%s'\n", s.EntityName())
 
 			// prefix entity if not already added
 			ret = s.Entity() + ret

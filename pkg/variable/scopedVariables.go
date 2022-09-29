@@ -2,7 +2,7 @@ package variable
 
 import (
 	"errors"
-	infoprinter "go2async/internal/infoPrinter"
+	infoPrinter "go2async/internal/infoPrinter"
 	"strconv"
 )
 
@@ -129,7 +129,7 @@ func (sv *ScopedVariables) AddVariable(v VariableDef) (*VariableInfo, error) {
 
 	sv.Variables[v.Name()] = newV
 
-	infoprinter.VerbosePrintf("Allocated %s at pos %d downto %d\n", v.Name(), (sv.Size)+(v.Len()*typeSize)-1, (sv.Size))
+	infoPrinter.VerbosePrintf("Allocated %s at pos %d downto %d\n", v.Name(), (sv.Size)+(v.Len()*typeSize)-1, (sv.Size))
 
 	sv.Size += typeSize * v.Len()
 

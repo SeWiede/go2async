@@ -1,4 +1,4 @@
-package infoprinter
+package infoPrinter
 
 import (
 	"fmt"
@@ -10,6 +10,10 @@ func DebugPrintf(formatString string, a ...interface{}) (n int, err error) {
 		return fmt.Printf(formatString, a...)
 	}
 	return 0, nil
+}
+
+func DebugPrintfln(formatString string, a ...interface{}) (n int, err error) {
+	return DebugPrintf(formatString+"\n", a)
 }
 
 func DebugPrintln(a ...interface{}) (n int, err error) {

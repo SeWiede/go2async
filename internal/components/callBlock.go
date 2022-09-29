@@ -2,7 +2,7 @@ package components
 
 import (
 	"errors"
-	infoprinter "go2async/internal/infoPrinter"
+	infoPrinter "go2async/internal/infoPrinter"
 	"go2async/pkg/variable"
 	"strconv"
 )
@@ -75,7 +75,7 @@ func (cb *CallBlock) EntityName() string {
 }
 
 func (cb *CallBlock) Entity() string {
-	infoprinter.DebugPrintf("Generating unique callBlock entity '%s'\n", cb.EntityName())
+	infoPrinter.DebugPrintf("Generating unique callBlock entity '%s'\n", cb.EntityName())
 
 	return `LIBRARY IEEE;
 	USE IEEE.STD_LOGIC_1164.ALL;
