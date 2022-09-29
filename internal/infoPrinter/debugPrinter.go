@@ -7,25 +7,25 @@ import (
 
 func DebugPrintf(formatString string, a ...interface{}) (n int, err error) {
 	if *globalArguments.Debug {
-		return fmt.Printf(formatString, a...)
+		return fmt.Printf("[DEBUG]: "+formatString, a...)
 	}
 	return 0, nil
 }
 
 func DebugPrintfln(formatString string, a ...interface{}) (n int, err error) {
-	return DebugPrintf(formatString+"\n", a)
+	return DebugPrintf("[DEBUG]: "+formatString+"\n", a)
 }
 
 func DebugPrintln(a ...interface{}) (n int, err error) {
 	if *globalArguments.Debug {
-		return fmt.Println(a...)
+		return fmt.Println(append([]interface{}{"[DEBUG]: "}, a...)...)
 	}
 	return 0, nil
 }
 
 func DebugPrint(a ...interface{}) (n int, err error) {
 	if *globalArguments.Debug {
-		return fmt.Print(a...)
+		return fmt.Print(append([]interface{}{"[DEBUG]: "}, a...)...)
 	}
 	return 0, nil
 }

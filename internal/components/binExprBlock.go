@@ -3,6 +3,7 @@ package components
 import (
 	"fmt"
 	"go2async/internal/globalArguments"
+	"go2async/internal/infoPrinter"
 	"go2async/pkg/variable"
 	"strconv"
 )
@@ -73,7 +74,7 @@ func NewBinExprBlock(op string, vi *OperandInfo, parent *Block) *BinExprBlock {
 
 		opDescription += fmt.Sprintf("\n")
 
-		fmt.Print(opDescription)
+		infoPrinter.DebugPrint(opDescription)
 		ret.opDescription = opDescription
 	}
 
