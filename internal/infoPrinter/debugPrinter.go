@@ -13,7 +13,7 @@ func DebugPrintf(formatString string, a ...interface{}) (n int, err error) {
 }
 
 func DebugPrintfln(formatString string, a ...interface{}) (n int, err error) {
-	return DebugPrintf("[DEBUG]: "+formatString+"\n", a)
+	return DebugPrintf(formatString+"\n", a)
 }
 
 func DebugPrintln(a ...interface{}) (n int, err error) {
