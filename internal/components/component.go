@@ -1,6 +1,10 @@
 package components
 
-import "go2async/pkg/variable"
+import (
+	"errors"
+	"go2async/pkg/variable"
+	"strconv"
+)
 
 const archPrefix = "beh_"
 const defaultArch = "behavioural"
@@ -9,6 +13,7 @@ var zero = 0
 var one = 1
 
 type Component interface {
+	Name() string
 	ArchName() string
 	ComponentStr() string
 	Architecture() string
@@ -22,10 +27,24 @@ type BodyComponentType interface {
 	OutChannel() *HandshakeChannel
 
 	GetVariableSize() int
+
+	Predecessors() []BodyComponentType
+	AddPredecessor(BodyComponentType)
+	Successors() []BodyComponentType
+	AddSuccessor(BodyComponentType)
+
+	InputVariables() []*variable.VariableInfo
+	AddInputVariable(*variable.VariableInfo)
+	OutputVariables() []*variable.VariableInfo
+	AddOutputVariable(*variable.VariableInfo)
+
+	GetVariableLocation(string) (string, error)
 }
 
 type BodyComponent struct {
-	parent *Block
+	parentBlock *Block
+
+	number int
 
 	archName string
 
@@ -33,19 +52,29 @@ type BodyComponent struct {
 	Out *HandshakeChannel
 
 	variableSize int
+
+	predecessors []BodyComponentType
+	successors   []BodyComponentType
+
+	inputVariables  []*variable.VariableInfo
+	outputVariables []*variable.VariableInfo
 }
 
 // Type checks
+func (bc *BodyComponent) Name() string {
+	return strconv.Itoa(bc.number) + "__RESERVED__"
+}
+
 func (bc *BodyComponent) ArchName() string {
 	return bc.archName
 }
 
-func (bc *BodyComponent) ScopedVariables() *variable.ScopedVariables {
-	return bc.Parent().ScopedVariables()
+func (bc *BodyComponent) GetScopedVariables() *variable.ScopedVariables {
+	return bc.Parent().GetScopedVariables()
 }
 
 func (bc *BodyComponent) Parent() *Block {
-	return bc.parent
+	return bc.parentBlock
 }
 
 func (bc *BodyComponent) InChannel() *HandshakeChannel {
@@ -58,4 +87,40 @@ func (bc *BodyComponent) OutChannel() *HandshakeChannel {
 
 func (bc *BodyComponent) GetVariableSize() int {
 	return bc.variableSize
+}
+
+func (bc *BodyComponent) Predecessors() []BodyComponentType {
+	return bc.predecessors
+}
+
+func (bc *BodyComponent) AddPredecessor(bct BodyComponentType) {
+	bc.predecessors = append(bc.predecessors, bct)
+}
+
+func (bc *BodyComponent) Successors() []BodyComponentType {
+	return bc.successors
+}
+
+func (bc *BodyComponent) AddSuccessor(bct BodyComponentType) {
+	bc.successors = append(bc.successors, bct)
+}
+
+func (bc *BodyComponent) InputVariables() []*variable.VariableInfo {
+	return bc.inputVariables
+}
+
+func (bc *BodyComponent) AddInputVariable(vtd *variable.VariableInfo) {
+	bc.inputVariables = append(bc.inputVariables, vtd)
+}
+
+func (bc *BodyComponent) OutputVariables() []*variable.VariableInfo {
+	return bc.outputVariables
+}
+
+func (bc *BodyComponent) AddOutputVariable(vtd *variable.VariableInfo) {
+	bc.outputVariables = append(bc.outputVariables, vtd)
+}
+
+func (bc *BodyComponent) GetVariableLocation(name string) (string, error) {
+	return "", errors.New("not implemented")
 }

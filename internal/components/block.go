@@ -11,10 +11,20 @@ import (
 const blockPrefix = "B_"
 const defaultBlockEntityName = "BlockC"
 
+func ErrVariableNotFound(v string) error {
+	return errors.New("Variable '" + v + "' not found.")
+}
+
 type regBodyPair struct {
 	Reg *Reg
 	Bc  BodyComponentType
 }
+
+type variableOwner struct {
+	bc BodyComponentType
+	vi *variable.VariableInfo
+}
+
 type Block struct {
 	BodyComponent
 	Nr int
@@ -27,19 +37,16 @@ type Block struct {
 
 	ExternalInterfaces map[string]*variable.VariableInfo
 
+	VariableOwner map[string]*variableOwner
+
 	OutputSize int
 }
 
-func NewScopedVariables(parent *Block) *variable.ScopedVariables {
-	parentSize := 0
-	if parent != nil {
-		parentSize = parent.ScopedVariables().Size
-	}
-
+func NewScopedVariables() *variable.ScopedVariables {
 	return &variable.ScopedVariables{
 		Variables:    make(map[string]*variable.VariableInfo),
 		VariableList: []*variable.VariableInfo{},
-		Size:         parentSize,
+		Size:         0,
 		ParamPos:     0,
 	}
 }
@@ -51,8 +58,10 @@ func NewBlock(toplevel bool, parent *Block) *Block {
 	blockNr++
 
 	name := strings.ToLower(blockPrefix + strconv.Itoa(nr))
+
 	b := &Block{
 		BodyComponent: BodyComponent{
+			number:   nr,
 			archName: archPrefix + name,
 			In: &HandshakeChannel{
 				Req:  "in_req",
@@ -66,16 +75,16 @@ func NewBlock(toplevel bool, parent *Block) *Block {
 				Data: "bl_" + strconv.Itoa(nr) + "_data_out",
 				Out:  true,
 			},
-			parent:       parent,
+			parentBlock:  parent,
 			variableSize: parent.GetCurrentVariableSize(),
 		},
 
-		Nr:       nr,
 		TopLevel: toplevel,
 
-		scopedVariables: NewScopedVariables(parent),
+		scopedVariables: NewScopedVariables(),
 
 		ExternalInterfaces: make(map[string]*variable.VariableInfo),
+		VariableOwner:      make(map[string]*variableOwner),
 	}
 
 	return b
@@ -84,9 +93,10 @@ func NewBlock(toplevel bool, parent *Block) *Block {
 func NewParamDummyBlock(params map[string]*variable.VariableInfo) *Block {
 	ret := &Block{
 		ExternalInterfaces: make(map[string]*variable.VariableInfo),
+		VariableOwner:      make(map[string]*variableOwner),
 	}
 
-	ret.parent = nil
+	ret.parentBlock = nil
 	ret.scopedVariables = &variable.ScopedVariables{
 		Variables: params,
 	}
@@ -96,7 +106,13 @@ func NewParamDummyBlock(params map[string]*variable.VariableInfo) *Block {
 		ret.scopedVariables.Size += v.Len_ * v.Size_
 	}
 
+	ret.archName = "DummyBlock"
+
 	return ret
+}
+
+func (b *Block) Name() string {
+	return strings.ToLower(blockPrefix + strconv.Itoa(b.number))
 }
 
 func (b *Block) AddComponent(bodyComponent BodyComponentType) {
@@ -139,7 +155,7 @@ func (b *Block) EntityName() string {
 }
 
 func (b *Block) ComponentStr() string {
-	name := blockPrefix + strconv.Itoa(b.Nr)
+	name := b.Name()
 
 	dataInWidth := strconv.Itoa(b.GetVariableSize())
 	dataOutWidth := dataInWidth
@@ -186,17 +202,18 @@ func (b *Block) ComponentStr() string {
   port map (
 	rst => rst,
 	-- Input channel
-	in_ack => ` + b.In.Ack + `,
-	in_req => ` + b.In.Req + `,
-	in_data => std_logic_vector(resize(unsigned(` + b.In.Data + `), ` + strconv.Itoa(b.GetVariableSize()) + `)),
+	in_req => ` + b.Name() + `_in_req,
+	in_ack => ` + b.Name() + `_in_ack,
+	in_data => ` + b.Name() + `_in_data,
 	-- Output channel
-	out_req => ` + b.Out.Req + `,
-	out_data => ` + b.Out.Data + `,
-	out_ack => ` + b.Out.Ack + comma + `
+	out_req => ` + b.Name() + `_out_req,
+	out_ack => ` + b.Name() + `_out_ack,
+	out_data => ` + b.Name() + `_out_data ` + comma + `
 	-- External interfaces
 	` + externalInterfacesStr + `
   );
   `
+	//in_data => std_logic_vector(resize(unsigned(` + b.In.Data + `), ` + strconv.Itoa(b.GetVariableSize()) + `)),
 }
 
 func (b *Block) signalDefs() string {
@@ -208,9 +225,9 @@ func (b *Block) signalDefs() string {
 
 	for _, c := range b.RegBlockPairs {
 		if c.Reg != nil {
-			ret += SignalsString(c.Reg.OutChannel())
+			ret += c.Reg.OutChannel().SignalsString()
 		}
-		ret += SignalsString(c.Bc.OutChannel())
+		ret += c.Bc.OutChannel().SignalsString()
 	}
 
 	return ret
@@ -235,9 +252,9 @@ func (b *Block) componentsString() string {
 	ret := ""
 	for _, c := range b.RegBlockPairs {
 		if c.Reg != nil {
-			ret += c.Reg.ComponentStr()
+			ret += c.Reg.ComponentStr() + "\n"
 		}
-		ret += c.Bc.ComponentStr()
+		ret += c.Bc.ComponentStr() + "\n"
 	}
 
 	return ret
@@ -303,21 +320,35 @@ func (b *Block) Entity() string {
 		` + externalInterfacesStr +
 		`
 	  );
-	END ` + b.EntityName() + `;`
+	  END ` + b.EntityName() + `;`
 
 	return ret
 }
 
 func (b *Block) Architecture() string {
+	// Determine how many forks and joins are needed
+
+	//signalDefs := b.signalDefs()
+	dataSignalAssignments := b.getDefaultSignalAssignments()
+
+	signalDefs, forks, joins := b.getSignalDefsJoinsAndForks()
+
+	handshakeOverwrites := b.getHandshakeOverwrites(forks, joins)
+
 	ret := `architecture ` + b.archName + ` of ` + b.EntityName() + ` is
 	`
+	ret += signalDefs
 
-	ret += b.signalDefs()
 	ret += "\n"
 	ret += "begin"
 	ret += "\n"
 
-	ret += b.ioChannels()
+	ret += dataSignalAssignments
+	ret += "\n"
+
+	ret += handshakeOverwrites
+	ret += "\n"
+	//ret += b.ioChannels()
 
 	ret += "\n"
 
@@ -328,7 +359,7 @@ func (b *Block) Architecture() string {
 	return ret
 }
 
-func (b *Block) ScopedVariables() *variable.ScopedVariables {
+func (b *Block) GetScopedVariables() *variable.ScopedVariables {
 	return b.scopedVariables
 }
 
@@ -336,21 +367,73 @@ func (b *Block) GetCurrentVariableSize() int {
 	return b.scopedVariables.Size
 }
 
-func (b *Block) NewVariable(decl *variable.VariableTypeDecl) (*variable.VariableInfo, error) {
-	return b.ScopedVariables().AddVariable(decl)
+func (b *Block) NewScopeVariable(decl variable.VariableDef) (*variable.VariableInfo, error) {
+	infoPrinter.DebugPrintfln("Adding variable %s to block %s", decl.Name(), b.archName)
+
+	vi, err := b.GetScopedVariables().AddVariable(decl)
+	if err != nil {
+		return nil, err
+	}
+
+	b.VariableOwner[decl.Name()] = &variableOwner{
+		bc: b,
+		vi: vi,
+	}
+
+	return vi, nil
 }
 
 func (b *Block) GetVariable(name string) (*variable.VariableInfo, error) {
-	v, err := b.ScopedVariables().GetVariableInfo(name)
-	if err != nil {
+	infoPrinter.DebugPrintfln("Getting variable %s in block %s", name, b.Name())
+
+	own, ok := b.VariableOwner[name]
+	if ok {
+		infoPrinter.DebugPrintfln("Variable %s's owner is %s", name, own.bc.Name())
+		return own.vi, nil
+	} else {
 		if b.Parent() == nil {
+			return nil, ErrVariableNotFound(name)
+		}
+
+		// Get variable info form parent.
+		vi, err := b.Parent().GetVariable(name)
+		if err != nil {
 			return nil, err
 		}
 
-		return b.Parent().GetVariable(name)
-	} else {
-		return v, nil
+		prevComps := b.Predecessors()
+		prevComps = append(prevComps, b.Parent())
+
+		nextComps := b.Parent().Successors()
+		nextComps = append(nextComps, b)
+
+		// Track variables that are coming from outside this block's scope.
+		vi, err = b.NewScopeVariable(vi)
+		if err != nil {
+			return nil, err
+		}
+
+		// New owner of variable in current block is the current block.
+		b.VariableOwner[vi.Name()] = &variableOwner{
+			bc: b,
+			vi: vi,
+		}
+
+		b.inputVariables = append(b.inputVariables, vi)
+		b.outputVariables = append(b.outputVariables, vi)
+
+		infoPrinter.DebugPrintfln("Variable %s is from outside %s's scope. Added.", name, b.Name())
+
+		return vi, nil
 	}
+
+	/* v, err := b.GetScopedVariables().GetVariableInfo(name)
+	if err != nil {
+
+	} else {
+		infoPrinter.DebugPrintfln("Variable %s's owner is %s", name, own.bc.Name())
+		return v, nil
+	} */
 }
 
 func (b *Block) AddFunctionInterface(f *variable.VariableInfo) error {
@@ -360,7 +443,7 @@ func (b *Block) AddFunctionInterface(f *variable.VariableInfo) error {
 
 	b.ExternalInterfaces[f.Name_] = f.Copy()
 
-	infoPrinter.DebugPrintf("added func %s to block %s\n", f.Name_, b.archName)
+	infoPrinter.DebugPrintf("Added func %s to block %s\n", f.Name_, b.archName)
 
 	return nil
 }
@@ -372,8 +455,8 @@ func (b *Block) GetAndAssignFunctionInterface(fname string) (*variable.VariableI
 
 	infoPrinter.DebugPrintf("Function '%s' not found at block %s - searching parent\n", fname, b.archName)
 
-	if b.parent != nil {
-		f, err := b.parent.GetAndAssignFunctionInterface(fname)
+	if b.parentBlock != nil {
+		f, err := b.parentBlock.GetAndAssignFunctionInterface(fname)
 		if err == nil {
 			// parent-stack had the function defined: add the interface to block
 			fiCopy := f.Copy()
@@ -386,4 +469,302 @@ func (b *Block) GetAndAssignFunctionInterface(fname string) (*variable.VariableI
 	}
 
 	return nil, errors.New("No function defined for " + fname)
+}
+
+func (b *Block) GetVariableLocation(name string) (string, error) {
+
+	sv, err := b.scopedVariables.GetVariableInfo(name)
+	if err != nil {
+		return "", err
+	}
+
+	idx := getIndex(sv.Index_)
+	totalSize := sv.TotalSize()
+	if idx > 0 {
+		totalSize = sv.Size_
+	}
+
+	position := strconv.Itoa(sv.Position_+totalSize*(idx+1)) + " - 1 downto " + strconv.Itoa(sv.Position_+totalSize*idx)
+
+	return b.Name() + "_in_data(" + position + ")", nil
+}
+
+func (b *Block) getSignalDefsJoinsAndForks() (string, []*MultiHsFork, []*MultiHsJoin) {
+	joins := []*MultiHsJoin{}
+	forks := []*MultiHsFork{}
+	signalDefs := ""
+
+	for i, rbp := range b.RegBlockPairs {
+		currentComponent := rbp.Bc
+
+		if rbp.Reg != nil {
+			panic("block arch: registers not implemented!")
+		}
+
+		signalDefs += "signal " + currentComponent.Name() + "_in_req : std_logic;"
+		signalDefs += "signal " + currentComponent.Name() + "_out_req : std_logic;"
+		signalDefs += "signal " + currentComponent.Name() + "_in_ack : std_logic;"
+		signalDefs += "signal " + currentComponent.Name() + "_out_ack : std_logic;"
+
+		if bep, ok := currentComponent.(*BinExprBlock); ok {
+			signalDefs += "signal " + currentComponent.Name() + "_x : std_logic_vector(" + strconv.Itoa(bep.GetXTotalSize()) + "- 1 downto 0);"
+			signalDefs += "signal " + currentComponent.Name() + "_y : std_logic_vector(" + strconv.Itoa(bep.GetYTotalSize()) + "- 1 downto 0);"
+			signalDefs += "signal " + currentComponent.Name() + "_result : std_logic_vector(" + strconv.Itoa(bep.GetRTotalSize()) + "- 1 downto 0);"
+		} else {
+			signalDefs += "signal " + currentComponent.Name() + "_in_data : std_logic_vector(" + strconv.Itoa(currentComponent.GetVariableSize()) + "- 1 downto 0);"
+			signalDefs += "signal " + currentComponent.Name() + "_out_data : std_logic_vector(" + strconv.Itoa(currentComponent.GetVariableSize()) + "- 1 downto 0);"
+		}
+
+		signalDefs += "\n"
+
+		//invs := bc.InputVariables()
+
+		joinNeeded := false
+		forkNeeded := false
+
+		prevCs := currentComponent.Predecessors()
+		nextCs := currentComponent.Successors()
+
+		infoPrinter.DebugPrintfln("%s's %d. child %s; %d predecessors %d successors", b.Name(), i+1, currentComponent.Name(), len(prevCs), len(nextCs))
+
+		for i, _ := range prevCs {
+			if i+1 >= len(prevCs) {
+				break
+			}
+
+			if prevCs[i].Name() != prevCs[i+1].Name() {
+				joinNeeded = true
+			}
+		}
+
+		for i, _ := range nextCs {
+			if i+1 >= len(nextCs) {
+				break
+			}
+
+			if nextCs[i].Name() != nextCs[i+1].Name() {
+				forkNeeded = true
+			}
+		}
+
+		if joinNeeded {
+			// Add Join to block
+			newJoin, _ := NewMultiHsJoin(prevCs, currentComponent)
+			joins = append(joins, newJoin)
+
+			b.RegBlockPairs = append(b.RegBlockPairs, &regBodyPair{
+				Bc: newJoin,
+			})
+
+			signalDefs += "signal " + newJoin.Name() + "_in_req : std_logic_vector(" + strconv.Itoa(newJoin.NumHsComponents) + "- 1 downto 0);"
+			signalDefs += "signal " + newJoin.Name() + "_out_req : std_logic;"
+
+			signalDefs += "signal " + newJoin.Name() + "_in_ack : std_logic_vector(" + strconv.Itoa(newJoin.NumHsComponents) + "- 1 downto 0);"
+			signalDefs += "signal " + newJoin.Name() + "_out_ack : std_logic;"
+
+			signalDefs += "\n"
+		}
+
+		if forkNeeded {
+			// Add Fork to block
+			newFork, _ := NewMultiHsFork(nextCs, currentComponent)
+			forks = append(forks, newFork)
+
+			b.RegBlockPairs = append(b.RegBlockPairs, &regBodyPair{
+				Bc: newFork,
+			})
+
+			signalDefs += "signal " + newFork.Name() + "_in_req : std_logic;"
+			signalDefs += "signal " + newFork.Name() + "_out_req : std_logic_vector(" + strconv.Itoa(newFork.NumHsComponents) + "- 1 downto 0);"
+
+			signalDefs += "signal " + newFork.Name() + "_in_ack : std_logic;"
+			signalDefs += "signal " + newFork.Name() + "_out_ack : std_logic_vector(" + strconv.Itoa(newFork.NumHsComponents) + "- 1 downto 0);"
+		}
+
+		infoPrinter.DebugPrintfln("%s: forks (%t) joins (%t)", b.Name(), forkNeeded, joinNeeded)
+	}
+
+	return signalDefs, forks, joins
+}
+
+func (b *Block) getDefaultSignalAssignments() string {
+	signalAssignments := ""
+
+	for _, rbp := range b.RegBlockPairs {
+		currentComponent := rbp.Bc
+
+		// Signal assigments
+
+		// signalAssignments :=
+		/* signalAssignments += currentComponent.Name() + "_in_req <= " + owner.bc.Name() + "_out_req;"
+		signalAssignments += currentComponent.Name() + "<= " + owner.bc.Name() + "_out_req;"
+		signalAssignments += currentComponent.Name() + "<= " + owner.bc.Name() + "_in_ack;"
+		signalAssignments += currentComponent.Name() + "<= " + owner.bc.Name() + "_out_ack;" */
+
+		// gather all inputs
+
+		inputAssignment := ""
+
+		if _, ok := currentComponent.(*BinExprBlock); ok {
+
+		} else {
+			signalAssignments += currentComponent.Name() + "_in_data <= "
+		}
+
+		infoPrinter.DebugPrintfln("%s's has %d inputs", currentComponent.Name(), len(currentComponent.InputVariables()))
+
+		// default predecessor and successor is the parent block.
+
+		for i, input := range currentComponent.InputVariables() {
+			currentInputAssignment := ""
+			var err error
+
+			owner, ok := b.VariableOwner[input.Name_]
+			if input.Const_ != "" {
+				currentInputAssignment += "std_logic_vector(to_signed(" + input.Const_ + ", "
+
+				if i == 0 {
+					currentInputAssignment += currentComponent.Name() + "_x'length"
+				} else if i == 1 {
+					currentInputAssignment += currentComponent.Name() + "_y'length"
+				}
+
+				currentInputAssignment += "))"
+			} else {
+				if !ok {
+					/* inputAssignment += "<???>"
+					infoPrinter.DebugPrintfln("%s's input var %s not found!", currentComponent.Name(), input.Name_) */
+					panic("Could not find var " + input.Name_ + "'s owner")
+				}
+
+				currentInputAssignment, err = owner.bc.GetVariableLocation(input.Name_)
+				if err != nil {
+					panic(err.Error())
+				}
+
+				if owner.bc.Name() == b.Name() {
+					currentInputAssignment = strings.TrimPrefix(currentInputAssignment, b.Name()+"_")
+				}
+
+			}
+
+			if bep, ok := currentComponent.(*BinExprBlock); ok {
+				if i == 0 {
+					signalAssignments += bep.Name() + "_x <= " + currentInputAssignment + ";\n"
+				} else if i == 1 {
+					signalAssignments += bep.Name() + "_y <= " + currentInputAssignment + ";\n"
+				}
+			} else {
+
+				inputAssignment += currentInputAssignment
+
+				if i+1 < len(currentComponent.InputVariables()) {
+					inputAssignment += " & "
+				} else {
+					signalAssignments += inputAssignment + ";\n"
+				}
+			}
+
+			infoPrinter.DebugPrintfln("%s's input var %s comes from %s", currentComponent.Name(), input.Name_, currentInputAssignment)
+		}
+
+		// In case of fork/joins some of these values are overwritten later
+
+		predecessor := b.Name()
+		defaultPredecessor := true
+		if len(currentComponent.Predecessors()) > 0 {
+			predecessor = currentComponent.Predecessors()[0].Name()
+			defaultPredecessor = false
+		}
+
+		if predecessor == b.Name() {
+			defaultPredecessor = true
+		}
+
+		successor := b.Name()
+		defaultSuccessor := true
+		if len(currentComponent.Successors()) > 0 {
+			successor = currentComponent.Successors()[0].Name()
+			defaultSuccessor = false
+		}
+
+		if successor == b.Name() {
+			defaultSuccessor = true
+		}
+
+		connection := predecessor + "_out_req"
+		if defaultPredecessor {
+			connection = "in_req"
+		}
+		signalAssignments += currentComponent.Name() + "_in_req <= " + connection + ";"
+
+		connection = predecessor + "_out_ack"
+		if defaultPredecessor {
+			connection = "in_ack"
+		}
+		signalAssignments += currentComponent.Name() + "_in_ack <= " + connection + ";"
+
+		connection = successor + "_in_req"
+		if defaultSuccessor {
+			connection = "out_req"
+		}
+		signalAssignments += currentComponent.Name() + "_out_req <= " + connection + ";"
+
+		connection = successor + "_in_ack"
+		if defaultSuccessor {
+			connection = "out_ack"
+		}
+		signalAssignments += currentComponent.Name() + "_out_ack <= " + connection + ";"
+		signalAssignments += "\n"
+	}
+
+	return signalAssignments
+}
+
+func (b *Block) getHandshakeOverwrites(forks []*MultiHsFork, joins []*MultiHsJoin) string {
+	signalOverwrites := ""
+
+	for _, fork := range forks {
+		// 1 in_req, more out_req
+
+		signalOverwrites += fork.Name() + "_in_req <= " + fork.Sender.Name() + "_out_req;\n"
+		signalOverwrites += fork.Sender.Name() + "_out_ack <= " + fork.Name() + "_in_ack;\n"
+
+		forkOutAck := fork.Name() + "_out_ack <= "
+		for i, receiver := range fork.Receivers {
+			istr := strconv.Itoa(i)
+			signalOverwrites += receiver.Name() + "_in_req <= " + fork.Name() + "_out_req(" + istr + ");\n"
+
+			forkOutAck += receiver.Name() + "_in_ack"
+
+			if i+1 < len(fork.Receivers) {
+				forkOutAck += " & "
+			}
+		}
+
+		signalOverwrites += forkOutAck + ";\n"
+	}
+
+	for _, join := range joins {
+		// more in_req, 1 out_req
+
+		signalOverwrites += join.Name() + "_out_ack <= " + join.Receiver.Name() + "_in_ack;\n"
+		signalOverwrites += join.Receiver.Name() + "_in_req <= " + join.Name() + "_out_req;\n"
+
+		joinInReq := join.Name() + "_in_req <= "
+		for i, sender := range join.Senders {
+			istr := strconv.Itoa(i)
+			signalOverwrites += sender.Name() + "_out_ack <= " + join.Name() + "_in_ack(" + istr + ");\n"
+
+			joinInReq += sender.Name() + "_out_req"
+
+			if i+1 < len(join.Senders) {
+				joinInReq += " & "
+			}
+		}
+
+		signalOverwrites += joinInReq + ";\n"
+	}
+
+	return signalOverwrites
 }

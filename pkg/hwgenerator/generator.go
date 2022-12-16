@@ -111,18 +111,23 @@ func (g *Generator) HandleAssignmentStmt(s *ast.AssignStmt, parent *components.B
 				Len_:  1,
 			}
 
-			if lhsVar, err = parent.NewVariable(varDecl); err != nil {
+			// TODO: REMOVE
+			/* if lhsVar, err = parent.NewVariable(varDecl); err != nil {
+				return nil, g.peb.NewParseError(s, err)
+			} */
+
+			if lhsVar, err = variable.NewLocalVariable(varDecl); err != nil {
 				return nil, g.peb.NewParseError(s, err)
 			}
 		}
 
-		newFuncBlk := components.NewBinExprBlock("=", &components.OperandInfo{
+		newFuncBlk, err := components.NewBinExprBlock("=", &components.OperandInfo{
 			R: lhsVar,
-			X: &variable.VariableInfo{
-				Const_: rhsExpr.Value,
-				Size_:  lhsVar.Size_,
-			},
+			X: variable.MakeConst(rhsExpr.Value, lhsVar.Size_),
 		}, parent)
+		if err != nil {
+			return nil, err
+		}
 
 		g.components[newFuncBlk.ArchName()] = newFuncBlk
 		parent.AddComponent(newFuncBlk)
@@ -141,15 +146,23 @@ func (g *Generator) HandleAssignmentStmt(s *ast.AssignStmt, parent *components.B
 				Len_:  1,
 			}
 
-			if lhsVar, err = parent.NewVariable(varDecl); err != nil {
+			// TODO: REMOVE
+			/* if lhsVar, err = parent.NewVariable(varDecl); err != nil {
+				return nil, g.peb.NewParseError(s, err)
+			} */
+
+			if lhsVar, err = variable.NewLocalVariable(varDecl); err != nil {
 				return nil, g.peb.NewParseError(s, err)
 			}
 		}
 
-		newFuncBlk := components.NewBinExprBlock("=", &components.OperandInfo{
+		newFuncBlk, err := components.NewBinExprBlock("=", &components.OperandInfo{
 			R: lhsVar,
 			X: v,
 		}, parent)
+		if err != nil {
+			return nil, err
+		}
 
 		g.components[newFuncBlk.ArchName()] = newFuncBlk
 		parent.AddComponent(newFuncBlk)
@@ -185,15 +198,23 @@ func (g *Generator) HandleAssignmentStmt(s *ast.AssignStmt, parent *components.B
 				Len_:  1,
 			}
 
-			if lhsVar, err = parent.NewVariable(varDecl); err != nil {
+			// TODO: REMOVE
+			/* if lhsVar, err = parent.NewVariable(varDecl); err != nil {
+				return nil, g.peb.NewParseError(s, err)
+			} */
+
+			if lhsVar, err = variable.NewLocalVariable(varDecl); err != nil {
 				return nil, g.peb.NewParseError(s, err)
 			}
 		}
 
-		newFuncBlk := components.NewBinExprBlock("=", &components.OperandInfo{
+		newFuncBlk, err := components.NewBinExprBlock("=", &components.OperandInfo{
 			R: lhsVar,
 			X: v,
 		}, parent)
+		if err != nil {
+			return nil, err
+		}
 
 		g.components[newFuncBlk.ArchName()] = newFuncBlk
 		parent.AddComponent(newFuncBlk)
@@ -206,39 +227,53 @@ func (g *Generator) HandleAssignmentStmt(s *ast.AssignStmt, parent *components.B
 			return nil, g.peb.NewParseError(s, errors.New("Cannot initialize variable with binary expression"))
 		}
 
-		tmpBlock, err := g.GenerateBlock([]ast.Stmt{}, false, parent, false)
+		/*
+			TODO: WORK IN PROGRESS
+			tmpBlock, err := g.GenerateBlock([]ast.Stmt{}, false, parent, false)
+			if err != nil {
+				return nil, g.peb.NewParseError(s, err)
+			}
+
+			varDecl := &variable.VariableTypeDecl{
+				Name_: "__g2a_tempVar",
+				Typ_:  lhsVar.Typ_,
+				Len_:  lhsVar.Len_,
+			}
+
+			// TODO: REMOVE
+			// tmpVar, err := tmpBlock.NewVariable(varDecl)
+			// if err != nil {
+			// 	return nil, g.peb.NewParseError(s, err)
+			// }
+
+			tmpVar, err := variable.NewLocalVariable(varDecl)
+			if err != nil {
+				return nil, g.peb.NewParseError(s, err)
+			}
+
+			g.components[tmpBlock.ArchName()] = tmpBlock
+			parent.AddComponent(tmpBlock)
+		*/
+
+		newFuncBlock, err := g.GenerateBinaryExpressionBlock(lhsVar, rhsExpr, parent)
 		if err != nil {
 			return nil, g.peb.NewParseError(s, err)
 		}
 
-		varDecl := &variable.VariableTypeDecl{
-			Name_: "__g2a_tempVar",
-			Typ_:  lhsVar.Typ_,
-			Len_:  lhsVar.Len_,
-		}
-
-		tmpVar, err := tmpBlock.NewVariable(varDecl)
-		if err != nil {
-			return nil, g.peb.NewParseError(s, err)
-		}
-
-		g.components[tmpBlock.ArchName()] = tmpBlock
-		parent.AddComponent(tmpBlock)
-
-		_, err = g.GenerateBinaryExpressionFuncBlock(tmpVar, rhsExpr, tmpBlock)
-		if err != nil {
-			return nil, g.peb.NewParseError(s, err)
-		}
-
-		newFuncBlk := components.NewBinExprBlock("=", &components.OperandInfo{
+		/* newFuncBlk, err := components.NewBinExprBlock("=", &components.OperandInfo{
 			R: lhsVar,
 			X: tmpVar,
-		}, tmpBlock)
+		}, parent)
+		if err != nil {
+			return nil, err
+		}
 
 		g.components[newFuncBlk.ArchName()] = newFuncBlk
-		parent.AddComponent(newFuncBlk)
+		parent.AddComponent(newFuncBlk) */
 
-		return newFuncBlk, nil
+		// Components added previous call
+
+		return newFuncBlock, nil
 	case *ast.CallExpr:
 		funcNameIdent, ok := rhsExpr.Fun.(*ast.Ident)
 		if !ok {
@@ -301,7 +336,12 @@ func (g *Generator) HandleAssignmentStmt(s *ast.AssignStmt, parent *components.B
 				Len_:  1,
 			}
 
-			if lhsVar, err = parent.NewVariable(varDecl); err != nil {
+			// TODO: REMOVE
+			/* if lhsVar, err = parent.NewVariable(varDecl); err != nil {
+				return nil, g.peb.NewParseError(s, err)
+			} */
+
+			if lhsVar, err = variable.NewLocalVariable(varDecl); err != nil {
 				return nil, g.peb.NewParseError(s, err)
 			}
 		}
@@ -334,7 +374,7 @@ func (g *Generator) HandleAssignmentStmt(s *ast.AssignStmt, parent *components.B
 	}
 }
 
-func (g *Generator) GenerateBinaryExpressionFuncBlock(result *variable.VariableInfo, be *ast.BinaryExpr, parent *components.Block) (fb *components.BinExprBlock, err error) {
+func (g *Generator) GenerateBinaryExpressionBlock(result *variable.VariableInfo, be *ast.BinaryExpr, parent *components.Block) (fb *components.BinExprBlock, err error) {
 	xexpr := be.X
 	yexpr := be.Y
 
@@ -347,15 +387,22 @@ func (g *Generator) GenerateBinaryExpressionFuncBlock(result *variable.VariableI
 
 	switch t := xexpr.(type) {
 	case *ast.BinaryExpr:
-		infoPrinter.DebugPrintln("nested binary expression left: ", t.X, t.Op.String(), t.Y)
+		infoPrinter.DebugPrintln("nested binary expression ", result.Name_, " = ", t.X, t.Op.String(), t.Y)
 
-		g.GenerateBinaryExpressionFuncBlock(result, t, parent)
+		g.GenerateBinaryExpressionBlock(result, t, parent)
+		/*newFuncBlk, err := g.GenerateBinaryExpressionBlock(result, t, parent)
+		if err != nil {
+			return nil, err
+		}
+
+		g.components[newFuncBlk.ArchName()] = newFuncBlk
+		parent.AddComponent(newFuncBlk)*/
+
+		// Component is generated at the end of function for this recursive call!
+
 		x = result
 	case *ast.BasicLit:
-		x = &variable.VariableInfo{
-			Const_: t.Value,
-			Size_:  result.Size_,
-		}
+		x = variable.MakeConst(t.Value, result.Size_)
 	case *ast.Ident:
 		x, err = parent.GetVariable(t.Name)
 		if err != nil {
@@ -396,10 +443,7 @@ func (g *Generator) GenerateBinaryExpressionFuncBlock(result *variable.VariableI
 		infoPrinter.DebugPrintln("nested binary expression right: ", t.X, t.Op.String(), t.Y)
 		return nil, g.peb.NewParseError(be, errors.New("Binary expression in right side of binary expression not allowed"))
 	case *ast.BasicLit:
-		y = &variable.VariableInfo{
-			Const_: t.Value,
-			Size_:  result.Size_,
-		}
+		y = variable.MakeConst(t.Value, result.Size_)
 	case *ast.Ident:
 		y, err = parent.GetVariable(t.Name)
 		if err != nil {
@@ -437,11 +481,14 @@ func (g *Generator) GenerateBinaryExpressionFuncBlock(result *variable.VariableI
 
 	infoPrinter.DebugPrintln("generating func: ", result.Name_, " = ", x.Name_, " ", operation, " ", y.Name_, " const: ", y.Const_)
 
-	newFuncBlk := components.NewBinExprBlock(operation, &components.OperandInfo{
+	newFuncBlk, err := components.NewBinExprBlock(operation, &components.OperandInfo{
 		R: result,
 		X: x,
 		Y: y,
 	}, parent)
+	if err != nil {
+		return nil, err
+	}
 
 	g.components[newFuncBlk.ArchName()] = newFuncBlk
 	parent.AddComponent(newFuncBlk)
@@ -462,9 +509,8 @@ func (g *Generator) GenerateSelectorBlock(be *ast.BinaryExpr, inverted bool, par
 
 	switch t := xexpr.(type) {
 	case *ast.BasicLit:
-		x = &variable.VariableInfo{
-			Const_: t.Value,
-		}
+		// TODO: determine size
+		x = variable.MakeConst(t.Value, 8)
 	case *ast.Ident:
 		x, err = parent.GetVariable(t.Name)
 		if err != nil {
@@ -502,10 +548,7 @@ func (g *Generator) GenerateSelectorBlock(be *ast.BinaryExpr, inverted bool, par
 
 	switch t := yexpr.(type) {
 	case *ast.BasicLit:
-		y = &variable.VariableInfo{
-			Const_: t.Value,
-			Size_:  x.Size_,
-		}
+		y = variable.MakeConst(t.Value, x.Size_)
 	case *ast.Ident:
 		y, err = parent.GetVariable(t.Name)
 		if err != nil {
@@ -587,7 +630,7 @@ func (g *Generator) GenerateIfBlock(is *ast.IfStmt, parent *components.Block) (f
 	}
 
 	var elseBody components.BodyComponentType
-	elseBody = components.NewBinExprBlock("NOP", &components.OperandInfo{
+	elseBody, err = components.NewBinExprBlock("NOP", &components.OperandInfo{
 		R: &variable.VariableInfo{
 			Position_: 0,
 			Size_:     8,
@@ -597,6 +640,10 @@ func (g *Generator) GenerateIfBlock(is *ast.IfStmt, parent *components.Block) (f
 			Size_:     8,
 		},
 	}, parent)
+	if err != nil {
+		return nil, err
+	}
+
 	if is.Else != nil {
 		elseBody, err = g.GenerateBlock(is.Else.(*ast.BlockStmt).List, false, parent, false)
 		if err != nil {
@@ -683,7 +730,7 @@ func (g *Generator) GenerateBodyBlock(s ast.Stmt, parent *components.Block) (c c
 		for _, spec := range decl.Specs[0].(*ast.ValueSpec).Names {
 			switch declType := decl.Specs[0].(*ast.ValueSpec).Type.(type) {
 			case *ast.Ident:
-				if _, err := parent.NewVariable(&variable.VariableTypeDecl{
+				if _, err := parent.NewScopeVariable(&variable.VariableTypeDecl{
 					Name_: spec.Name,
 					Typ_:  declType.Name,
 					Len_:  1,
@@ -709,7 +756,7 @@ func (g *Generator) GenerateBodyBlock(s ast.Stmt, parent *components.Block) (c c
 					return nil, g.peb.NewParseError(s, err)
 				}
 
-				if _, err := parent.NewVariable(&variable.VariableTypeDecl{
+				if _, err := parent.NewScopeVariable(&variable.VariableTypeDecl{
 					Name_: spec.Name,
 					Typ_:  elt.Name,
 					Len_:  leni,
@@ -870,7 +917,7 @@ func (g *Generator) GenerateScope(f *ast.FuncDecl) (s *components.Scope, err err
 
 				vi.Name_ = param.Name
 
-				np, err := paramDummyBlock.NewVariable(vi)
+				np, err := paramDummyBlock.NewScopeVariable(vi)
 				if err != nil {
 					return nil, g.peb.NewParseError(f, err)
 				}
@@ -885,7 +932,7 @@ func (g *Generator) GenerateScope(f *ast.FuncDecl) (s *components.Scope, err err
 
 				vi.Name_ = param.Name
 
-				np, err := paramDummyBlock.NewVariable(vi)
+				np, err := paramDummyBlock.NewScopeVariable(vi)
 				if err != nil {
 					return nil, g.peb.NewParseError(f, err)
 				}
@@ -919,7 +966,7 @@ func (g *Generator) GenerateScope(f *ast.FuncDecl) (s *components.Scope, err err
 	if err != nil {
 		return nil, g.peb.NewParseError(f, err)
 	}
-	block.OutputSize = block.ScopedVariables().GetSize()
+	block.OutputSize = block.GetScopedVariables().GetSize()
 
 	rs, ok := f.Body.List[fields-1].(*ast.ReturnStmt)
 	if !ok {

@@ -1,6 +1,12 @@
 package variable
 
-import "strconv"
+import (
+	"errors"
+	infoPrinter "go2async/internal/infoPrinter"
+	"strconv"
+)
+
+var ErrEmptyName = errors.New("Variable name is empty")
 
 type FuncInterface struct {
 	Parameters *ScopedVariables
@@ -69,16 +75,25 @@ func (vTd *VariableTypeDecl) Copy() *VariableTypeDecl {
 }
 
 type VariableInfo struct {
-	Name_       string
+	Name_  string
+	Size_  int
+	Typ_   string
+	Const_ string
+	Len_   int
+
 	Position_   int
-	Size_       int
-	Typ_        string
-	Const_      string
-	Len_        int
 	Index_      string
 	IndexIdent_ *VariableInfo
 
 	FuncIntf_ *FuncInterface
+}
+
+func MakeConst(constval string, size int) *VariableInfo {
+	return &VariableInfo{
+		Const_: constval,
+		Size_:  size,
+		Len_:   1,
+	}
 }
 
 func (vTd *VariableInfo) Name() string {
@@ -122,6 +137,21 @@ func (vi *VariableInfo) Copy() *VariableInfo {
 	}
 }
 
+func (vi *VariableInfo) GetDecl() *VariableTypeDecl {
+	var copiedFuncIntf *FuncInterface
+	if vi.FuncIntf_ != nil {
+		copiedFuncIntf = vi.FuncIntf_.Copy()
+	}
+
+	return &VariableTypeDecl{
+		Name_: vi.Name_,
+		Typ_:  vi.Typ_,
+		Len_:  vi.Len_,
+
+		FuncIntf_: copiedFuncIntf,
+	}
+}
+
 func (vi *VariableInfo) String() string {
 	k := vi.Name_
 	lB := strconv.Itoa(vi.Position_)
@@ -133,4 +163,56 @@ func (vi *VariableInfo) String() string {
 	}
 
 	return k + " is at (" + uB + " - 1 downto " + lB + ") "
+}
+
+func (vi *VariableInfo) TotalSize() int {
+	ret := 0
+
+	if vi.Const_ == "" {
+		ret = vi.Size_ * vi.Len_
+	}
+
+	return ret
+}
+
+func NewLocalVariable(v VariableDef) (*VariableInfo, error) {
+	if v == nil {
+		return nil, ErrNilDecl
+	}
+
+	typeSize := -1
+	funcIntf := v.FuncIntf()
+
+	if v.FuncIntf() == nil {
+		if v.Len() <= 0 {
+			return nil, ErrInvalidVariableLength
+		}
+
+		var ok bool
+		typeSize, ok = SupportedTypes[v.Typ()]
+		if !ok {
+			return nil, ErrUnsupportedVariableTypeFn(v.Typ())
+		}
+	} else {
+		// typeSize if result size
+		typeSize = v.FuncIntf().Results.GetSize()
+		funcIntf = funcIntf.Copy()
+	}
+
+	name := v.Name()
+
+	if name == "" {
+		return nil, ErrEmptyName
+	}
+
+	infoPrinter.VerbosePrintf("New local variable %s typ %s size %d len %d\n", v.Name(), v.Typ(), typeSize, v.Len())
+
+	return &VariableInfo{
+		Name_:     v.Name(),
+		Position_: 0, // Position can only be 0 for new local variables since they are not part of scopedVariables
+		Size_:     typeSize,
+		Typ_:      v.Typ(),
+		Len_:      v.Len(),
+		FuncIntf_: funcIntf,
+	}, nil
 }

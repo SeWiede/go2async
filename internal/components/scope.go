@@ -209,8 +209,8 @@ func (s *Scope) Component() string {
 
 func (s *Scope) signalDefs() string {
 
-	ret := SignalsString(s.Block.Out)
-	ret += SignalsString(s.OutReg.Out)
+	ret := s.Block.Out.SignalsString()
+	ret += s.OutReg.Out.SignalsString()
 
 	return ret
 }

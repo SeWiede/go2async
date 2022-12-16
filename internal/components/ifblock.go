@@ -41,7 +41,7 @@ func NewIfBlock(cond *SelectorBlock, thenBody, elseBody BodyComponentType, paren
 				DataWidth: parent.GetCurrentVariableSize(),
 			},
 			variableSize: parent.GetCurrentVariableSize(),
-			parent:       parent,
+			parentBlock:  parent,
 		},
 		Nr: nr,
 	}
@@ -99,13 +99,13 @@ func (ib *IfBlock) ComponentStr() string {
 }
 
 func (ib *IfBlock) signalDefs() string {
-	ret := SignalsString(ib.entryFork.Out1)
-	ret += SignalsString(ib.entryFork.Out2)
-	ret += SignalsString(ib.demux.Out1)
-	ret += SignalsString(ib.demux.Out2)
-	ret += SignalsString(ib.thenBody.OutChannel())
-	ret += SignalsString(ib.elseBody.OutChannel())
-	ret += SignalsString(ib.merger.Out)
+	ret := ib.entryFork.Out1.SignalsString()
+	ret += ib.entryFork.Out2.SignalsString()
+	ret += ib.demux.Out1.SignalsString()
+	ret += ib.demux.Out2.SignalsString()
+	ret += ib.thenBody.OutChannel().SignalsString()
+	ret += ib.elseBody.OutChannel().SignalsString()
+	ret += ib.merger.Out.SignalsString()
 
 	ret += "signal " + ib.cond.Out.Req + ", " + ib.cond.Out.Ack + " : std_logic;"
 	ret += "signal " + ib.cond.Out.Data + " : std_logic_vector(0 downto 0);\n"

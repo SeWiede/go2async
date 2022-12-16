@@ -25,7 +25,7 @@ var selectorNr = 0
 
 var selecTorOutDataWith = 1
 
-func NewSelectorBlock(op string, variableInfo *OperandInfo, inverted bool, parent *Block) *SelectorBlock {
+func NewSelectorBlock(op string, oi *OperandInfo, inverted bool, parent *Block) *SelectorBlock {
 	nr := selectorNr
 	selectorNr++
 
@@ -45,16 +45,18 @@ func NewSelectorBlock(op string, variableInfo *OperandInfo, inverted bool, paren
 				DataWidth: selecTorOutDataWith,
 			},
 
-			parent:       parent,
+			parentBlock:  parent,
 			variableSize: parent.GetCurrentVariableSize(),
 		},
 
 		Nr: nr,
 
 		Operation: op,
-		Oi:        variableInfo,
+		Oi:        oi,
 		Inverted:  inverted,
 	}
+
+	getOperandOwnersAndSetNewOwner(ret, parent, oi)
 
 	return ret
 }

@@ -6,11 +6,15 @@ import (
 )
 
 type HandshakeChannel struct {
-	Req  string
-	Ack  string
-	Data string
+	Req      string
+	ReqWidth int
 
-	DataWidth int
+	Ack      string
+	AckWidth int
+
+	Data          string
+	DataWidth     int
+	DataWidthName string
 
 	Out bool
 }
@@ -42,22 +46,40 @@ func (hw *HandshakeChannel) Connect(to *HandshakeChannel) (*HandshakeChannel, er
 
 	to.Req = hw.Req
 	to.Ack = hw.Ack
+
 	if hw.Data != "" {
 		to.Data = hw.Data
 	}
+
 	return to, nil
 }
 
 func (c *HandshakeChannel) getStv() string {
-	ret := "std_logic_vector(DATA_WIDTH - 1 downto 0)"
+	if c.DataWidthName == "" {
+		c.DataWidthName = "DATA_WIDTH"
+	}
+
+	ret := "std_logic_vector(" + c.DataWidthName + " - 1 downto 0)"
 	if c.DataWidth > 0 {
 		ret = "std_logic_vector(" + strconv.Itoa(c.DataWidth) + "-1 downto 0)"
 	}
 	return ret
 }
 
-func SignalsString(c *HandshakeChannel) string {
-	ret := "signal " + c.Req + ", " + c.Ack + " : std_logic;"
+func (c *HandshakeChannel) SignalsString() string {
+	ret := ""
+
+	if c.ReqWidth <= 0 {
+		ret += "signal " + c.Req + " : std_logic;"
+	} else {
+		ret += "signal " + c.Req + " : std_logic_vector(" + strconv.Itoa(c.ReqWidth) + " - 1 downto 0);"
+	}
+	if c.AckWidth <= 0 {
+		ret += "signal " + c.Ack + " : std_logic;"
+	} else {
+		ret += "signal " + c.Ack + " : std_logic_vector(" + strconv.Itoa(c.AckWidth) + " - 1 downto 0);"
+	}
+
 	if c.Data != "" {
 		if c.Data != "open" {
 			ret += "signal " + c.Data + ": " + c.getStv() + ";"

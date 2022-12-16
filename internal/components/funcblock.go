@@ -52,7 +52,7 @@ func NewFuncBlock(paramsResults *variable.FuncInterface, fi variable.VariableDef
 				DataWidth: parent.GetCurrentVariableSize(),
 			},
 
-			parent:       parent,
+			parentBlock:  parent,
 			variableSize: parent.GetCurrentVariableSize(),
 		},
 

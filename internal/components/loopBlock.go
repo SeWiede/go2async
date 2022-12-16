@@ -45,7 +45,7 @@ func NewLoopBlock(loopCond *SelectorBlock, body BodyComponentType, parent *Block
 				DataWidth: parent.GetCurrentVariableSize(),
 			},
 
-			parent:       parent,
+			parentBlock:  parent,
 			variableSize: parent.GetCurrentVariableSize(),
 		},
 		Nr: nr,
@@ -121,16 +121,16 @@ func (lb *LoopBlock) ComponentStr() string {
 }
 
 func (lb *LoopBlock) signalDefs() string {
-	ret := SignalsString(lb.body.OutChannel())
-	ret += SignalsString(lb.entryMux.Out)
-	ret += SignalsString(lb.initRegFork.Out1)
-	ret += SignalsString(lb.initRegFork.Out2)
-	ret += SignalsString(lb.loopCond.Out)
-	ret += SignalsString(lb.condFork.Out1)
-	ret += SignalsString(lb.condFork.Out2)
-	ret += SignalsString(lb.exitDemux.Out1)
-	ret += SignalsString(lb.exitDemux.Out2)
-	ret += SignalsString(lb.bodyReg.Out)
+	ret := lb.body.OutChannel().SignalsString()
+	ret += lb.entryMux.Out.SignalsString()
+	ret += lb.initRegFork.Out1.SignalsString()
+	ret += lb.initRegFork.Out2.SignalsString()
+	ret += lb.loopCond.Out.SignalsString()
+	ret += lb.condFork.Out1.SignalsString()
+	ret += lb.condFork.Out2.SignalsString()
+	ret += lb.exitDemux.Out1.SignalsString()
+	ret += lb.exitDemux.Out2.SignalsString()
+	ret += lb.bodyReg.Out.SignalsString()
 
 	ret += "signal " + lb.condReg.Out.Req + ", " + lb.condReg.Out.Ack + " : std_logic;"
 	ret += "signal " + lb.condReg.Out.Data + " : std_logic_vector(0 downto 0);\n"
