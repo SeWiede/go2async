@@ -48,8 +48,7 @@ func NewCallBlock(paramsResults *variable.FuncInterface, fi variable.VariableDef
 				DataWidth: parent.GetCurrentVariableSize(),
 			},
 
-			parentBlock:  parent,
-			variableSize: parent.GetCurrentVariableSize(),
+			parentBlock: parent,
 		},
 
 		Nr: nr,

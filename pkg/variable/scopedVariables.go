@@ -6,8 +6,6 @@ import (
 	"strconv"
 )
 
-var SupportedTypes map[string]int = map[string]int{"int": strconv.IntSize, "int8": 8, "int16": 16, "int32": 32, "int64": 64, "uint": strconv.IntSize, "uint8": 8, "uint16": 16, "uint32": 32, "uint64": 64, "byte": 8}
-
 var ErrInvalidVariableLength = errors.New("Invalid variable length - has to be greater than 0")
 var ErrNilDecl = errors.New("Variable decl is nil")
 
@@ -115,21 +113,22 @@ func (sv *ScopedVariables) AddVariable(v VariableDef) (*VariableInfo, error) {
 	}
 
 	newV := &VariableInfo{
-		Name_:     v.Name(),
+		Name_:     name,
 		Position_: sv.Size,
 		Size_:     typeSize,
 		Typ_:      v.Typ(),
 		Len_:      v.Len(),
+		Const_:    v.Const(),
 		FuncIntf_: funcIntf,
 	}
 
-	if _, ok := sv.Variables[v.Name()]; ok {
-		return nil, ErrVariableAlreadyDeclaredFn(v.Name())
+	if _, ok := sv.Variables[name]; ok {
+		return nil, ErrVariableAlreadyDeclaredFn(name)
 	}
 
-	sv.Variables[v.Name()] = newV
+	sv.Variables[name] = newV
 
-	infoPrinter.VerbosePrintf("Allocated %s at pos %d downto %d\n", v.Name(), (sv.Size)+(v.Len()*typeSize)-1, (sv.Size))
+	infoPrinter.VerbosePrintf("Allocated '%s' type %s at pos %d downto %d\n", name, v.Typ(), (sv.Size)+(v.Len()*typeSize)-1, (sv.Size))
 
 	sv.Size += typeSize * v.Len()
 

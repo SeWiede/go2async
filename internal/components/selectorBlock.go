@@ -45,8 +45,7 @@ func NewSelectorBlock(op string, oi *OperandInfo, inverted bool, parent *Block) 
 				DataWidth: selecTorOutDataWith,
 			},
 
-			parentBlock:  parent,
-			variableSize: parent.GetCurrentVariableSize(),
+			parentBlock: parent,
 		},
 
 		Nr: nr,

@@ -54,8 +54,11 @@ func (r *Reg) OutChannel() *HandshakeChannel {
 	return r.Out
 }
 
+func (r *Reg) Name() string {
+	return regPrefix + strconv.Itoa(r.Nr)
+}
+
 func (r *Reg) ComponentStr() string {
-	name := regPrefix + strconv.Itoa(r.Nr)
 	phaseOutString := "PHASE_INIT_OUT => '0'"
 	if r.PhaseOut {
 		phaseOutString = "PHASE_INIT_OUT => '1'"
@@ -66,7 +69,7 @@ func (r *Reg) ComponentStr() string {
 		dataWidthStr = strconv.Itoa(r.DataWidth)
 	}
 
-	return name + `: entity work.decoupled_hs_reg(` + r.archName + `)
+	return r.Name() + `: entity work.decoupled_hs_reg(` + r.archName + `)
   generic map (
     DATA_WIDTH => ` + dataWidthStr + `,
     VALUE => ` + r.StartValue + `,
@@ -75,13 +78,14 @@ func (r *Reg) ComponentStr() string {
   )
   port map (
     rst => rst,
-    in_ack => ` + r.In.Ack + `,
-    in_req => ` + r.In.Req + `,
-    in_data => std_logic_vector(resize(unsigned(` + r.In.Data + `), ` + strconv.Itoa(r.DataWidth) + `)),
+    -- Input channel
+    in_req => ` + r.Name() + `_in_req,
+    in_ack => ` + r.Name() + `_in_ack,
+    in_data => ` + r.Name() + `_in_data,
     -- Output channel
-    out_req => ` + r.Out.Req + `,
-    out_data => ` + r.Out.Data + `(` + dataWidthStr + ` - 1 downto 0),
-    out_ack => ` + r.Out.Ack + `
+    out_req => ` + r.Name() + `_out_req,
+    out_ack => ` + r.Name() + `_out_ack,
+    out_data => ` + r.Name() + `_out_data
   );
   `
 }

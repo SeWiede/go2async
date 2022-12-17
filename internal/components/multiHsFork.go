@@ -2,7 +2,6 @@ package components
 
 import (
 	"errors"
-	"go2async/pkg/variable"
 	"strconv"
 )
 
@@ -34,9 +33,6 @@ func NewMultiHsFork(receivers []BodyComponentType, sender BodyComponentType) (*M
 		BodyComponent: BodyComponent{
 			number:   nr,
 			archName: defaultArch, // beware of defaultArch!
-
-			inputVariables:  []*variable.VariableInfo{},
-			outputVariables: []*variable.VariableInfo{},
 		},
 
 		Receivers: receivers,

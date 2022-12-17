@@ -34,6 +34,35 @@ type OperandInfo struct {
 var bebNr = 0
 
 func getOperandOwnersAndSetNewOwner(bt BodyComponentType, parent *Block, oi *OperandInfo) (BodyComponentType, error) {
+	resultType := ""
+
+	if oi.R != nil {
+		// Set new owner of result variable after getting previous owners!
+		if own, ok := parent.VariableOwner[oi.R.Name_]; ok {
+			own.bc = bt
+			own.vi = oi.R
+		} else {
+			infoPrinter.DebugPrintfln("Adding variable '%s' to ownermap of '%s'", oi.R.Name_, parent.Name())
+
+			parent.VariableOwner[oi.R.Name_] = &variableOwner{
+				bc: bt,
+				vi: oi.R,
+			}
+		}
+
+		oi.R.DefinedOnly_ = false
+
+		if _, err := bt.AddOutputVariable(oi.R); err != nil {
+			return nil, err
+		}
+
+		resultType = oi.R.Typ_
+
+		infoPrinter.DebugPrintfln("New owner of variable '%s' is new binExprBlock '%s'", oi.R.Name_, bt.Name())
+	} else {
+		panic("Missing result var")
+	}
+
 	// get sources of X, Y
 	if oi.X != nil {
 		if oi.X.Const_ == "" {
@@ -49,13 +78,27 @@ func getOperandOwnersAndSetNewOwner(bt BodyComponentType, parent *Block, oi *Ope
 
 			infoPrinter.DebugPrintfln("[%s]: Previous component of X input '%s' is '%s'", bt.Name(), oi.X.Name_, ownX.bc.Name())
 		} else {
-			infoPrinter.DebugPrintfln("[%s]: X Input '%s' is const '%s'", bt.Name(), oi.X.Name_, oi.X.Const_)
+			oi.X.Typ_ = resultType
+
+			infoPrinter.DebugPrintfln("[%s]: X Input '%s' is const '%s' with type %s inferred from result", bt.Name(), oi.X.Name_, oi.X.Const_, resultType)
 		}
 
-		bt.AddInputVariable(oi.X)
+		if oi.X.DefinedOnly_ {
+			panic("using defined only variable")
+		}
+
+		if _, err := bt.AddInputVariable(oi.X); err != nil {
+			return nil, err
+		}
 	} else {
-		// TODO: Size?
-		bt.AddInputVariable(variable.MakeConst("0", 8))
+		constVar, err := variable.MakeConst("0", resultType)
+		if err != nil {
+			return nil, err
+		}
+
+		if _, err := bt.AddInputVariable(constVar); err != nil {
+			return nil, err
+		}
 	}
 
 	if oi.Y != nil {
@@ -72,32 +115,27 @@ func getOperandOwnersAndSetNewOwner(bt BodyComponentType, parent *Block, oi *Ope
 
 			infoPrinter.DebugPrintfln("[%s]: Previous component of Y input '%s' is '%s'", bt.Name(), oi.Y.Name_, ownY.bc.Name())
 		} else {
+			oi.Y.Typ_ = resultType
+
 			infoPrinter.DebugPrintfln("[%s]: Y Input '%s' is const '%s'", bt.Name(), oi.Y.Name_, oi.Y.Const_)
 		}
 
-		bt.AddInputVariable(oi.Y)
-	} else {
-		// TODO: Size?
-		bt.AddInputVariable(variable.MakeConst("0", 8))
-	}
-
-	if oi.R != nil {
-		// Set new owner of result variable after getting previous owners!
-		if own, ok := parent.VariableOwner[oi.R.Name_]; ok {
-			own.bc = bt
-			own.vi = oi.R
-		} else {
-			infoPrinter.DebugPrintfln("Adding variable '%s' to ownermap of '%s'", oi.R.Name_, parent.Name())
-
-			parent.VariableOwner[oi.R.Name_] = &variableOwner{
-				bc: bt,
-				vi: oi.R,
-			}
+		if oi.Y.DefinedOnly_ {
+			panic("using defined only variable")
 		}
 
-		bt.AddOutputVariable(oi.R)
+		if _, err := bt.AddInputVariable(oi.Y); err != nil {
+			return nil, err
+		}
+	} else {
+		constVar, err := variable.MakeConst("0", resultType)
+		if err != nil {
+			return nil, err
+		}
 
-		infoPrinter.DebugPrintfln("New owner of variable '%s' is new binExprBlock '%s'", oi.R.Name_, bt.Name())
+		if _, err := bt.AddInputVariable(constVar); err != nil {
+			return nil, err
+		}
 	}
 
 	return bt, nil
@@ -126,11 +164,10 @@ func NewBinExprBlock(op string, oi *OperandInfo, parent *Block) (*BinExprBlock, 
 				DataWidth: parent.GetCurrentVariableSize(),
 			},
 
-			parentBlock:  parent,
-			variableSize: parent.GetCurrentVariableSize(),
+			parentBlock: parent,
 
-			inputVariables:  []*variable.VariableInfo{},
-			outputVariables: []*variable.VariableInfo{},
+			inputVariables:  variable.NewScopedVariables(),
+			outputVariables: variable.NewScopedVariables(),
 		},
 
 		Operation: op,
@@ -156,7 +193,9 @@ func NewBinExprBlock(op string, oi *OperandInfo, parent *Block) (*BinExprBlock, 
 
 	if op != "NOP" {
 		// get sources of X, Y
-		getOperandOwnersAndSetNewOwner(ret, parent, oi)
+		if _, err := getOperandOwnersAndSetNewOwner(ret, parent, oi); err != nil {
+			return nil, err
+		}
 
 		infoPrinter.DebugPrintfln("[%s] finished owner assignments of [%s]", parent.Name(), ret.Name())
 	}
@@ -165,28 +204,25 @@ func NewBinExprBlock(op string, oi *OperandInfo, parent *Block) (*BinExprBlock, 
 }
 
 func (bep *BinExprBlock) GetXTotalSize() int {
-	x := bep.Oi.X
-
-	if x == nil {
-		return 1
+	x, err := bep.InputVariables().GetVariableInfoAt(0)
+	if err != nil {
+		panic(bep.Name() + " invalid x")
 	}
 
 	return x.TotalSize()
 }
 func (bep *BinExprBlock) GetYTotalSize() int {
-	y := bep.Oi.Y
-
-	if y == nil {
-		return 1
+	y, err := bep.InputVariables().GetVariableInfoAt(1)
+	if err != nil {
+		panic(bep.Name() + " invalid y")
 	}
 
 	return y.TotalSize()
 }
 func (bep *BinExprBlock) GetRTotalSize() int {
-	r := bep.Oi.R
-
-	if r == nil {
-		return 1
+	r, err := bep.OutputVariables().GetVariableInfoAt(0)
+	if err != nil {
+		panic(bep.Name() + " invalid r")
 	}
 
 	return r.TotalSize()
@@ -365,16 +401,22 @@ func (bep *BinExprBlock) Entity() string {
 	op2Size := 0
 	resSize := 0
 
-	if op1 := bep.Oi.X; op1 != nil {
+	if op1, err := bep.InputVariables().GetVariableInfoAt(0); err == nil {
 		op1Size = op1.TotalSize()
+	} else {
+		panic(bep.Name() + " invalid x")
 	}
 
-	if op2 := bep.Oi.Y; op2 != nil {
+	if op2, err := bep.InputVariables().GetVariableInfoAt(1); err == nil {
 		op2Size = op2.TotalSize()
+	} else {
+		panic(bep.Name() + " invalid y")
 	}
 
-	if res := bep.Oi.R; res != nil {
+	if res, err := bep.OutputVariables().GetVariableInfoAt(0); err == nil {
 		resSize = res.TotalSize()
+	} else {
+		panic(bep.Name() + " invalid result")
 	}
 
 	return `LIBRARY IEEE;
@@ -393,7 +435,8 @@ func (bep *BinExprBlock) Entity() string {
 		out_req : OUT STD_LOGIC;
 		out_ack : IN STD_LOGIC;
 		result : OUT STD_LOGIC_VECTOR(` + strconv.Itoa(resSize) + ` - 1 DOWNTO 0));
-	END ` + bep.EntityName() + `;`
+	END ` + bep.EntityName() + `;
+	`
 }
 
 func (bep *BinExprBlock) GetVariableLocation(name string) (string, error) {

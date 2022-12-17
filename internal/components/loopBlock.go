@@ -45,8 +45,7 @@ func NewLoopBlock(loopCond *SelectorBlock, body BodyComponentType, parent *Block
 				DataWidth: parent.GetCurrentVariableSize(),
 			},
 
-			parentBlock:  parent,
-			variableSize: parent.GetCurrentVariableSize(),
+			parentBlock: parent,
 		},
 		Nr: nr,
 	}

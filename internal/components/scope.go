@@ -17,7 +17,6 @@ type Scope struct {
 	Block *Block
 
 	Params     map[string]*variable.VariableInfo
-	Variables  map[string]*variable.VariableInfo
 	ReturnVars []*variable.VariableInfo
 
 	OutReg *Reg
@@ -28,7 +27,7 @@ type Scope struct {
 
 var scopeNr = 0
 
-func NewScope(name string, block *Block, params map[string]*variable.VariableInfo, returnVars []*variable.VariableInfo) *Scope {
+func NewScope(name string, block *Block) *Scope {
 	nr := scopeNr
 	if name == "" {
 		scopeNr++
@@ -41,9 +40,6 @@ func NewScope(name string, block *Block, params map[string]*variable.VariableInf
 		In: &HandshakeChannel{
 			Out: false,
 		},
-		Params:     params,
-		Variables:  make(map[string]*variable.VariableInfo),
-		ReturnVars: returnVars,
 	}
 
 	entryIn := &HandshakeChannel{
@@ -60,7 +56,7 @@ func NewScope(name string, block *Block, params map[string]*variable.VariableInf
 		rs += s.Size_
 	}
 
-	s.OutReg = NewReg(s.Block.OutputSize, false, "0")
+	s.OutReg = NewReg(s.Block.OutputVariables().Size, false, "0")
 
 	s.Block.Out.Connect(s.OutReg.In)
 
@@ -86,7 +82,7 @@ func (s *Scope) EntityName() string {
 }
 
 func (s *Scope) Entity() string {
-	infoPrinter.DebugPrintf("Generating unique block entity '%s'\n", s.EntityName())
+	infoPrinter.DebugPrintf("Generating unique scope entity '%s'\n", s.EntityName())
 
 	externalInterfacesStr := ``
 	externalIntferacesGenericsStr := ``
@@ -151,9 +147,11 @@ func (s *Scope) Entity() string {
 	return ret
 }
 
-func (s *Scope) Component() string {
-	name := scopePrefix + strconv.Itoa(s.Nr)
+func (s *Scope) Name() string {
+	return scopePrefix + strconv.Itoa(s.Nr)
+}
 
+func (s *Scope) ComponentStr() string {
 	externalInterfacesStr := ``
 	externalIntferacesGenericsStr := ``
 	comma := ``
@@ -184,33 +182,75 @@ func (s *Scope) Component() string {
 		i++
 	}
 
-	return name + `: entity work.` + s.EntityName() + `(` + s.archName + `)
+	return s.Name() + `: entity work.` + s.EntityName() + `(` + s.archName + `)
   generic map(
-    DATA_WIDTH => ` + s.archName + `_DATA_WIDTH,
-	OUT_DATA_WIDTH => ` + s.archName + `_OUT_DATA_WIDTH,
-	IN_DATA_WIDTH => ` + s.archName + `_IN_DATA_WIDTH` + comma + `
+    DATA_WIDTH => ` + s.Name() + `_DATA_WIDTH,
+	OUT_DATA_WIDTH => ` + s.Name() + `_OUT_DATA_WIDTH,
+	IN_DATA_WIDTH => ` + s.Name() + `_IN_DATA_WIDTH` + comma + `
 	` + externalIntferacesGenericsStr + `
   )
   port map (
-   rst => rst,
-   -- Input channel
-   in_ack => ` + s.In.Ack + `,
-   in_req => ` + s.In.Req + `,
-   in_data => ` + s.In.Data + `,
-   -- Output channel
-   out_req => ` + s.Out.Req + `,
-   out_data => ` + s.Out.Data + `,
-   out_ack => ` + s.Out.Ack + comma + `
-   -- External interfaces
-   ` + externalInterfacesStr + `
-  );
+	rst => rst,
+	-- Input channel
+	in_req => ` + s.Name() + `_in_req,
+	in_ack => ` + s.Name() + `_in_ack,
+	in_data => ` + s.Name() + `_in_data,
+	-- Output channel
+	out_req => ` + s.Name() + `_out_req,
+	out_ack => ` + s.Name() + `_out_ack,
+	out_data => ` + s.Name() + `_out_data ` + comma + `
+	-- External interfaces
+	` + externalInterfacesStr + `
   `
 }
 
 func (s *Scope) signalDefs() string {
+	/* 	ret := s.Block.Out.SignalsString()
+	   	ret += s.OutReg.Out.SignalsString() */
+	ret := ""
 
-	ret := s.Block.Out.SignalsString()
-	ret += s.OutReg.Out.SignalsString()
+	// Block
+	ret += "signal " + s.Block.Name() + "_in_req : std_logic;"
+	ret += "signal " + s.Block.Name() + "_in_ack : std_logic;"
+	ret += "signal " + s.Block.Name() + "_in_data : std_logic_vector(" + strconv.Itoa(s.Block.InputVariables().Size) + " - 1 downto 0);"
+	ret += "\n"
+
+	ret += "signal " + s.Block.Name() + "_out_req : std_logic;"
+	ret += "signal " + s.Block.Name() + "_out_ack : std_logic;"
+	ret += "signal " + s.Block.Name() + "_out_data : std_logic_vector(" + strconv.Itoa(s.Block.OutputVariables().Size) + " - 1 downto 0);"
+	ret += "\n"
+
+	// OutReg
+	ret += "signal " + s.OutReg.Name() + "_in_req : std_logic;"
+	ret += "signal " + s.OutReg.Name() + "_in_ack : std_logic;"
+	ret += "signal " + s.OutReg.Name() + "_in_data : std_logic_vector(" + strconv.Itoa(s.OutReg.DataWidth) + " - 1 downto 0);"
+	ret += "\n"
+
+	ret += "signal " + s.OutReg.Name() + "_out_req : std_logic;"
+	ret += "signal " + s.OutReg.Name() + "_out_ack : std_logic;"
+	ret += "signal " + s.OutReg.Name() + "_out_data : std_logic_vector(" + strconv.Itoa(s.OutReg.DataWidth) + " - 1 downto 0);"
+	ret += "\n"
+
+	return ret
+}
+
+func (s *Scope) signalAssignments() string {
+	ret := ""
+
+	// Scope Inputs to Block
+	ret += s.Block.Name() + "_in_req <= in_req;\n"
+	ret += "in_ack <= " + s.Block.Name() + "_in_ack;\n"
+	ret += s.Block.Name() + "_in_data <= in_data;\n"
+
+	// Block to Reg
+	ret += s.OutReg.Name() + "_in_req <= " + s.Block.Name() + "_out_req;\n"
+	ret += s.Block.Name() + "_out_ack <= " + s.OutReg.Name() + "_in_ack;\n"
+	ret += s.OutReg.Name() + "_in_data <= " + s.Block.Name() + "_out_data;\n"
+
+	// Reg to Scope Ouput
+	ret += "out_req <= " + s.OutReg.Name() + "_out_req;\n"
+	ret += s.OutReg.Name() + "_out_ack <= out_ack;\n"
+	ret += "out_data <= " + s.OutReg.Name() + "_out_data;\n"
 
 	return ret
 }
@@ -224,22 +264,7 @@ func (s *Scope) Architecture() string {
 	ret += "begin"
 	ret += "\n"
 
-	ret += "out_req <= " + s.OutChannel().Req + "; \n"
-	ret += s.OutChannel().Ack + " <= out_ack; \n"
-	ret += "out_data <= "
-	for _, v := range s.ReturnVars {
-		if v.Len_ == 1 {
-			idx := getIndex(v.Index_)
-			ret += s.OutReg.OutChannel().Data + "(" + strconv.Itoa(v.Position_+v.Size_*(idx+1)) + " -1 downto " + strconv.Itoa(v.Position_+v.Size_*idx) + ") & "
-		} else {
-			for idx := v.Len_ - 1; idx >= 0; idx-- {
-				ret += s.OutReg.OutChannel().Data + "(" + strconv.Itoa(v.Position_+v.Size_*(idx+1)) + " -1 downto " + strconv.Itoa(v.Position_+v.Size_*idx) + ") & "
-			}
-		}
-	}
-	ret = strings.TrimSuffix(ret, " & ")
-
-	ret += ";\n"
+	ret += s.signalAssignments()
 
 	ret += "\n"
 

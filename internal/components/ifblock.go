@@ -40,8 +40,8 @@ func NewIfBlock(cond *SelectorBlock, thenBody, elseBody BodyComponentType, paren
 				Out:       true,
 				DataWidth: parent.GetCurrentVariableSize(),
 			},
-			variableSize: parent.GetCurrentVariableSize(),
-			parentBlock:  parent,
+
+			parentBlock: parent,
 		},
 		Nr: nr,
 	}

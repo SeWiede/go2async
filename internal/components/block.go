@@ -33,13 +33,9 @@ type Block struct {
 	RegBlockPairs  []*regBodyPair
 	BodyComponents []BodyComponentType
 
-	scopedVariables *variable.ScopedVariables
-
 	ExternalInterfaces map[string]*variable.VariableInfo
 
 	VariableOwner map[string]*variableOwner
-
-	OutputSize int
 }
 
 func NewScopedVariables() *variable.ScopedVariables {
@@ -75,13 +71,12 @@ func NewBlock(toplevel bool, parent *Block) *Block {
 				Data: "bl_" + strconv.Itoa(nr) + "_data_out",
 				Out:  true,
 			},
-			parentBlock:  parent,
-			variableSize: parent.GetCurrentVariableSize(),
+			parentBlock: parent,
+
+			inputVariables: NewScopedVariables(),
 		},
 
 		TopLevel: toplevel,
-
-		scopedVariables: NewScopedVariables(),
 
 		ExternalInterfaces: make(map[string]*variable.VariableInfo),
 		VariableOwner:      make(map[string]*variableOwner),
@@ -97,13 +92,13 @@ func NewParamDummyBlock(params map[string]*variable.VariableInfo) *Block {
 	}
 
 	ret.parentBlock = nil
-	ret.scopedVariables = &variable.ScopedVariables{
+	ret.inputVariables = &variable.ScopedVariables{
 		Variables: params,
 	}
 
-	ret.scopedVariables.Size = 0
+	ret.inputVariables.Size = 0
 	for _, v := range params {
-		ret.scopedVariables.Size += v.Len_ * v.Size_
+		ret.inputVariables.Size += v.Len_ * v.Size_
 	}
 
 	ret.archName = "DummyBlock"
@@ -118,7 +113,8 @@ func (b *Block) Name() string {
 func (b *Block) AddComponent(bodyComponent BodyComponentType) {
 	b.Out = bodyComponent.OutChannel()
 
-	if b.TopLevel {
+	// TODO: explore top-level behaviour!
+	if /* b.TopLevel */ false {
 		newreg := NewReg(bodyComponent.GetVariableSize(), false, "0")
 		newreg.Out.Connect(bodyComponent.InChannel())
 
@@ -157,11 +153,8 @@ func (b *Block) EntityName() string {
 func (b *Block) ComponentStr() string {
 	name := b.Name()
 
-	dataInWidth := strconv.Itoa(b.GetVariableSize())
-	dataOutWidth := dataInWidth
-	if len(b.RegBlockPairs) > 0 {
-		dataOutWidth = strconv.Itoa(b.RegBlockPairs[len(b.RegBlockPairs)-1].Bc.GetVariableSize())
-	}
+	dataInWidthStr := strconv.Itoa(b.InputVariables().Size)
+	dataOutWidthStr := strconv.Itoa(b.OutputVariables().Size)
 
 	externalInterfacesStr := ``
 	externalIntferacesGenericsStr := ``
@@ -195,8 +188,8 @@ func (b *Block) ComponentStr() string {
 
 	return name + `: entity work.` + b.EntityName() + `(` + b.archName + `)
   generic map(
-   DATA_IN_WIDTH => ` + dataInWidth + `,
-   DATA_OUT_WIDTH => ` + dataOutWidth + comma + `
+   DATA_IN_WIDTH => ` + dataInWidthStr + `,
+   DATA_OUT_WIDTH => ` + dataOutWidthStr + comma + `
    ` + externalIntferacesGenericsStr + `
   )
   port map (
@@ -360,22 +353,24 @@ func (b *Block) Architecture() string {
 }
 
 func (b *Block) GetScopedVariables() *variable.ScopedVariables {
-	return b.scopedVariables
+	return b.inputVariables
 }
 
 func (b *Block) GetCurrentVariableSize() int {
-	return b.scopedVariables.Size
+	return b.inputVariables.Size
 }
 
-func (b *Block) NewScopeVariable(decl variable.VariableDef) (*variable.VariableInfo, error) {
-	infoPrinter.DebugPrintfln("Adding variable %s to block %s", decl.Name(), b.archName)
+func (b *Block) NewScopeVariable(vdef variable.VariableDef) (*variable.VariableInfo, error) {
+	infoPrinter.DebugPrintfln("Adding variable %s to block %s", vdef.Name(), b.archName)
 
-	vi, err := b.GetScopedVariables().AddVariable(decl)
-	if err != nil {
-		return nil, err
-	}
+	/* 	vi, err := b.GetScopedVariables().AddVariable(decl)
+	   	if err != nil {
+	   		return nil, err
+	   	} */
 
-	b.VariableOwner[decl.Name()] = &variableOwner{
+	vi := variable.FromDef(vdef)
+
+	b.VariableOwner[vdef.Name()] = &variableOwner{
 		bc: b,
 		vi: vi,
 	}
@@ -413,16 +408,17 @@ func (b *Block) GetVariable(name string) (*variable.VariableInfo, error) {
 			return nil, err
 		}
 
+		vi.DefinedOnly_ = false
+
 		// New owner of variable in current block is the current block.
 		b.VariableOwner[vi.Name()] = &variableOwner{
 			bc: b,
 			vi: vi,
 		}
 
-		b.inputVariables = append(b.inputVariables, vi)
-		b.outputVariables = append(b.outputVariables, vi)
+		b.InputVariables().AddVariable(vi)
 
-		infoPrinter.DebugPrintfln("Variable %s is from outside %s's scope. Added.", name, b.Name())
+		infoPrinter.DebugPrintfln("[%s] Variable %s is from outside the block's scope. Added to inputs (current size = %d).", b.Name(), name, b.InputVariables().Size)
 
 		return vi, nil
 	}
@@ -473,7 +469,7 @@ func (b *Block) GetAndAssignFunctionInterface(fname string) (*variable.VariableI
 
 func (b *Block) GetVariableLocation(name string) (string, error) {
 
-	sv, err := b.scopedVariables.GetVariableInfo(name)
+	sv, err := b.inputVariables.GetVariableInfo(name)
 	if err != nil {
 		return "", err
 	}
@@ -498,10 +494,10 @@ func (b *Block) getSignalDefsJoinsAndForks() (string, []*MultiHsFork, []*MultiHs
 
 	signalDefs += "signal " + b.Name() + "_in_req : std_logic;"
 	signalDefs += "signal " + b.Name() + "_in_ack : std_logic;"
-	signalDefs += "signal " + b.Name() + "_in_data : std_logic_vector(" + strconv.Itoa(b.scopedVariables.Size) + " - 1 downto 0);"
+	signalDefs += "signal " + b.Name() + "_in_data : std_logic_vector(" + strconv.Itoa(b.InputVariables().Size) + " - 1 downto 0);"
 	signalDefs += "signal " + b.Name() + "_out_req : std_logic;"
 	signalDefs += "signal " + b.Name() + "_out_ack : std_logic;"
-	signalDefs += "signal " + b.Name() + "_out_data : std_logic_vector(" + strconv.Itoa(b.OutputSize) + " - 1 downto 0);"
+	signalDefs += "signal " + b.Name() + "_out_data : std_logic_vector(" + strconv.Itoa(b.OutputVariables().Size) + " - 1 downto 0);"
 
 	for i, rbp := range b.RegBlockPairs {
 		currentComponent := rbp.Bc
@@ -516,8 +512,8 @@ func (b *Block) getSignalDefsJoinsAndForks() (string, []*MultiHsFork, []*MultiHs
 		signalDefs += "signal " + currentComponent.Name() + "_out_ack : std_logic;"
 
 		if bep, ok := currentComponent.(*BinExprBlock); ok {
-			signalDefs += "signal " + currentComponent.Name() + "_x : std_logic_vector(" + strconv.Itoa(bep.GetXTotalSize()) + "- 1 downto 0);"
-			signalDefs += "signal " + currentComponent.Name() + "_y : std_logic_vector(" + strconv.Itoa(bep.GetYTotalSize()) + "- 1 downto 0);"
+			signalDefs += "signal " + currentComponent.Name() + "_x : std_logic_vector(" + strconv.Itoa(bep.GetXTotalSize()) + "- 1 downto 0) := (others => '0');"
+			signalDefs += "signal " + currentComponent.Name() + "_y : std_logic_vector(" + strconv.Itoa(bep.GetYTotalSize()) + "- 1 downto 0) := (others => '0');"
 			signalDefs += "signal " + currentComponent.Name() + "_result : std_logic_vector(" + strconv.Itoa(bep.GetRTotalSize()) + "- 1 downto 0);"
 		} else {
 			signalDefs += "signal " + currentComponent.Name() + "_in_data : std_logic_vector(" + strconv.Itoa(currentComponent.GetVariableSize()) + "- 1 downto 0);"
@@ -631,11 +627,11 @@ func (b *Block) getDefaultSignalAssignments() string {
 			signalAssignments += currentComponent.Name() + "_in_data <= "
 		}
 
-		infoPrinter.DebugPrintfln("%s's has %d inputs", currentComponent.Name(), len(currentComponent.InputVariables()))
+		infoPrinter.DebugPrintfln("%s's has %d inputs", currentComponent.Name(), len(currentComponent.InputVariables().VariableList))
 
 		// default predecessor and successor is the parent block.
 
-		for i, input := range currentComponent.InputVariables() {
+		for i, input := range currentComponent.InputVariables().VariableList {
 			currentInputAssignment := ""
 			var err error
 
@@ -654,7 +650,7 @@ func (b *Block) getDefaultSignalAssignments() string {
 				if !ok {
 					/* inputAssignment += "<???>"
 					infoPrinter.DebugPrintfln("%s's input var %s not found!", currentComponent.Name(), input.Name_) */
-					panic("Could not find var " + input.Name_ + "'s owner")
+					panic("Could not find var " + input.Name_ + "'s owner const is: " + input.Const_)
 				}
 
 				currentInputAssignment, err = owner.bc.GetVariableLocation(input.Name_)
@@ -673,7 +669,7 @@ func (b *Block) getDefaultSignalAssignments() string {
 
 				inputAssignment += currentInputAssignment
 
-				if i+1 < len(currentComponent.InputVariables()) {
+				if i+1 < len(currentComponent.InputVariables().VariableList) {
 					inputAssignment += " & "
 				} else {
 					signalAssignments += inputAssignment + ";\n"
@@ -696,8 +692,9 @@ func (b *Block) getDefaultSignalAssignments() string {
 		}
 
 		signalAssignments += currentComponent.Name() + "_in_req <= " + predecessor + "_out_req;"
-		signalAssignments += currentComponent.Name() + "_in_ack <= " + predecessor + "_out_ack;"
-		signalAssignments += currentComponent.Name() + "_out_req <= " + successor + "_in_req;"
+		signalAssignments += predecessor + "_out_ack <= " + currentComponent.Name() + "_in_ack;"
+
+		signalAssignments += successor + "_in_req <= " + currentComponent.Name() + "_out_req;"
 		signalAssignments += currentComponent.Name() + "_out_ack <= " + successor + "_in_ack;"
 		signalAssignments += "\n"
 	}
@@ -751,4 +748,21 @@ func (b *Block) getHandshakeOverwrites(forks []*MultiHsFork, joins []*MultiHsJoi
 	}
 
 	return signalOverwrites
+}
+
+func (b *Block) SetOutput(vis []*variable.VariableInfo) error {
+	infoPrinter.DebugPrintfln("[%s]: Overwriting implicit output variables", b.Name())
+
+	b.outputVariables = NewScopedVariables()
+
+	for _, vi := range vis {
+		_, err := b.AddOutputVariable(vi)
+		if err != nil {
+			return err
+		}
+
+		infoPrinter.DebugPrintfln("[%s]: Added explicit output var %s", b.Name(), vi.Name_)
+	}
+
+	return nil
 }

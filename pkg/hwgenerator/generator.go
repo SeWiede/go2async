@@ -121,9 +121,14 @@ func (g *Generator) HandleAssignmentStmt(s *ast.AssignStmt, parent *components.B
 			}
 		}
 
+		constVar, err := variable.MakeConst(rhsExpr.Value, lhsVar.Typ_)
+		if err != nil {
+			return nil, err
+		}
+
 		newFuncBlk, err := components.NewBinExprBlock("=", &components.OperandInfo{
 			R: lhsVar,
-			X: variable.MakeConst(rhsExpr.Value, lhsVar.Size_),
+			X: constVar,
 		}, parent)
 		if err != nil {
 			return nil, err
@@ -402,7 +407,10 @@ func (g *Generator) GenerateBinaryExpressionBlock(result *variable.VariableInfo,
 
 		x = result
 	case *ast.BasicLit:
-		x = variable.MakeConst(t.Value, result.Size_)
+		x, err = variable.MakeConst(t.Value, result.Typ_)
+		if err != nil {
+			return nil, err
+		}
 	case *ast.Ident:
 		x, err = parent.GetVariable(t.Name)
 		if err != nil {
@@ -443,7 +451,10 @@ func (g *Generator) GenerateBinaryExpressionBlock(result *variable.VariableInfo,
 		infoPrinter.DebugPrintln("nested binary expression right: ", t.X, t.Op.String(), t.Y)
 		return nil, g.peb.NewParseError(be, errors.New("Binary expression in right side of binary expression not allowed"))
 	case *ast.BasicLit:
-		y = variable.MakeConst(t.Value, result.Size_)
+		y, err = variable.MakeConst(t.Value, result.Typ_)
+		if err != nil {
+			return nil, err
+		}
 	case *ast.Ident:
 		y, err = parent.GetVariable(t.Name)
 		if err != nil {
@@ -510,7 +521,10 @@ func (g *Generator) GenerateSelectorBlock(be *ast.BinaryExpr, inverted bool, par
 	switch t := xexpr.(type) {
 	case *ast.BasicLit:
 		// TODO: determine size
-		x = variable.MakeConst(t.Value, 8)
+		x, err = variable.MakeConst(t.Value, "uint8")
+		if err != nil {
+			return nil, err
+		}
 	case *ast.Ident:
 		x, err = parent.GetVariable(t.Name)
 		if err != nil {
@@ -548,7 +562,10 @@ func (g *Generator) GenerateSelectorBlock(be *ast.BinaryExpr, inverted bool, par
 
 	switch t := yexpr.(type) {
 	case *ast.BasicLit:
-		y = variable.MakeConst(t.Value, x.Size_)
+		y, err = variable.MakeConst(t.Value, x.Typ_)
+		if err != nil {
+			return nil, err
+		}
 	case *ast.Ident:
 		y, err = parent.GetVariable(t.Name)
 		if err != nil {
@@ -723,7 +740,7 @@ func (g *Generator) GenerateBodyBlock(s ast.Stmt, parent *components.Block) (c c
 			return nil, g.peb.NewParseError(s, errors.New("Invalid declaration type!"))
 		} else {
 			if decl.Tok != token.VAR {
-				return nil, g.peb.NewParseError(s, errors.New("Only var declaration allowed!"))
+				return nil, g.peb.NewParseError(s, errors.New("Only var declaration supported!"))
 			}
 		}
 
@@ -962,18 +979,17 @@ func (g *Generator) GenerateScope(f *ast.FuncDecl) (s *components.Scope, err err
 		return nil, g.peb.NewParseError(f, errors.New("At least one top-level statement + return expected"))
 	}
 
-	block, err := g.GenerateBlock(f.Body.List[0:fields-1], false, paramDummyBlock, true)
+	block, err := g.GenerateBlock(f.Body.List[0:fields-1], true, paramDummyBlock, true)
 	if err != nil {
 		return nil, g.peb.NewParseError(f, err)
 	}
-	block.OutputSize = block.GetScopedVariables().GetSize()
 
 	rs, ok := f.Body.List[fields-1].(*ast.ReturnStmt)
 	if !ok {
 		return nil, g.peb.NewParseError(f, errors.New("Missing return statement at the end"))
 	}
 
-	returnPositions := []*variable.VariableInfo{}
+	returnVars := []*variable.VariableInfo{}
 	for _, res := range rs.Results {
 		switch x := res.(type) {
 		case *ast.Ident:
@@ -982,7 +998,7 @@ func (g *Generator) GenerateScope(f *ast.FuncDecl) (s *components.Scope, err err
 				return nil, g.peb.NewParseError(f, err)
 			}
 
-			returnPositions = append(returnPositions, vi)
+			returnVars = append(returnVars, vi)
 		case *ast.IndexExpr:
 			vi, err := block.GetVariable(x.X.(*ast.Ident).Name)
 			if err != nil {
@@ -998,16 +1014,22 @@ func (g *Generator) GenerateScope(f *ast.FuncDecl) (s *components.Scope, err err
 				return nil, g.peb.NewParseError(f, errors.New("Invalid indexType in return"))
 			}
 
-			returnPositions = append(returnPositions, vi)
+			returnVars = append(returnVars, vi)
 		default:
 			return nil, g.peb.NewParseError(f, errors.New("Invalid expression in return"))
 		}
 	}
 
-	s = components.NewScope(f.Name.Name, block, params, returnPositions)
+	err = block.SetOutput(returnVars)
+	if err != nil {
+		return nil, g.peb.NewParseError(f, err)
+	}
+
+	s = components.NewScope(f.Name.Name, block /*, params, returnVars*/)
 
 	g.components[block.ArchName()] = block
 	g.scopes[s.ArchName()] = s
+
 	return s, nil
 }
 
@@ -1112,8 +1134,8 @@ func (g *Generator) GenerateVHDL() string {
 		}
 
 		g.defs.ScopeProperties[sn] = &ScopeProperty{
-			paramSize:  s.Block.GetVariableSize(),
-			returnSize: rs,
+			paramSize:  s.Block.InputVariables().Size,
+			returnSize: s.Block.OutputVariables().Size,
 		}
 		ret += s.Architecture()
 	}

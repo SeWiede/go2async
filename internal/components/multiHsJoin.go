@@ -1,7 +1,6 @@
 package components
 
 import (
-	"go2async/pkg/variable"
 	"strconv"
 )
 
@@ -32,9 +31,6 @@ func NewMultiHsJoin(senders []BodyComponentType, receiver BodyComponentType) (*M
 		BodyComponent: BodyComponent{
 			number:   nr,
 			archName: defaultArch, // beware of defaultArch!
-
-			inputVariables:  []*variable.VariableInfo{},
-			outputVariables: []*variable.VariableInfo{},
 		},
 
 		Senders:  senders,

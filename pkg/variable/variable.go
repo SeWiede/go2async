@@ -8,6 +8,8 @@ import (
 
 var ErrEmptyName = errors.New("Variable name is empty")
 
+var SupportedTypes map[string]int = map[string]int{"int": strconv.IntSize, "int8": 8, "int16": 16, "int32": 32, "int64": 64, "uint": strconv.IntSize, "uint8": 8, "uint16": 16, "uint32": 32, "uint64": 64, "byte": 8}
+
 type FuncInterface struct {
 	Parameters *ScopedVariables
 	Results    *ScopedVariables
@@ -31,14 +33,16 @@ type VariableDef interface {
 	Name() string
 	Typ() string
 	Len() int
+	Const() string
 
 	FuncIntf() *FuncInterface
 }
 
 type VariableTypeDecl struct {
-	Name_ string
-	Typ_  string
-	Len_  int
+	Name_  string
+	Typ_   string
+	Len_   int
+	Const_ string
 
 	FuncIntf_ *FuncInterface
 }
@@ -53,6 +57,10 @@ func (vTd *VariableTypeDecl) Typ() string {
 
 func (vTd *VariableTypeDecl) Len() int {
 	return vTd.Len_
+}
+
+func (vTd *VariableTypeDecl) Const() string {
+	return vTd.Const_
 }
 
 func (vTd *VariableTypeDecl) FuncIntf() *FuncInterface {
@@ -86,14 +94,22 @@ type VariableInfo struct {
 	IndexIdent_ *VariableInfo
 
 	FuncIntf_ *FuncInterface
+
+	DefinedOnly_ bool
 }
 
-func MakeConst(constval string, size int) *VariableInfo {
+func MakeConst(constval string, typ string) (*VariableInfo, error) {
+	size, ok := SupportedTypes[typ]
+	if !ok {
+		return nil, ErrUnsupportedVariableTypeFn(typ)
+	}
+
 	return &VariableInfo{
 		Const_: constval,
 		Size_:  size,
+		Typ_:   typ,
 		Len_:   1,
-	}
+	}, nil
 }
 
 func (vTd *VariableInfo) Name() string {
@@ -106,6 +122,10 @@ func (vTd *VariableInfo) Typ() string {
 
 func (vTd *VariableInfo) Len() int {
 	return vTd.Len_
+}
+
+func (vTd *VariableInfo) Const() string {
+	return vTd.Const_
 }
 
 func (vTd *VariableInfo) FuncIntf() *FuncInterface {
@@ -152,6 +172,23 @@ func (vi *VariableInfo) GetDecl() *VariableTypeDecl {
 	}
 }
 
+func FromDef(vdef VariableDef) *VariableInfo {
+	var copiedFuncIntf *FuncInterface
+	if vdef.FuncIntf() != nil {
+		copiedFuncIntf = vdef.FuncIntf().Copy()
+	}
+
+	return &VariableInfo{
+		Name_: vdef.Name(),
+		Typ_:  vdef.Typ(),
+		Len_:  vdef.Len(),
+
+		FuncIntf_: copiedFuncIntf,
+
+		DefinedOnly_: true,
+	}
+}
+
 func (vi *VariableInfo) String() string {
 	k := vi.Name_
 	lB := strconv.Itoa(vi.Position_)
@@ -166,13 +203,8 @@ func (vi *VariableInfo) String() string {
 }
 
 func (vi *VariableInfo) TotalSize() int {
-	ret := 0
 
-	if vi.Const_ == "" {
-		ret = vi.Size_ * vi.Len_
-	}
-
-	return ret
+	return vi.Size_ * vi.Len_
 }
 
 func NewLocalVariable(v VariableDef) (*VariableInfo, error) {
