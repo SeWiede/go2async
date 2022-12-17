@@ -494,6 +494,15 @@ func (b *Block) getSignalDefsJoinsAndForks() (string, []*MultiHsFork, []*MultiHs
 	forks := []*MultiHsFork{}
 	signalDefs := ""
 
+	// block signals
+
+	signalDefs += "signal " + b.Name() + "_in_req : std_logic;"
+	signalDefs += "signal " + b.Name() + "_in_ack : std_logic;"
+	signalDefs += "signal " + b.Name() + "_in_data : std_logic_vector(" + strconv.Itoa(b.scopedVariables.Size) + " - 1 downto 0);"
+	signalDefs += "signal " + b.Name() + "_out_req : std_logic;"
+	signalDefs += "signal " + b.Name() + "_out_ack : std_logic;"
+	signalDefs += "signal " + b.Name() + "_out_data : std_logic_vector(" + strconv.Itoa(b.OutputSize) + " - 1 downto 0);"
+
 	for i, rbp := range b.RegBlockPairs {
 		currentComponent := rbp.Bc
 
@@ -590,6 +599,17 @@ func (b *Block) getSignalDefsJoinsAndForks() (string, []*MultiHsFork, []*MultiHs
 func (b *Block) getDefaultSignalAssignments() string {
 	signalAssignments := ""
 
+	// block I/O assignments
+
+	signalAssignments += b.Name() + "_in_req <= in_req;\n"
+	signalAssignments += "in_ack <= " + b.Name() + "_in_ack;\n"
+	signalAssignments += b.Name() + "_in_data <= in_data;\n"
+
+	signalAssignments += "out_req <= " + b.Name() + "_out_req;\n"
+	signalAssignments += b.Name() + "_out_ack<= in_req;\n"
+	signalAssignments += "out_data <= " + b.Name() + "_out_data;\n"
+	signalAssignments += "\n"
+
 	for _, rbp := range b.RegBlockPairs {
 		currentComponent := rbp.Bc
 
@@ -641,11 +661,6 @@ func (b *Block) getDefaultSignalAssignments() string {
 				if err != nil {
 					panic(err.Error())
 				}
-
-				if owner.bc.Name() == b.Name() {
-					currentInputAssignment = strings.TrimPrefix(currentInputAssignment, b.Name()+"_")
-				}
-
 			}
 
 			if bep, ok := currentComponent.(*BinExprBlock); ok {
@@ -671,50 +686,19 @@ func (b *Block) getDefaultSignalAssignments() string {
 		// In case of fork/joins some of these values are overwritten later
 
 		predecessor := b.Name()
-		defaultPredecessor := true
 		if len(currentComponent.Predecessors()) > 0 {
 			predecessor = currentComponent.Predecessors()[0].Name()
-			defaultPredecessor = false
-		}
-
-		if predecessor == b.Name() {
-			defaultPredecessor = true
 		}
 
 		successor := b.Name()
-		defaultSuccessor := true
 		if len(currentComponent.Successors()) > 0 {
 			successor = currentComponent.Successors()[0].Name()
-			defaultSuccessor = false
 		}
 
-		if successor == b.Name() {
-			defaultSuccessor = true
-		}
-
-		connection := predecessor + "_out_req"
-		if defaultPredecessor {
-			connection = "in_req"
-		}
-		signalAssignments += currentComponent.Name() + "_in_req <= " + connection + ";"
-
-		connection = predecessor + "_out_ack"
-		if defaultPredecessor {
-			connection = "in_ack"
-		}
-		signalAssignments += currentComponent.Name() + "_in_ack <= " + connection + ";"
-
-		connection = successor + "_in_req"
-		if defaultSuccessor {
-			connection = "out_req"
-		}
-		signalAssignments += currentComponent.Name() + "_out_req <= " + connection + ";"
-
-		connection = successor + "_in_ack"
-		if defaultSuccessor {
-			connection = "out_ack"
-		}
-		signalAssignments += currentComponent.Name() + "_out_ack <= " + connection + ";"
+		signalAssignments += currentComponent.Name() + "_in_req <= " + predecessor + "_out_req;"
+		signalAssignments += currentComponent.Name() + "_in_ack <= " + predecessor + "_out_ack;"
+		signalAssignments += currentComponent.Name() + "_out_req <= " + successor + "_in_req;"
+		signalAssignments += currentComponent.Name() + "_out_ack <= " + successor + "_in_ack;"
 		signalAssignments += "\n"
 	}
 
