@@ -186,6 +186,7 @@ END fork;
 LIBRARY ieee;
 USE ieee.std_logic_1164.ALL;
 USE work.click_element_library_constants.ALL;
+use ieee.std_logic_misc.all;
 
 ENTITY MultiHsJoin IS
   GENERIC (
@@ -207,6 +208,7 @@ END MultiHsJoin;
 LIBRARY ieee;
 USE ieee.std_logic_1164.ALL;
 USE work.click_element_library_constants.ALL;
+use ieee.std_logic_misc.all;
 
 ENTITY MultiHsFork IS
   GENERIC (
@@ -512,27 +514,12 @@ ARCHITECTURE beh OF multiHsFork IS
   ATTRIBUTE dont_touch : STRING;
   ATTRIBUTE dont_touch OF phase : SIGNAL IS "true";
   ATTRIBUTE dont_touch OF click : SIGNAL IS "true";
-
-  SIGNAL out_ack_and : STD_LOGIC := '0';
-  SIGNAL out_ack_nand : STD_LOGIC := '0';
 BEGIN
   -- Control Path
   out_req <= (others => in_req);
-
   in_ack <= phase;
-
   
-  out_ack_g: for i in 0 to out_ack'length - 1 generate
-    out_ack_and <= out_ack(i) AND out_ack(i+1);
-  end generate;
-  
-  out_ack_g_n: for i in 0 to out_ack'length - 1 generate
-    out_ack_nand <= NOT(out_ack(i)) AND NOT(out_ack(i+1));
-  end generate;
-  
-  click <= (out_ack_and AND NOT(phase)) OR (out_ack_nand AND phase) AFTER AND3_DELAY + OR2_DELAY;
-
-  -- click <= (and(out_ack) AND NOT(phase)) OR (and(NOT(out_ack)) AND phase) AFTER AND3_DELAY + OR2_DELAY;
+  click <= (and_reduce(out_ack) AND NOT(phase)) OR (and_reduce(NOT(out_ack)) AND phase) AFTER AND3_DELAY + OR2_DELAY;
   
   clock_regs : PROCESS (click, rst)
   BEGIN
@@ -561,20 +548,9 @@ ARCHITECTURE beh OF multiHsJoin IS
 BEGIN
   -- Control Path
   out_req <= phase;
-
   in_ack <= (others => out_ack);
-  
-  in_req_g: for i in 0 to in_req'length - 1 generate
-    in_req_and <= in_req(i) AND in_req(i+1);
-  end generate;
-  
-  in_req_g_n: for i in 0 to in_req'length - 1 generate
-    in_req_nand <= NOT(in_req(i)) AND NOT(in_req(i+1));
-  end generate;
 
-  click <= (in_req_and AND NOT(phase)) OR (in_req_nand AND phase) AFTER AND3_DELAY + OR2_DELAY;
-
-  -- click <= (and(in_req) AND NOT(phase)) OR (and(NOT(in_req)) AND phase) AFTER AND3_DELAY + OR2_DELAY;
+  click <= (and_reduce(in_req) AND NOT(phase)) OR (and_reduce(NOT(in_req)) AND phase) AFTER AND3_DELAY + OR2_DELAY;
   
   clock_regs : PROCESS (click, rst)
   BEGIN
