@@ -172,21 +172,27 @@ func (vi *VariableInfo) GetDecl() *VariableTypeDecl {
 	}
 }
 
-func FromDef(vdef VariableDef) *VariableInfo {
+func FromDef(vdef VariableDef) (*VariableInfo, error) {
 	var copiedFuncIntf *FuncInterface
 	if vdef.FuncIntf() != nil {
 		copiedFuncIntf = vdef.FuncIntf().Copy()
+	}
+
+	typeSize, ok := SupportedTypes[vdef.Typ()]
+	if !ok {
+		return nil, ErrUnsupportedVariableTypeFn(vdef.Typ())
 	}
 
 	return &VariableInfo{
 		Name_: vdef.Name(),
 		Typ_:  vdef.Typ(),
 		Len_:  vdef.Len(),
+		Size_: typeSize,
 
 		FuncIntf_: copiedFuncIntf,
 
 		DefinedOnly_: true,
-	}
+	}, nil
 }
 
 func (vi *VariableInfo) String() string {

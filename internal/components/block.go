@@ -74,6 +74,8 @@ func NewBlock(toplevel bool, parent *Block) *Block {
 			parentBlock: parent,
 
 			inputVariables: NewScopedVariables(),
+
+			isBlock: true,
 		},
 
 		TopLevel: toplevel,
@@ -336,12 +338,20 @@ func (b *Block) Architecture() string {
 	ret += "begin"
 	ret += "\n"
 
+	//ret += b.ioChannels()
+
+	ret += "signalAssignments: process(all)"
+	ret += "\n"
+	ret += "begin"
+	ret += "\n"
+
 	ret += dataSignalAssignments
 	ret += "\n"
 
 	ret += handshakeOverwrites
 	ret += "\n"
-	//ret += b.ioChannels()
+
+	ret += "end process;"
 
 	ret += "\n"
 
@@ -368,7 +378,10 @@ func (b *Block) NewScopeVariable(vdef variable.VariableDef) (*variable.VariableI
 	   		return nil, err
 	   	} */
 
-	vi := variable.FromDef(vdef)
+	vi, err := variable.FromDef(vdef)
+	if err != nil {
+		return nil, err
+	}
 
 	b.VariableOwner[vdef.Name()] = &variableOwner{
 		bc: b,
@@ -485,109 +498,122 @@ func (b *Block) GetVariableLocation(name string) (string, error) {
 	return b.Name() + "_in_data(" + position + ")", nil
 }
 
-func (b *Block) getSignalDefsJoinsAndForks() (string, []*MultiHsFork, []*MultiHsJoin) {
+func (b *Block) getComponentSignalDefJoinsAndForks(currentComponent BodyComponentType) (string, []*MultiHsFork, []*MultiHsJoin) {
+	signalDefs := ""
 	joins := []*MultiHsJoin{}
 	forks := []*MultiHsFork{}
-	signalDefs := ""
 
-	// block signals
+	signalDefs += "signal " + currentComponent.Name() + "_in_req : std_logic;"
+	signalDefs += "signal " + currentComponent.Name() + "_out_req : std_logic;"
+	signalDefs += "signal " + currentComponent.Name() + "_in_ack : std_logic;"
+	signalDefs += "signal " + currentComponent.Name() + "_out_ack : std_logic;"
 
-	signalDefs += "signal " + b.Name() + "_in_req : std_logic;"
-	signalDefs += "signal " + b.Name() + "_in_ack : std_logic;"
-	signalDefs += "signal " + b.Name() + "_in_data : std_logic_vector(" + strconv.Itoa(b.InputVariables().Size) + " - 1 downto 0);"
-	signalDefs += "signal " + b.Name() + "_out_req : std_logic;"
-	signalDefs += "signal " + b.Name() + "_out_ack : std_logic;"
-	signalDefs += "signal " + b.Name() + "_out_data : std_logic_vector(" + strconv.Itoa(b.OutputVariables().Size) + " - 1 downto 0);"
+	if bep, ok := currentComponent.(*BinExprBlock); ok {
+		signalDefs += "signal " + currentComponent.Name() + "_x : std_logic_vector(" + strconv.Itoa(bep.GetXTotalSize()) + "- 1 downto 0) := (others => '0');"
+		signalDefs += "signal " + currentComponent.Name() + "_y : std_logic_vector(" + strconv.Itoa(bep.GetYTotalSize()) + "- 1 downto 0) := (others => '0');"
+		signalDefs += "signal " + currentComponent.Name() + "_result : std_logic_vector(" + strconv.Itoa(bep.GetRTotalSize()) + "- 1 downto 0);"
+	} else {
+		signalDefs += "signal " + currentComponent.Name() + "_in_data : std_logic_vector(" + strconv.Itoa(currentComponent.InputVariables().Size) + "- 1 downto 0);"
+		signalDefs += "signal " + currentComponent.Name() + "_out_data : std_logic_vector(" + strconv.Itoa(currentComponent.OutputVariables().Size) + "- 1 downto 0);"
+	}
 
-	for i, rbp := range b.RegBlockPairs {
-		currentComponent := rbp.Bc
+	signalDefs += "\n"
 
-		if rbp.Reg != nil {
-			panic("block arch: registers not implemented!")
+	//invs := bc.InputVariables()
+
+	joinNeeded := false
+	forkNeeded := false
+
+	prevCs := currentComponent.Predecessors()
+	nextCs := currentComponent.Successors()
+
+	infoPrinter.DebugPrintfln("%s's child %s; %d predecessors %d successors", b.Name(), currentComponent.Name(), len(prevCs), len(nextCs))
+
+	for i, _ := range prevCs {
+		if i+1 >= len(prevCs) {
+			break
 		}
 
-		signalDefs += "signal " + currentComponent.Name() + "_in_req : std_logic;"
-		signalDefs += "signal " + currentComponent.Name() + "_out_req : std_logic;"
-		signalDefs += "signal " + currentComponent.Name() + "_in_ack : std_logic;"
-		signalDefs += "signal " + currentComponent.Name() + "_out_ack : std_logic;"
-
-		if bep, ok := currentComponent.(*BinExprBlock); ok {
-			signalDefs += "signal " + currentComponent.Name() + "_x : std_logic_vector(" + strconv.Itoa(bep.GetXTotalSize()) + "- 1 downto 0) := (others => '0');"
-			signalDefs += "signal " + currentComponent.Name() + "_y : std_logic_vector(" + strconv.Itoa(bep.GetYTotalSize()) + "- 1 downto 0) := (others => '0');"
-			signalDefs += "signal " + currentComponent.Name() + "_result : std_logic_vector(" + strconv.Itoa(bep.GetRTotalSize()) + "- 1 downto 0);"
-		} else {
-			signalDefs += "signal " + currentComponent.Name() + "_in_data : std_logic_vector(" + strconv.Itoa(currentComponent.GetVariableSize()) + "- 1 downto 0);"
-			signalDefs += "signal " + currentComponent.Name() + "_out_data : std_logic_vector(" + strconv.Itoa(currentComponent.GetVariableSize()) + "- 1 downto 0);"
+		if prevCs[i].Name() != prevCs[i+1].Name() {
+			joinNeeded = true
 		}
+	}
+
+	for i, _ := range nextCs {
+		if i+1 >= len(nextCs) {
+			break
+		}
+
+		if nextCs[i].Name() != nextCs[i+1].Name() {
+			forkNeeded = true
+		}
+	}
+
+	if joinNeeded {
+		// Add Join to block
+		newJoin, _ := NewMultiHsJoin(prevCs, currentComponent)
+		joins = append(joins, newJoin)
+
+		b.RegBlockPairs = append(b.RegBlockPairs, &regBodyPair{
+			Bc: newJoin,
+		})
+
+		signalDefs += "signal " + newJoin.Name() + "_in_req : std_logic_vector(" + strconv.Itoa(newJoin.NumHsComponents) + "- 1 downto 0);"
+		signalDefs += "signal " + newJoin.Name() + "_out_req : std_logic;"
+
+		signalDefs += "signal " + newJoin.Name() + "_in_ack : std_logic_vector(" + strconv.Itoa(newJoin.NumHsComponents) + "- 1 downto 0);"
+		signalDefs += "signal " + newJoin.Name() + "_out_ack : std_logic;"
 
 		signalDefs += "\n"
-
-		//invs := bc.InputVariables()
-
-		joinNeeded := false
-		forkNeeded := false
-
-		prevCs := currentComponent.Predecessors()
-		nextCs := currentComponent.Successors()
-
-		infoPrinter.DebugPrintfln("%s's %d. child %s; %d predecessors %d successors", b.Name(), i+1, currentComponent.Name(), len(prevCs), len(nextCs))
-
-		for i, _ := range prevCs {
-			if i+1 >= len(prevCs) {
-				break
-			}
-
-			if prevCs[i].Name() != prevCs[i+1].Name() {
-				joinNeeded = true
-			}
-		}
-
-		for i, _ := range nextCs {
-			if i+1 >= len(nextCs) {
-				break
-			}
-
-			if nextCs[i].Name() != nextCs[i+1].Name() {
-				forkNeeded = true
-			}
-		}
-
-		if joinNeeded {
-			// Add Join to block
-			newJoin, _ := NewMultiHsJoin(prevCs, currentComponent)
-			joins = append(joins, newJoin)
-
-			b.RegBlockPairs = append(b.RegBlockPairs, &regBodyPair{
-				Bc: newJoin,
-			})
-
-			signalDefs += "signal " + newJoin.Name() + "_in_req : std_logic_vector(" + strconv.Itoa(newJoin.NumHsComponents) + "- 1 downto 0);"
-			signalDefs += "signal " + newJoin.Name() + "_out_req : std_logic;"
-
-			signalDefs += "signal " + newJoin.Name() + "_in_ack : std_logic_vector(" + strconv.Itoa(newJoin.NumHsComponents) + "- 1 downto 0);"
-			signalDefs += "signal " + newJoin.Name() + "_out_ack : std_logic;"
-
-			signalDefs += "\n"
-		}
-
-		if forkNeeded {
-			// Add Fork to block
-			newFork, _ := NewMultiHsFork(nextCs, currentComponent)
-			forks = append(forks, newFork)
-
-			b.RegBlockPairs = append(b.RegBlockPairs, &regBodyPair{
-				Bc: newFork,
-			})
-
-			signalDefs += "signal " + newFork.Name() + "_in_req : std_logic;"
-			signalDefs += "signal " + newFork.Name() + "_out_req : std_logic_vector(" + strconv.Itoa(newFork.NumHsComponents) + "- 1 downto 0);"
-
-			signalDefs += "signal " + newFork.Name() + "_in_ack : std_logic;"
-			signalDefs += "signal " + newFork.Name() + "_out_ack : std_logic_vector(" + strconv.Itoa(newFork.NumHsComponents) + "- 1 downto 0);"
-		}
-
-		infoPrinter.DebugPrintfln("%s: forks (%t) joins (%t)", b.Name(), forkNeeded, joinNeeded)
 	}
+
+	if forkNeeded {
+		// Add Fork to block
+		newFork, _ := NewMultiHsFork(nextCs, currentComponent)
+		forks = append(forks, newFork)
+
+		b.RegBlockPairs = append(b.RegBlockPairs, &regBodyPair{
+			Bc: newFork,
+		})
+
+		signalDefs += "signal " + newFork.Name() + "_in_req : std_logic;"
+		signalDefs += "signal " + newFork.Name() + "_out_req : std_logic_vector(" + strconv.Itoa(newFork.NumHsComponents) + "- 1 downto 0);"
+
+		signalDefs += "signal " + newFork.Name() + "_in_ack : std_logic;"
+		signalDefs += "signal " + newFork.Name() + "_out_ack : std_logic_vector(" + strconv.Itoa(newFork.NumHsComponents) + "- 1 downto 0);"
+	}
+
+	infoPrinter.DebugPrintfln("%s: forks (%t) joins (%t)", currentComponent.Name(), forkNeeded, joinNeeded)
+
+	return signalDefs, forks, joins
+}
+
+func (b *Block) getSignalDefsJoinsAndForks() (string, []*MultiHsFork, []*MultiHsJoin) {
+	forks := []*MultiHsFork{}
+	joins := []*MultiHsJoin{}
+	signalDefs := ""
+
+	for i, rbp := range b.RegBlockPairs {
+		if rbp.Reg != nil {
+			panic("pipeline regs not supported yet")
+		}
+
+		infoPrinter.DebugPrintfln("[%s/%s]: processing %d. child", b.Name(), rbp.Bc.Name(), i+1)
+
+		sd, f, j := b.getComponentSignalDefJoinsAndForks(rbp.Bc)
+
+		signalDefs += sd
+		forks = append(forks, f...)
+		joins = append(joins, j...)
+	}
+
+	// block signals
+	infoPrinter.DebugPrintfln("[%s]: processing block itself", b.Name())
+	sd, f, j := b.getComponentSignalDefJoinsAndForks(b)
+
+	signalDefs += sd
+	forks = append(forks, f...)
+	joins = append(joins, j...)
 
 	return signalDefs, forks, joins
 }
@@ -596,13 +622,12 @@ func (b *Block) getDefaultSignalAssignments() string {
 	signalAssignments := ""
 
 	// block I/O assignments
-
-	signalAssignments += b.Name() + "_in_req <= in_req;\n"
-	signalAssignments += "in_ack <= " + b.Name() + "_in_ack;\n"
+	signalAssignments += b.Name() + "_out_req <= in_req;\n"
+	signalAssignments += "in_ack <= " + b.Name() + "_out_ack;\n"
 	signalAssignments += b.Name() + "_in_data <= in_data;\n"
 
-	signalAssignments += "out_req <= " + b.Name() + "_out_req;\n"
-	signalAssignments += b.Name() + "_out_ack<= in_req;\n"
+	signalAssignments += "out_req <= " + b.Name() + "_in_req;\n"
+	signalAssignments += b.Name() + "_in_ack <= out_ack;\n"
 	signalAssignments += "out_data <= " + b.Name() + "_out_data;\n"
 	signalAssignments += "\n"
 
@@ -621,10 +646,12 @@ func (b *Block) getDefaultSignalAssignments() string {
 
 		inputAssignment := ""
 
+		recipient := currentComponent.Name() + "_in_data"
+
 		if _, ok := currentComponent.(*BinExprBlock); ok {
 
 		} else {
-			signalAssignments += currentComponent.Name() + "_in_data <= "
+			signalAssignments += recipient + " <= "
 		}
 
 		infoPrinter.DebugPrintfln("%s's has %d inputs", currentComponent.Name(), len(currentComponent.InputVariables().VariableList))
@@ -661,9 +688,11 @@ func (b *Block) getDefaultSignalAssignments() string {
 
 			if bep, ok := currentComponent.(*BinExprBlock); ok {
 				if i == 0 {
-					signalAssignments += bep.Name() + "_x <= " + currentInputAssignment + ";\n"
+					recipient = bep.Name() + "_x"
+					signalAssignments += recipient + " <= " + currentInputAssignment
 				} else if i == 1 {
-					signalAssignments += bep.Name() + "_y <= " + currentInputAssignment + ";\n"
+					recipient = bep.Name() + "_y"
+					signalAssignments += recipient + " <= " + currentInputAssignment
 				}
 			} else {
 
@@ -672,9 +701,11 @@ func (b *Block) getDefaultSignalAssignments() string {
 				if i+1 < len(currentComponent.InputVariables().VariableList) {
 					inputAssignment += " & "
 				} else {
-					signalAssignments += inputAssignment + ";\n"
+					signalAssignments += inputAssignment
 				}
 			}
+
+			signalAssignments += ";\n"
 
 			infoPrinter.DebugPrintfln("%s's input var %s comes from %s", currentComponent.Name(), input.Name_, currentInputAssignment)
 		}
@@ -697,6 +728,50 @@ func (b *Block) getDefaultSignalAssignments() string {
 		signalAssignments += successor + "_in_req <= " + currentComponent.Name() + "_out_req;"
 		signalAssignments += currentComponent.Name() + "_out_ack <= " + successor + "_in_ack;"
 		signalAssignments += "\n"
+	}
+
+	infoPrinter.DebugPrintfln("[%s]: assigning block outputs (there are %d)", b.Name(), len(b.OutputVariables().VariableList))
+
+	signalAssignments += b.Name() + "_out_data <= "
+
+	// Block output assignments
+	for i, outVar := range b.OutputVariables().VariableList {
+
+		currentInputAssignment := ""
+		var err error
+
+		owner, ok := b.VariableOwner[outVar.Name()]
+		if outVar.Const_ != "" {
+			currentInputAssignment += "std_logic_vector(to_signed(" + outVar.Const() + ", " + strconv.Itoa(outVar.TotalSize()) + "))"
+		} else {
+			if !ok {
+				/* inputAssignment += "<???>"
+				infoPrinter.DebugPrintfln("%s's input var %s not found!", currentComponent.Name(), input.Name_) */
+				panic("Could not find var " + outVar.Name() + "'s owner const is: " + outVar.Const())
+			}
+
+			currentInputAssignment, err = owner.bc.GetVariableLocation(outVar.Name())
+			if err != nil {
+				panic(err.Error())
+			}
+		}
+
+		signalAssignments += currentInputAssignment
+
+		if outVar.Size_ != owner.vi.Size_ {
+			// TODO: disallow implicit casts?
+			infoPrinter.DebugPrintfln("[%s] Return variable size mismatch! %d != %d -> casting to outvar size", b.Name(), outVar.Size_, owner.vi.Size_)
+
+			signalAssignments += "(" + strconv.Itoa(outVar.Size_) + " - 1 downto 0)"
+		}
+
+		if i+1 < len(b.OutputVariables().VariableList) {
+			signalAssignments += " & "
+		} else {
+			signalAssignments += ";\n"
+		}
+
+		infoPrinter.DebugPrintfln("[%s]: output %d is %s", b.Name(), i, currentInputAssignment)
 	}
 
 	return signalAssignments

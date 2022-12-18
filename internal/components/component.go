@@ -2,6 +2,7 @@ package components
 
 import (
 	"errors"
+	"go2async/internal/infoPrinter"
 	"go2async/pkg/variable"
 	"strconv"
 )
@@ -19,6 +20,7 @@ type Component interface {
 	Architecture() string
 	Entity() string
 	EntityName() string
+	Parent() *Block
 }
 
 type BodyComponentType interface {
@@ -56,6 +58,8 @@ type BodyComponent struct {
 
 	inputVariables  *variable.ScopedVariables
 	outputVariables *variable.ScopedVariables
+
+	isBlock bool
 }
 
 // Type checks
@@ -104,7 +108,23 @@ func (bc *BodyComponent) InputVariables() *variable.ScopedVariables {
 }
 
 func (bc *BodyComponent) AddInputVariable(vtd *variable.VariableInfo) (*variable.VariableInfo, error) {
-	return bc.InputVariables().AddVariable(vtd)
+
+	vi, err := bc.InputVariables().AddVariable(vtd)
+
+	if !bc.isBlock {
+		// Check owner map
+		parent := bc.parentBlock
+		if _, ok := parent.VariableOwner[vi.Name()]; !ok {
+			parent.VariableOwner[vi.Name()] = &variableOwner{
+				bc: parent,
+				vi: vi,
+			}
+
+			infoPrinter.DebugPrintfln("[%s]: No owner for variable '%s' found. Making parent %s owner", bc.Name(), vi.Name(), parent.Name())
+		}
+	}
+
+	return vi, err
 }
 
 func (bc *BodyComponent) OutputVariables() *variable.ScopedVariables {

@@ -64,78 +64,82 @@ func getOperandOwnersAndSetNewOwner(bt BodyComponentType, parent *Block, oi *Ope
 	}
 
 	// get sources of X, Y
-	if oi.X != nil {
-		if oi.X.Const_ == "" {
-
-			ownX, ok := parent.VariableOwner[oi.X.Name_]
-			if !ok {
-				infoPrinter.DebugPrintfln("No owner for X variable '%s' found", oi.X.Name_)
-				return nil, errors.New("No owner for X operator")
+	{
+		if oi.X == nil {
+			constVar, err := variable.MakeConst("0", resultType)
+			if err != nil {
+				return nil, err
 			}
 
-			bt.AddPredecessor(ownX.bc)
-			ownX.bc.AddSuccessor(bt)
-
-			infoPrinter.DebugPrintfln("[%s]: Previous component of X input '%s' is '%s'", bt.Name(), oi.X.Name_, ownX.bc.Name())
-		} else {
-			oi.X.Typ_ = resultType
-
-			infoPrinter.DebugPrintfln("[%s]: X Input '%s' is const '%s' with type %s inferred from result", bt.Name(), oi.X.Name_, oi.X.Const_, resultType)
+			oi.X = constVar
 		}
 
 		if oi.X.DefinedOnly_ {
 			panic("using defined only variable")
 		}
 
-		if _, err := bt.AddInputVariable(oi.X); err != nil {
-			return nil, err
+		if oi.X.Const_ != "" {
+			oi.X.Typ_ = resultType
+			infoPrinter.DebugPrintfln("[%s]: X Input '%s' is const '%s' with type %s inferred from result", bt.Name(), oi.X.Name_, oi.X.Const_, resultType)
 		}
-	} else {
-		constVar, err := variable.MakeConst("0", resultType)
+
+		addedVar, err := bt.AddInputVariable(oi.X)
 		if err != nil {
 			return nil, err
 		}
+		oi.X = addedVar
 
-		if _, err := bt.AddInputVariable(constVar); err != nil {
-			return nil, err
+		infoPrinter.DebugPrintfln("[%s]: X Input '%s' const %s type %s", bt.Name(), oi.X.Name_, oi.X.Const_, resultType)
+
+		ownX, ok := parent.VariableOwner[oi.X.Name_]
+		if !ok {
+			// Shouldn't happen
+			return nil, errors.New("No owner for X operator")
 		}
+
+		bt.AddPredecessor(ownX.bc)
+		ownX.bc.AddSuccessor(bt)
+
+		infoPrinter.DebugPrintfln("[%s]: Previous component of X input '%s' is '%s'", bt.Name(), oi.X.Name_, ownX.bc.Name())
 	}
 
-	if oi.Y != nil {
-		if oi.Y.Const_ == "" {
-
-			ownY, ok := parent.VariableOwner[oi.Y.Name_]
-			if !ok {
-				infoPrinter.DebugPrintfln("No owner for Y variable '%s' found", oi.Y.Name_)
-				return nil, errors.New("No owner for Y operator")
+	{
+		if oi.Y == nil {
+			constVar, err := variable.MakeConst("0", resultType)
+			if err != nil {
+				return nil, err
 			}
 
-			bt.AddPredecessor(ownY.bc)
-			ownY.bc.AddSuccessor(bt)
-
-			infoPrinter.DebugPrintfln("[%s]: Previous component of Y input '%s' is '%s'", bt.Name(), oi.Y.Name_, ownY.bc.Name())
-		} else {
-			oi.Y.Typ_ = resultType
-
-			infoPrinter.DebugPrintfln("[%s]: Y Input '%s' is const '%s'", bt.Name(), oi.Y.Name_, oi.Y.Const_)
+			oi.Y = constVar
 		}
 
 		if oi.Y.DefinedOnly_ {
 			panic("using defined only variable")
 		}
 
-		if _, err := bt.AddInputVariable(oi.Y); err != nil {
-			return nil, err
+		if oi.Y.Const_ != "" {
+			oi.Y.Typ_ = resultType
+			infoPrinter.DebugPrintfln("[%s]: Y Input '%s' is const '%s' with type %s inferred from result", bt.Name(), oi.Y.Name_, oi.Y.Const_, resultType)
 		}
-	} else {
-		constVar, err := variable.MakeConst("0", resultType)
+
+		addedVar, err := bt.AddInputVariable(oi.Y)
 		if err != nil {
 			return nil, err
 		}
+		oi.Y = addedVar
 
-		if _, err := bt.AddInputVariable(constVar); err != nil {
-			return nil, err
+		infoPrinter.DebugPrintfln("[%s]: Y Input '%s' const %s type %s", bt.Name(), oi.Y.Name_, oi.Y.Const_, resultType)
+
+		ownY, ok := parent.VariableOwner[oi.Y.Name_]
+		if !ok {
+			// Shouldn't happen
+			return nil, errors.New("No owner for Y operator")
 		}
+
+		bt.AddPredecessor(ownY.bc)
+		ownY.bc.AddSuccessor(bt)
+
+		infoPrinter.DebugPrintfln("[%s]: Previous component of Y input '%s' is '%s'", bt.Name(), oi.Y.Name_, ownY.bc.Name())
 	}
 
 	return bt, nil

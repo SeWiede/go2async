@@ -128,7 +128,7 @@ func (sv *ScopedVariables) AddVariable(v VariableDef) (*VariableInfo, error) {
 
 	sv.Variables[name] = newV
 
-	infoPrinter.VerbosePrintf("Allocated '%s' type %s at pos %d downto %d\n", name, v.Typ(), (sv.Size)+(v.Len()*typeSize)-1, (sv.Size))
+	infoPrinter.VerbosePrintf("Allocated '%s' type %s at pos %d downto %d\n", newV.Name(), v.Typ(), (sv.Size)+(v.Len()*typeSize)-1, (sv.Size))
 
 	sv.Size += typeSize * v.Len()
 

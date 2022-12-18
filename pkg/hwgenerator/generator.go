@@ -923,9 +923,9 @@ func (g *Generator) GenerateScope(f *ast.FuncDecl) (s *components.Scope, err err
 	// only relevant for variable handling
 	paramDummyBlock := components.NewParamDummyBlock(params)
 
-	for _, field := range f.Type.Params.List {
-		for _, param := range field.Names {
-			switch fieldType := field.Type.(type) {
+	for _, paramField := range f.Type.Params.List {
+		for _, param := range paramField.Names {
+			switch fieldType := paramField.Type.(type) {
 			case *ast.Ident, *ast.ArrayType:
 				vi, err := g.parseVariableExpression(fieldType)
 				if err != nil {
@@ -970,6 +970,44 @@ func (g *Generator) GenerateScope(f *ast.FuncDecl) (s *components.Scope, err err
 		}
 	}
 
+	// Get return variables
+	returnVars := []*variable.VariableInfo{}
+	for _, paramField := range f.Type.Results.List {
+		var vi *variable.VariableInfo
+
+		switch fieldType := paramField.Type.(type) {
+		case *ast.Ident, *ast.ArrayType:
+			vic, err := g.parseVariableExpression(fieldType)
+			if err != nil {
+				return nil, g.peb.NewParseError(f, err)
+			}
+
+			vi, err = variable.FromDef(vic)
+			if err != nil {
+				return nil, g.peb.NewParseError(f, err)
+			}
+
+			infoPrinter.DebugPrintfln("Got result variable %s type %s size %d", vi.Name(), vi.Typ(), vi.Size_)
+		case *ast.FuncType:
+			return nil, g.peb.NewParseError(f, errors.New("FuncType is not supported in function results list"))
+		default:
+			return nil, g.peb.NewParseError(f, errors.New("Type '"+reflect.TypeOf(fieldType).String()+"' is not supported in function results list"))
+		}
+
+		returnVars = append(returnVars, vi)
+
+		for i, param := range paramField.Names {
+			if i != 0 {
+				viCopy := vi.Copy()
+				vi.Name_ = param.Name
+
+				returnVars = append(returnVars, viCopy)
+			} else {
+				vi.Name_ = param.Name
+			}
+		}
+	}
+
 	if len(params) == 0 {
 		return nil, g.peb.NewParseError(f, errors.New("At least one function parameter expected"))
 	}
@@ -989,8 +1027,14 @@ func (g *Generator) GenerateScope(f *ast.FuncDecl) (s *components.Scope, err err
 		return nil, g.peb.NewParseError(f, errors.New("Missing return statement at the end"))
 	}
 
-	returnVars := []*variable.VariableInfo{}
-	for _, res := range rs.Results {
+	if len(rs.Results) != len(returnVars) {
+		return nil, g.peb.NewParseError(f, errors.New("Func results list length ("+strconv.Itoa(len(rs.Results))+") mismatches number of return vars ("+strconv.Itoa(len(returnVars))+")"))
+	}
+
+	// Overwrite name in return variables: this is to find the corresponding variable and maybe also case sizes
+	// TODO: disallow implicit casting?
+
+	for i, res := range rs.Results {
 		switch x := res.(type) {
 		case *ast.Ident:
 			vi, err := block.GetVariable(x.Name)
@@ -998,7 +1042,14 @@ func (g *Generator) GenerateScope(f *ast.FuncDecl) (s *components.Scope, err err
 				return nil, g.peb.NewParseError(f, err)
 			}
 
-			returnVars = append(returnVars, vi)
+			returnVars[i].Name_ = vi.Name()
+
+			if vi.Size_ != returnVars[i].Size_ {
+				infoPrinter.DebugPrintfln("@@@@@@@ Return variable size mismatch! %d != %d", vi.Size_, returnVars[i].Size_)
+			}
+			infoPrinter.DebugPrintfln("Overwriting name of return variable %s to %s typ %s and %s", returnVars[i].Name(), vi.Name(), returnVars[i].Typ(), vi.Typ())
+
+			// TODO: check types?
 		case *ast.IndexExpr:
 			vi, err := block.GetVariable(x.X.(*ast.Ident).Name)
 			if err != nil {
@@ -1014,7 +1065,9 @@ func (g *Generator) GenerateScope(f *ast.FuncDecl) (s *components.Scope, err err
 				return nil, g.peb.NewParseError(f, errors.New("Invalid indexType in return"))
 			}
 
-			returnVars = append(returnVars, vi)
+			returnVars[i].Name_ = vi.Name()
+			// returnVars = append(returnVars, vi)
+			// TODO: check types?
 		default:
 			return nil, g.peb.NewParseError(f, errors.New("Invalid expression in return"))
 		}
