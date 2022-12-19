@@ -101,20 +101,8 @@ func NewBinExprBlock(op string, oi *OperandInfo, parent *Block) (*BinExprBlock, 
 func getOperandOwnersAndSetNewOwner(bt BodyComponentType, parent *Block, oi *OperandInfo) (BodyComponentType, error) {
 	resultType := ""
 
+	// Do this step first, to fetch the resultType
 	if oi.R != nil {
-		// Set new owner of result variable after getting previous owners!
-		if own, ok := parent.VariableOwner[oi.R.Name_]; ok {
-			own.bc = bt
-			own.vi = oi.R
-		} else {
-			infoPrinter.DebugPrintfln("Adding variable '%s' to ownermap of '%s'", oi.R.Name_, parent.Name())
-
-			parent.VariableOwner[oi.R.Name_] = &variableOwner{
-				bc: bt,
-				vi: oi.R,
-			}
-		}
-
 		oi.R.DefinedOnly_ = false
 
 		if _, err := bt.AddOutputVariable(oi.R); err != nil {
@@ -205,6 +193,19 @@ func getOperandOwnersAndSetNewOwner(bt BodyComponentType, parent *Block, oi *Ope
 		ownY.bc.AddSuccessor(bt)
 
 		infoPrinter.DebugPrintfln("[%s]: Previous component of Y input '%s' is '%s'", bt.Name(), oi.Y.Name_, ownY.bc.Name())
+	}
+
+	// Set new owner of result variable after getting previous owners! - R is not nil here!
+	if own, ok := parent.VariableOwner[oi.R.Name_]; ok {
+		own.bc = bt
+		own.vi = oi.R
+	} else {
+		infoPrinter.DebugPrintfln("Adding variable '%s' to ownermap of '%s'", oi.R.Name_, parent.Name())
+
+		parent.VariableOwner[oi.R.Name_] = &variableOwner{
+			bc: bt,
+			vi: oi.R,
+		}
 	}
 
 	return bt, nil
