@@ -33,6 +33,71 @@ type OperandInfo struct {
 
 var bebNr = 0
 
+func NewBinExprBlock(op string, oi *OperandInfo, parent *Block) (*BinExprBlock, error) {
+	nr := bebNr
+	bebNr++
+
+	name := binexprblockprefix + strconv.Itoa(nr)
+
+	ret := &BinExprBlock{
+		BodyComponent: BodyComponent{
+			number:   nr,
+			archName: archPrefix + name,
+
+			In: &HandshakeChannel{
+				Out: false,
+			},
+
+			Out: &HandshakeChannel{
+				Req:       name + "_o_req",
+				Ack:       name + "_o_ack",
+				Data:      name + "_data",
+				Out:       true,
+				DataWidth: parent.GetCurrentVariableSize(),
+			},
+
+			parentBlock: parent,
+
+			inputVariables:  variable.NewScopedVariables(),
+			outputVariables: variable.NewScopedVariables(),
+
+			predecessors: map[string]BodyComponentType{},
+			successors:   map[string]BodyComponentType{},
+		},
+
+		Operation: op,
+		Oi:        oi,
+	}
+
+	if *globalArguments.Debug {
+		opDescription := fmt.Sprintf("binExprBlock '%s': %s [size %d, len %d, index %s; const %s] = %s [size %d, len %d, index %s; const %s] ",
+			ret.Name(), oi.R.Name_, oi.R.Size_, oi.R.Len_, oi.R.Index_, oi.R.Const_, oi.X.Name_, oi.X.Size_, oi.X.Len_, oi.X.Index_, oi.X.Const_)
+
+		opDescription += op
+
+		if oi.Y != nil {
+			opDescription += fmt.Sprintf(" %s [size %d, len %d, index %s; const %s]", oi.Y.Name_, oi.Y.Size_, oi.Y.Len_, oi.Y.Index_, oi.Y.Const_)
+		}
+
+		infoPrinter.DebugPrintln("Creating " + opDescription + " - parent: " + parent.archName)
+
+		opDescription += fmt.Sprintf("\n")
+
+		ret.opDescription = opDescription
+	}
+
+	if op != "NOP" {
+		// get sources of X, Y
+		if _, err := getOperandOwnersAndSetNewOwner(ret, parent, oi); err != nil {
+			return nil, err
+		}
+
+		infoPrinter.DebugPrintfln("[%s] finished owner assignments of [%s]", parent.Name(), ret.Name())
+	}
+
+	return ret, nil
+}
+
 func getOperandOwnersAndSetNewOwner(bt BodyComponentType, parent *Block, oi *OperandInfo) (BodyComponentType, error) {
 	resultType := ""
 
@@ -143,68 +208,6 @@ func getOperandOwnersAndSetNewOwner(bt BodyComponentType, parent *Block, oi *Ope
 	}
 
 	return bt, nil
-}
-
-func NewBinExprBlock(op string, oi *OperandInfo, parent *Block) (*BinExprBlock, error) {
-	nr := bebNr
-	bebNr++
-
-	name := binexprblockprefix + strconv.Itoa(nr)
-
-	ret := &BinExprBlock{
-		BodyComponent: BodyComponent{
-			number:   nr,
-			archName: archPrefix + name,
-
-			In: &HandshakeChannel{
-				Out: false,
-			},
-
-			Out: &HandshakeChannel{
-				Req:       name + "_o_req",
-				Ack:       name + "_o_ack",
-				Data:      name + "_data",
-				Out:       true,
-				DataWidth: parent.GetCurrentVariableSize(),
-			},
-
-			parentBlock: parent,
-
-			inputVariables:  variable.NewScopedVariables(),
-			outputVariables: variable.NewScopedVariables(),
-		},
-
-		Operation: op,
-		Oi:        oi,
-	}
-
-	if *globalArguments.Debug {
-		opDescription := fmt.Sprintf("binExprBlock '%s': %s [size %d, len %d, index %s; const %s] = %s [size %d, len %d, index %s; const %s] ",
-			ret.Name(), oi.R.Name_, oi.R.Size_, oi.R.Len_, oi.R.Index_, oi.R.Const_, oi.X.Name_, oi.X.Size_, oi.X.Len_, oi.X.Index_, oi.X.Const_)
-
-		opDescription += op
-
-		if oi.Y != nil {
-			opDescription += fmt.Sprintf(" %s [size %d, len %d, index %s; const %s]", oi.Y.Name_, oi.Y.Size_, oi.Y.Len_, oi.Y.Index_, oi.Y.Const_)
-		}
-
-		infoPrinter.DebugPrintln("Creating " + opDescription + " - parent: " + parent.archName)
-
-		opDescription += fmt.Sprintf("\n")
-
-		ret.opDescription = opDescription
-	}
-
-	if op != "NOP" {
-		// get sources of X, Y
-		if _, err := getOperandOwnersAndSetNewOwner(ret, parent, oi); err != nil {
-			return nil, err
-		}
-
-		infoPrinter.DebugPrintfln("[%s] finished owner assignments of [%s]", parent.Name(), ret.Name())
-	}
-
-	return ret, nil
 }
 
 func (bep *BinExprBlock) GetXTotalSize() int {

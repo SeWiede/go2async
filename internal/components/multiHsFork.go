@@ -12,7 +12,7 @@ var ErrInvalidNumberOfHsComponents = errors.New("Invalid number of handshake com
 type MultiHsFork struct {
 	BodyComponent
 
-	Receivers []BodyComponentType
+	Receivers map[string]BodyComponentType
 	Sender    BodyComponentType
 
 	NumHsComponents int
@@ -20,7 +20,7 @@ type MultiHsFork struct {
 
 var multiHsForkNr = 0
 
-func NewMultiHsFork(receivers []BodyComponentType, sender BodyComponentType) (*MultiHsFork, error) {
+func NewMultiHsFork(receivers map[string]BodyComponentType, sender BodyComponentType) (*MultiHsFork, error) {
 	comps := len(receivers)
 	if comps <= 1 {
 		return nil, ErrInvalidNumberOfHsComponents

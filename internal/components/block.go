@@ -75,6 +75,9 @@ func NewBlock(toplevel bool, parent *Block) *Block {
 
 			inputVariables: NewScopedVariables(),
 
+			predecessors: map[string]BodyComponentType{},
+			successors:   map[string]BodyComponentType{},
+
 			isBlock: true,
 		},
 
@@ -104,6 +107,9 @@ func NewParamDummyBlock(params map[string]*variable.VariableInfo) *Block {
 	}
 
 	ret.archName = "DummyBlock"
+
+	ret.predecessors = map[string]BodyComponentType{}
+	ret.successors = map[string]BodyComponentType{}
 
 	return ret
 }
@@ -409,11 +415,11 @@ func (b *Block) GetVariable(name string) (*variable.VariableInfo, error) {
 			return nil, err
 		}
 
-		prevComps := b.Predecessors()
-		prevComps = append(prevComps, b.Parent())
+		b.AddPredecessor(b.Parent())
+		//prevComps = append(prevComps, b.Parent())
 
-		nextComps := b.Parent().Successors()
-		nextComps = append(nextComps, b)
+		//nextComps := b.Parent().Successors()
+		b.Parent().AddSuccessor(b)
 
 		// Track variables that are coming from outside this block's scope.
 		vi, err = b.NewScopeVariable(vi)
@@ -529,24 +535,11 @@ func (b *Block) getComponentSignalDefJoinsAndForks(currentComponent BodyComponen
 
 	infoPrinter.DebugPrintfln("%s's child %s; %d predecessors %d successors", b.Name(), currentComponent.Name(), len(prevCs), len(nextCs))
 
-	for i, _ := range prevCs {
-		if i+1 >= len(prevCs) {
-			break
-		}
-
-		if prevCs[i].Name() != prevCs[i+1].Name() {
-			joinNeeded = true
-		}
+	if len(prevCs) > 1 {
+		joinNeeded = true
 	}
-
-	for i, _ := range nextCs {
-		if i+1 >= len(nextCs) {
-			break
-		}
-
-		if nextCs[i].Name() != nextCs[i+1].Name() {
-			forkNeeded = true
-		}
+	if len(nextCs) > 1 {
+		forkNeeded = true
 	}
 
 	if joinNeeded {
@@ -713,13 +706,15 @@ func (b *Block) getDefaultSignalAssignments() string {
 		// In case of fork/joins some of these values are overwritten later
 
 		predecessor := b.Name()
-		if len(currentComponent.Predecessors()) > 0 {
-			predecessor = currentComponent.Predecessors()[0].Name()
+		for _, pred := range currentComponent.Predecessors() {
+			predecessor = pred.Name()
+			break
 		}
 
 		successor := b.Name()
-		if len(currentComponent.Successors()) > 0 {
-			successor = currentComponent.Successors()[0].Name()
+		for _, succ := range currentComponent.Successors() {
+			successor = succ.Name()
+			break
 		}
 
 		signalAssignments += currentComponent.Name() + "_in_req <= " + predecessor + "_out_req;"
@@ -787,7 +782,10 @@ func (b *Block) getHandshakeOverwrites(forks []*MultiHsFork, joins []*MultiHsJoi
 		signalOverwrites += fork.Sender.Name() + "_out_ack <= " + fork.Name() + "_in_ack;\n"
 
 		forkOutAck := fork.Name() + "_out_ack <= "
-		for i, receiver := range fork.Receivers {
+
+		// Order does not matter
+		i := 0
+		for _, receiver := range fork.Receivers {
 			istr := strconv.Itoa(i)
 			signalOverwrites += receiver.Name() + "_in_req <= " + fork.Name() + "_out_req(" + istr + ");\n"
 
@@ -796,6 +794,8 @@ func (b *Block) getHandshakeOverwrites(forks []*MultiHsFork, joins []*MultiHsJoi
 			if i+1 < len(fork.Receivers) {
 				forkOutAck += " & "
 			}
+
+			i++
 		}
 
 		signalOverwrites += forkOutAck + ";\n"
@@ -808,7 +808,10 @@ func (b *Block) getHandshakeOverwrites(forks []*MultiHsFork, joins []*MultiHsJoi
 		signalOverwrites += join.Receiver.Name() + "_in_req <= " + join.Name() + "_out_req;\n"
 
 		joinInReq := join.Name() + "_in_req <= "
-		for i, sender := range join.Senders {
+
+		// Order does not matter
+		i := 0
+		for _, sender := range join.Senders {
 			istr := strconv.Itoa(i)
 			signalOverwrites += sender.Name() + "_out_ack <= " + join.Name() + "_in_ack(" + istr + ");\n"
 
@@ -817,6 +820,8 @@ func (b *Block) getHandshakeOverwrites(forks []*MultiHsFork, joins []*MultiHsJoi
 			if i+1 < len(join.Senders) {
 				joinInReq += " & "
 			}
+
+			i++
 		}
 
 		signalOverwrites += joinInReq + ";\n"

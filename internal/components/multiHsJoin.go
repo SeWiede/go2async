@@ -9,7 +9,7 @@ const multiHsJoinprefix = "MHSJ_"
 type MultiHsJoin struct {
 	BodyComponent
 
-	Senders  []BodyComponentType
+	Senders  map[string]BodyComponentType
 	Receiver BodyComponentType
 
 	NumHsComponents int
@@ -17,7 +17,7 @@ type MultiHsJoin struct {
 
 var multiHsJoinNr = 0
 
-func NewMultiHsJoin(senders []BodyComponentType, receiver BodyComponentType) (*MultiHsJoin, error) {
+func NewMultiHsJoin(senders map[string]BodyComponentType, receiver BodyComponentType) (*MultiHsJoin, error) {
 	comps := len(senders)
 
 	if comps <= 1 {

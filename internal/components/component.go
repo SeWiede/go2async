@@ -30,9 +30,9 @@ type BodyComponentType interface {
 
 	GetVariableSize() int
 
-	Predecessors() []BodyComponentType
+	Predecessors() map[string]BodyComponentType
 	AddPredecessor(BodyComponentType)
-	Successors() []BodyComponentType
+	Successors() map[string]BodyComponentType
 	AddSuccessor(BodyComponentType)
 
 	InputVariables() *variable.ScopedVariables
@@ -53,8 +53,8 @@ type BodyComponent struct {
 	In  *HandshakeChannel
 	Out *HandshakeChannel
 
-	predecessors []BodyComponentType
-	successors   []BodyComponentType
+	predecessors map[string]BodyComponentType
+	successors   map[string]BodyComponentType
 
 	inputVariables  *variable.ScopedVariables
 	outputVariables *variable.ScopedVariables
@@ -87,20 +87,20 @@ func (bc *BodyComponent) GetVariableSize() int {
 	return bc.InputVariables().Size
 }
 
-func (bc *BodyComponent) Predecessors() []BodyComponentType {
+func (bc *BodyComponent) Predecessors() map[string]BodyComponentType {
 	return bc.predecessors
 }
 
 func (bc *BodyComponent) AddPredecessor(bct BodyComponentType) {
-	bc.predecessors = append(bc.predecessors, bct)
+	bc.predecessors[bct.Name()] = bct
 }
 
-func (bc *BodyComponent) Successors() []BodyComponentType {
+func (bc *BodyComponent) Successors() map[string]BodyComponentType {
 	return bc.successors
 }
 
 func (bc *BodyComponent) AddSuccessor(bct BodyComponentType) {
-	bc.successors = append(bc.successors, bct)
+	bc.successors[bct.Name()] = bct
 }
 
 func (bc *BodyComponent) InputVariables() *variable.ScopedVariables {
