@@ -3,7 +3,7 @@ package components
 import (
 	"errors"
 	"go2async/internal/infoPrinter"
-	"go2async/pkg/variable"
+	"go2async/internal/variable"
 	"strconv"
 )
 

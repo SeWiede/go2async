@@ -8,7 +8,7 @@ import (
 	"go/token"
 	"go2async/internal/components"
 	infoPrinter "go2async/internal/infoPrinter"
-	"go2async/pkg/variable"
+	"go2async/internal/variable"
 	"io/ioutil"
 	"os"
 	"reflect"

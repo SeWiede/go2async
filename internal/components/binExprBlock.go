@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"go2async/internal/globalArguments"
 	"go2async/internal/infoPrinter"
-	"go2async/pkg/variable"
+	"go2async/internal/variable"
 	"strconv"
 	"strings"
 )
@@ -111,7 +111,7 @@ func getOperandOwnersAndSetNewOwner(bt BodyComponentType, parent *Block, oi *Ope
 
 		resultType = oi.R.Typ_
 
-		infoPrinter.DebugPrintfln("New owner of variable '%s' is new binExprBlock '%s'", oi.R.Name_, bt.Name())
+		infoPrinter.DebugPrintfln("[%s] Result variable '%s' type '%s' added to outputs", bt.Name(), oi.R.Name(), oi.R.Typ())
 	} else {
 		panic("Missing result var")
 	}
@@ -142,7 +142,7 @@ func getOperandOwnersAndSetNewOwner(bt BodyComponentType, parent *Block, oi *Ope
 		}
 		oi.X = addedVar
 
-		infoPrinter.DebugPrintfln("[%s]: X Input '%s' const %s type %s", bt.Name(), oi.X.Name_, oi.X.Const_, resultType)
+		infoPrinter.DebugPrintfln("[%s]: X Input '%s' type %s", bt.Name(), oi.X.Name_, resultType)
 
 		ownX, ok := parent.VariableOwner[oi.X.Name_]
 		if !ok {
@@ -181,7 +181,7 @@ func getOperandOwnersAndSetNewOwner(bt BodyComponentType, parent *Block, oi *Ope
 		}
 		oi.Y = addedVar
 
-		infoPrinter.DebugPrintfln("[%s]: Y Input '%s' const %s type %s", bt.Name(), oi.Y.Name_, oi.Y.Const_, resultType)
+		infoPrinter.DebugPrintfln("[%s]: Y Input '%s' type %s", bt.Name(), oi.Y.Name_, resultType)
 
 		ownY, ok := parent.VariableOwner[oi.Y.Name_]
 		if !ok {
@@ -207,6 +207,8 @@ func getOperandOwnersAndSetNewOwner(bt BodyComponentType, parent *Block, oi *Ope
 			vi: oi.R,
 		}
 	}
+
+	infoPrinter.DebugPrintfln("New owner of variable '%s' is new binExprBlock '%s'", oi.R.Name_, bt.Name())
 
 	return bt, nil
 }
