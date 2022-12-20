@@ -21,8 +21,9 @@ type regBodyPair struct {
 }
 
 type variableOwner struct {
-	bc BodyComponentType
-	vi *variable.VariableInfo
+	// Linked list of predecessors
+	ownerList *ownerList
+	vi        *variable.VariableInfo
 }
 
 type Block struct {
@@ -390,8 +391,8 @@ func (b *Block) NewScopeVariable(vdef variable.VariableDef) (*variable.VariableI
 	}
 
 	b.VariableOwner[vdef.Name()] = &variableOwner{
-		bc: b,
-		vi: vi,
+		ownerList: NewOwnerList(b),
+		vi:        vi,
 	}
 
 	return vi, nil
@@ -402,7 +403,7 @@ func (b *Block) GetVariable(name string) (*variable.VariableInfo, error) {
 
 	own, ok := b.VariableOwner[name]
 	if ok {
-		infoPrinter.DebugPrintfln("Variable %s's owner is %s", name, own.bc.Name())
+		infoPrinter.DebugPrintfln("Variable %s's latest owner is %s", name, own.ownerList.lastest.Name())
 		return own.vi, nil
 	} else {
 		if b.Parent() == nil {
@@ -431,8 +432,8 @@ func (b *Block) GetVariable(name string) (*variable.VariableInfo, error) {
 
 		// New owner of variable in current block is the current block.
 		b.VariableOwner[vi.Name()] = &variableOwner{
-			bc: b,
-			vi: vi,
+			ownerList: NewOwnerList(b),
+			vi:        vi,
 		}
 
 		b.InputVariables().AddVariable(vi)
@@ -653,9 +654,7 @@ func (b *Block) getDefaultSignalAssignments() string {
 
 		for i, input := range currentComponent.InputVariables().VariableList {
 			currentInputAssignment := ""
-			var err error
 
-			owner, ok := b.VariableOwner[input.Name_]
 			if input.Const_ != "" {
 				currentInputAssignment += "std_logic_vector(to_signed(" + input.Const_ + ", "
 
@@ -667,13 +666,19 @@ func (b *Block) getDefaultSignalAssignments() string {
 
 				currentInputAssignment += "))"
 			} else {
+				varOwner, ok := b.VariableOwner[input.Name_]
 				if !ok {
 					/* inputAssignment += "<???>"
 					infoPrinter.DebugPrintfln("%s's input var %s not found!", currentComponent.Name(), input.Name_) */
 					panic("Could not find var " + input.Name_ + "'s owner const is: " + input.Const_)
 				}
 
-				currentInputAssignment, err = owner.bc.GetVariableLocation(input.Name_)
+				predecessor, err := varOwner.ownerList.GetOwnerOf(currentComponent)
+				if err != nil {
+					panic("There was no predecessor for " + currentComponent.Name() + " for variable " + input.Name())
+				}
+
+				currentInputAssignment, err = predecessor.GetVariableLocation(input.Name_)
 				if err != nil {
 					panic(err.Error())
 				}
@@ -735,7 +740,7 @@ func (b *Block) getDefaultSignalAssignments() string {
 		currentInputAssignment := ""
 		var err error
 
-		owner, ok := b.VariableOwner[outVar.Name()]
+		varOwner, ok := b.VariableOwner[outVar.Name()]
 		if outVar.Const_ != "" {
 			currentInputAssignment += "std_logic_vector(to_signed(" + outVar.Const() + ", " + strconv.Itoa(outVar.TotalSize()) + "))"
 		} else {
@@ -745,7 +750,9 @@ func (b *Block) getDefaultSignalAssignments() string {
 				panic("Could not find var " + outVar.Name() + "'s owner const is: " + outVar.Const())
 			}
 
-			currentInputAssignment, err = owner.bc.GetVariableLocation(outVar.Name())
+			predecessor := varOwner.ownerList.GetLatest()
+
+			currentInputAssignment, err = predecessor.GetVariableLocation(outVar.Name())
 			if err != nil {
 				panic(err.Error())
 			}
@@ -753,9 +760,9 @@ func (b *Block) getDefaultSignalAssignments() string {
 
 		signalAssignments += currentInputAssignment
 
-		if outVar.Size_ != owner.vi.Size_ {
+		if outVar.Size_ != varOwner.vi.Size_ {
 			// TODO: disallow implicit casts?
-			infoPrinter.DebugPrintfln("[%s] Return variable size mismatch! %d != %d -> casting to outvar size", b.Name(), outVar.Size_, owner.vi.Size_)
+			infoPrinter.DebugPrintfln("[%s] Return variable size mismatch! %d != %d -> casting to outvar size", b.Name(), outVar.Size_, varOwner.vi.Size_)
 
 			signalAssignments += "(" + strconv.Itoa(outVar.Size_) + " - 1 downto 0)"
 		}

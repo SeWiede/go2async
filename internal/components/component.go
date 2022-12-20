@@ -115,9 +115,10 @@ func (bc *BodyComponent) AddInputVariable(vtd *variable.VariableInfo) (*variable
 		// Check owner map
 		parent := bc.parentBlock
 		if _, ok := parent.VariableOwner[vi.Name()]; !ok {
+
 			parent.VariableOwner[vi.Name()] = &variableOwner{
-				bc: parent,
-				vi: vi,
+				ownerList: NewOwnerList(parent),
+				vi:        vtd,
 			}
 
 			infoPrinter.DebugPrintfln("[%s]: No owner for variable '%s' found. Making parent %s owner", bc.Name(), vi.Name(), parent.Name())

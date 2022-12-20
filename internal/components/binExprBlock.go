@@ -150,10 +150,13 @@ func getOperandOwnersAndSetNewOwner(bt BodyComponentType, parent *Block, oi *Ope
 			return nil, errors.New("No owner for X operator")
 		}
 
-		bt.AddPredecessor(ownX.bc)
-		ownX.bc.AddSuccessor(bt)
+		latestOwner := ownX.ownerList.lastest
+		ownX.ownerList.AddSuccessorToLatest(bt)
 
-		infoPrinter.DebugPrintfln("[%s]: Previous component of X input '%s' is '%s'", bt.Name(), oi.X.Name_, ownX.bc.Name())
+		bt.AddPredecessor(latestOwner)
+		latestOwner.AddSuccessor(bt)
+
+		infoPrinter.DebugPrintfln("[%s]: Previous component of X input '%s' is '%s'", bt.Name(), oi.X.Name_, latestOwner.Name())
 	}
 
 	{
@@ -189,22 +192,26 @@ func getOperandOwnersAndSetNewOwner(bt BodyComponentType, parent *Block, oi *Ope
 			return nil, errors.New("No owner for Y operator")
 		}
 
-		bt.AddPredecessor(ownY.bc)
-		ownY.bc.AddSuccessor(bt)
+		latestOwner := ownY.ownerList.lastest
+		ownY.ownerList.AddSuccessorToLatest(bt)
 
-		infoPrinter.DebugPrintfln("[%s]: Previous component of Y input '%s' is '%s'", bt.Name(), oi.Y.Name_, ownY.bc.Name())
+		bt.AddPredecessor(latestOwner)
+
+		latestOwner.AddSuccessor(bt)
+
+		infoPrinter.DebugPrintfln("[%s]: Previous component of Y input '%s' is '%s'", bt.Name(), oi.Y.Name_, latestOwner.Name())
 	}
 
 	// Set new owner of result variable after getting previous owners! - R is not nil here!
-	if own, ok := parent.VariableOwner[oi.R.Name_]; ok {
-		own.bc = bt
+	if own, ok := parent.VariableOwner[oi.R.Name()]; ok {
 		own.vi = oi.R
+		own.ownerList.AddOwner(bt)
 	} else {
 		infoPrinter.DebugPrintfln("Adding variable '%s' to ownermap of '%s'", oi.R.Name_, parent.Name())
 
-		parent.VariableOwner[oi.R.Name_] = &variableOwner{
-			bc: bt,
-			vi: oi.R,
+		parent.VariableOwner[oi.R.Name()] = &variableOwner{
+			ownerList: NewOwnerList(bt),
+			vi:        oi.R,
 		}
 	}
 
