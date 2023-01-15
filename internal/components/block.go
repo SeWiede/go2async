@@ -531,21 +531,21 @@ func (b *Block) getComponentSignalDefJoinsAndForks(currentComponent BodyComponen
 	joinNeeded := false
 	forkNeeded := false
 
-	prevCs := currentComponent.Predecessors()
-	nextCs := currentComponent.Successors()
+	predecessors := currentComponent.Predecessors()
+	successors := currentComponent.Successors()
 
-	infoPrinter.DebugPrintfln("%s's child %s; %d predecessors %d successors", b.Name(), currentComponent.Name(), len(prevCs), len(nextCs))
+	infoPrinter.DebugPrintfln("%s's child %s; %d predecessors %d successors", b.Name(), currentComponent.Name(), len(predecessors), len(successors))
 
-	if len(prevCs) > 1 {
+	if len(predecessors) > 1 {
 		joinNeeded = true
 	}
-	if len(nextCs) > 1 {
+	if len(successors) > 1 {
 		forkNeeded = true
 	}
 
 	if joinNeeded {
 		// Add Join to block
-		newJoin, _ := NewMultiHsJoin(prevCs, currentComponent)
+		newJoin, _ := NewMultiHsJoin(predecessors, currentComponent)
 		joins = append(joins, newJoin)
 
 		b.RegBlockPairs = append(b.RegBlockPairs, &regBodyPair{
@@ -563,7 +563,7 @@ func (b *Block) getComponentSignalDefJoinsAndForks(currentComponent BodyComponen
 
 	if forkNeeded {
 		// Add Fork to block
-		newFork, _ := NewMultiHsFork(nextCs, currentComponent)
+		newFork, _ := NewMultiHsFork(successors, currentComponent)
 		forks = append(forks, newFork)
 
 		b.RegBlockPairs = append(b.RegBlockPairs, &regBodyPair{
@@ -587,6 +587,8 @@ func (b *Block) getSignalDefsJoinsAndForks() (string, []*MultiHsFork, []*MultiHs
 	joins := []*MultiHsJoin{}
 	signalDefs := ""
 
+	openEndComps := map[string]BodyComponentType{}
+
 	for i, rbp := range b.RegBlockPairs {
 		if rbp.Reg != nil {
 			panic("pipeline regs not supported yet")
@@ -595,6 +597,11 @@ func (b *Block) getSignalDefsJoinsAndForks() (string, []*MultiHsFork, []*MultiHs
 		infoPrinter.DebugPrintfln("[%s/%s]: processing %d. child", b.Name(), rbp.Bc.Name(), i+1)
 
 		sd, f, j := b.getComponentSignalDefJoinsAndForks(rbp.Bc)
+
+		if len(rbp.Bc.Successors()) == 0 {
+			// Track comps with no successors for end-of-block join
+			openEndComps[rbp.Bc.Name()] = rbp.Bc
+		}
 
 		signalDefs += sd
 		forks = append(forks, f...)
@@ -608,6 +615,26 @@ func (b *Block) getSignalDefsJoinsAndForks() (string, []*MultiHsFork, []*MultiHs
 	signalDefs += sd
 	forks = append(forks, f...)
 	joins = append(joins, j...)
+
+	// Add end-of-block join
+	endJoin, err := NewMultiHsJoin(openEndComps, b)
+	if err != nil {
+		panic("error while building endJoin")
+	}
+
+	signalDefs += "signal " + endJoin.Name() + "_in_req : std_logic_vector(" + strconv.Itoa(endJoin.NumHsComponents) + "- 1 downto 0);"
+	signalDefs += "signal " + endJoin.Name() + "_out_req : std_logic;"
+
+	signalDefs += "signal " + endJoin.Name() + "_in_ack : std_logic_vector(" + strconv.Itoa(endJoin.NumHsComponents) + "- 1 downto 0);"
+	signalDefs += "signal " + endJoin.Name() + "_out_ack : std_logic;"
+
+	signalDefs += "\n"
+
+	joins = append(joins, endJoin)
+
+	b.RegBlockPairs = append(b.RegBlockPairs, &regBodyPair{
+		Bc: endJoin,
+	})
 
 	return signalDefs, forks, joins
 }
