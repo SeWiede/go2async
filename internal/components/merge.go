@@ -42,22 +42,28 @@ func NewMerge() *Merge {
 	}
 }
 
+func (d *Merge) Name() string {
+	return mergePrefix + strconv.Itoa(d.Nr)
+}
+
 func (d *Merge) ComponentStr() string {
-	name := mergePrefix + strconv.Itoa(d.Nr)
-	return name + `: entity work.merge
+	return d.Name() + `: entity work.merge
   generic map (
     DATA_WIDTH => DATA_WIDTH
   )
   port map (
-    inA_ack => ` + d.In1.Ack + `,
-    inA_data => ` + d.In1.Data + `(DATA_WIDTH - 1 downto 0),
-    inA_req => ` + d.In1.Req + `,
-    inB_ack => ` + d.In2.Ack + `,
-    inB_data => ` + d.In2.Data + `(DATA_WIDTH - 1 downto 0),
-    inB_req => ` + d.In2.Req + `,
-    outC_ack => ` + d.Out.Ack + `,
-    outC_data => ` + d.Out.Data + `,
-    outC_req => ` + d.Out.Req + `,
+    inA_req => ` + d.Name() + `_inA_req,
+    inA_ack => ` + d.Name() + `_inA_ack,
+    inA_data => ` + d.Name() + `_inA_data,
+
+    inB_req => ` + d.Name() + `_inB_req,
+    inB_ack => ` + d.Name() + `_inB_ack,
+    inB_data => ` + d.Name() + `_inB_data,
+    
+    outC_req => ` + d.Name() + `_outC_req,
+    outC_ack => ` + d.Name() + `outC_ack,
+    outC_data => ` + d.Name() + `_outC_data,
+    
     rst => rst
    );
    `

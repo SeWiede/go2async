@@ -49,26 +49,34 @@ func NewDEMUX() *DEMUX {
 	}
 }
 
+func (d *DEMUX) Name() string {
+	return demuxPrefix + strconv.Itoa(d.Nr)
+}
+
 func (d *DEMUX) ComponentStr() string {
-	name := demuxPrefix + strconv.Itoa(d.Nr)
-	return name + `: entity work.demux
+	return d.Name() + `: entity work.demux
   generic map (
     DATA_WIDTH => DATA_WIDTH
   )
   port map (
-    inA_ack => ` + d.In.Ack + `,
-    inA_data => ` + d.In.Data + `,
-    inA_req => ` + d.In.Req + `,
-    outB_ack => ` + d.Out1.Ack + `,
-    outB_data => ` + d.Out1.Data + `,
-    outB_req => ` + d.Out1.Req + `,
-    outC_ack => ` + d.Out2.Ack + `,
-    outC_data => ` + d.Out2.Data + `,
-    outC_req => ` + d.Out2.Req + `,
-    rst => rst,
-    inSel_ack => ` + d.Select.Ack + `,
-    inSel_req => ` + d.Select.Req + `,
-    selector => ` + d.Select.Data + `
+    inA_req => ` + d.Name() + `_inA_req,
+    inA_ack => ` + d.Name() + `_inA_ack,
+    inA_data => ` + d.Name() + `_inA_data,
+
+    outB_req => ` + d.Name() + `_outB_req,
+    outB_ack => ` + d.Name() + `_outB_ack,
+    outB_data => ` + d.Name() + `_outB_data,
+    
+    outC_req => ` + d.Name() + `_outC_req,
+    outC_ack => ` + d.Name() + `outC_ack,
+    outC_data => ` + d.Name() + `_outC_data,
+    
+
+    inSel_req => ` + d.Name() + `_inSel_req,
+    inSel_ack => ` + d.Name() + `_inSel_ack,
+    selector => ` + d.Name() + `_selector,
+    
+    rst => rst
   );
    `
 }
