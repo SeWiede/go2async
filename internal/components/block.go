@@ -68,8 +68,8 @@ func NewBlock(toplevel bool, parent BlockType) *Block {
 			},
 			parentBlock: parent,
 
-			inputVariables:  NewScopedVariables(),
-			outputVariables: NewScopedVariables(),
+			inputVariables: NewScopedVariables(),
+			//outputVariables: NewScopedVariables(),
 
 			predecessors: map[string]BodyComponentType{},
 			successors:   map[string]BodyComponentType{},
@@ -357,7 +357,7 @@ func (b *Block) GetCurrentVariableSize() int {
 }
 
 func (b *Block) NewScopeVariable(vdef variable.VariableDef) (*variable.VariableInfo, error) {
-	infoPrinter.DebugPrintfln("Adding variable %s to block %s", vdef.Name(), b.archName)
+	infoPrinter.DebugPrintfln("[%s]: Adding variable %s", b.Name(), vdef.Name())
 
 	/* 	vi, err := b.GetScopedVariables().AddVariable(decl)
 	   	if err != nil {
@@ -712,6 +712,7 @@ func (b *Block) getDefaultSignalAssignments() string {
 					recipient = bep.Name() + "_y"
 					signalAssignments += recipient + " <= " + currentInputAssignment
 				}
+				signalAssignments += ";\n"
 			} else if sb, ok := currentComponent.(*SelectorBlock); ok {
 				if i == 0 {
 					recipient = sb.Name() + "_x"
@@ -720,6 +721,7 @@ func (b *Block) getDefaultSignalAssignments() string {
 					recipient = sb.Name() + "_y"
 					signalAssignments += recipient + " <= " + currentInputAssignment
 				}
+				signalAssignments += ";\n"
 			} else {
 
 				inputAssignment += currentInputAssignment
@@ -728,12 +730,11 @@ func (b *Block) getDefaultSignalAssignments() string {
 					inputAssignment += " & "
 				} else {
 					signalAssignments += inputAssignment
+					signalAssignments += ";\n"
 				}
 			}
 
-			signalAssignments += ";\n"
-
-			infoPrinter.DebugPrintfln("%s's input var %s comes from %s", currentComponent.Name(), input.Name_, currentInputAssignment)
+			infoPrinter.DebugPrintfln("%s's input var %s comes from %s therefore: %s", currentComponent.Name(), input.Name_, currentInputAssignment, inputAssignment)
 		}
 
 		// In case of fork/joins some of these values are overwritten later
