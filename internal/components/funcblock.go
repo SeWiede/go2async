@@ -21,7 +21,7 @@ type FuncBlock struct {
 
 var fbNr = 0
 
-func NewFuncBlock(paramsResults *variable.FuncInterface, fi variable.VariableDef, parent *Block) (*FuncBlock, error) {
+func NewFuncBlock(paramsResults *variable.FuncInterface, fi variable.VariableDef, parent BlockType) (*FuncBlock, error) {
 	if fi.FuncIntf() == nil {
 		return nil, errors.New("invalid function variable '" + fi.Name() + "'")
 	}
@@ -40,7 +40,7 @@ func NewFuncBlock(paramsResults *variable.FuncInterface, fi variable.VariableDef
 		BodyComponent: BodyComponent{
 			archName: archPrefix + name,
 
-			In: &HandshakeChannel{
+			/* In: &HandshakeChannel{
 				Out: false,
 			},
 
@@ -50,7 +50,7 @@ func NewFuncBlock(paramsResults *variable.FuncInterface, fi variable.VariableDef
 				Data:      name + "_data",
 				Out:       true,
 				DataWidth: parent.GetCurrentVariableSize(),
-			},
+			}, */
 
 			parentBlock: parent,
 		},

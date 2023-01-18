@@ -43,7 +43,7 @@ func NewGenerator(intSize int) *Generator {
 	}
 }
 
-func (g *Generator) HandleAssignmentStmt(s *ast.AssignStmt, parent *components.Block) (fb components.BodyComponentType, err error) {
+func (g *Generator) HandleAssignmentStmt(s *ast.AssignStmt, parent components.BlockType) (fb components.BodyComponentType, err error) {
 	if len(s.Lhs) > 1 {
 		return nil, g.peb.NewParseError(s, errors.New("Expression lists are not allowed"))
 	}
@@ -379,7 +379,7 @@ func (g *Generator) HandleAssignmentStmt(s *ast.AssignStmt, parent *components.B
 	}
 }
 
-func (g *Generator) GenerateBinaryExpressionBlock(result *variable.VariableInfo, be *ast.BinaryExpr, parent *components.Block) (fb *components.BinExprBlock, err error) {
+func (g *Generator) GenerateBinaryExpressionBlock(result *variable.VariableInfo, be *ast.BinaryExpr, parent components.BlockType) (fb *components.BinExprBlock, err error) {
 	xexpr := be.X
 	yexpr := be.Y
 
@@ -507,7 +507,7 @@ func (g *Generator) GenerateBinaryExpressionBlock(result *variable.VariableInfo,
 	return newFuncBlk, nil
 }
 
-func (g *Generator) GenerateSelectorBlock(be *ast.BinaryExpr, inverted bool, parent *components.Block) (c *components.SelectorBlock, err error) {
+func (g *Generator) GenerateSelectorBlock(be *ast.BinaryExpr, inverted bool, parent components.BlockType) (c *components.SelectorBlock, err error) {
 	xexpr := be.X
 	yexpr := be.Y
 
@@ -611,12 +611,14 @@ func (g *Generator) GenerateSelectorBlock(be *ast.BinaryExpr, inverted bool, par
 	}, inverted, parent), nil
 }
 
-func (g *Generator) GenerateIfBlock(is *ast.IfStmt, parent *components.Block) (fb *components.IfBlock, err error) {
+func (g *Generator) GenerateIfBlock(is *ast.IfStmt, parent components.BlockType) (fb *components.IfBlock, err error) {
 	var cond *components.SelectorBlock
+
+	newIfBlk := components.NewIfBlock(parent)
 
 	switch x := is.Cond.(type) {
 	case *ast.BinaryExpr:
-		cond, err = g.GenerateSelectorBlock(x, false, parent)
+		cond, err = g.GenerateSelectorBlock(x, false, newIfBlk)
 		if err != nil {
 			return nil, g.peb.NewParseError(is, err)
 		}
@@ -629,7 +631,7 @@ func (g *Generator) GenerateIfBlock(is *ast.IfStmt, parent *components.Block) (f
 			}
 			return nil, g.peb.NewParseError(is, errors.New("Only binary expression in if condition allowed found "+ref.String()+" in parenthesis"))
 		}
-		cond, err = g.GenerateSelectorBlock(xBin, false, parent)
+		cond, err = g.GenerateSelectorBlock(xBin, false, newIfBlk)
 		if err != nil {
 			return nil, g.peb.NewParseError(is, err)
 		}
@@ -641,7 +643,7 @@ func (g *Generator) GenerateIfBlock(is *ast.IfStmt, parent *components.Block) (f
 		return nil, g.peb.NewParseError(is, errors.New("Only binary expression in if condition allowed found "+ref.String()))
 	}
 
-	thenBody, err := g.GenerateBlock(is.Body.List, false, parent, false)
+	thenBody, err := g.GenerateBlock(is.Body.List, false, newIfBlk, false)
 	if err != nil {
 		return nil, g.peb.NewParseError(is, err)
 	}
@@ -662,24 +664,26 @@ func (g *Generator) GenerateIfBlock(is *ast.IfStmt, parent *components.Block) (f
 	}
 
 	if is.Else != nil {
-		elseBody, err = g.GenerateBlock(is.Else.(*ast.BlockStmt).List, false, parent, false)
+		elseBody, err = g.GenerateBlock(is.Else.(*ast.BlockStmt).List, false, newIfBlk, false)
 		if err != nil {
 			return nil, g.peb.NewParseError(is, err)
 		}
 	}
 
+	newIfBlk.AssignBodyComponents(cond, thenBody, elseBody)
+
 	g.components[cond.ArchName()] = cond
 	g.components[thenBody.ArchName()] = thenBody
 	g.components[elseBody.ArchName()] = elseBody
 
-	newIfBlk := components.NewIfBlock(cond, thenBody, elseBody, parent)
+	//newIfBlk := components.NewIfBlock(cond, thenBody, elseBody, parent)
 	g.components[newIfBlk.ArchName()] = newIfBlk
 	parent.AddComponent(newIfBlk)
 
 	return newIfBlk, nil
 }
 
-func (g *Generator) GenerateLoopBlock(fs *ast.ForStmt, parent *components.Block) (fb *components.LoopBlock, err error) {
+func (g *Generator) GenerateLoopBlock(fs *ast.ForStmt, parent components.BlockType) (fb *components.LoopBlock, err error) {
 	var cond *components.SelectorBlock
 
 	switch x := fs.Cond.(type) {
@@ -732,7 +736,7 @@ func getTypeOfString(x string) string {
 	return "string"
 }
 
-func (g *Generator) GenerateBodyBlock(s ast.Stmt, parent *components.Block) (c components.BodyComponentType, err error) {
+func (g *Generator) GenerateBodyBlock(s ast.Stmt, parent components.BlockType) (c components.BodyComponentType, err error) {
 	switch sType := s.(type) {
 	case *ast.DeclStmt:
 		decl, ok := sType.Decl.(*ast.GenDecl)
@@ -801,7 +805,7 @@ func (g *Generator) GenerateBodyBlock(s ast.Stmt, parent *components.Block) (c c
 	}
 }
 
-func (g *Generator) GenerateBlock(stmts []ast.Stmt, toplevelStatement bool, parent *components.Block, addComponentToParent bool) (b *components.Block, err error) {
+func (g *Generator) GenerateBlock(stmts []ast.Stmt, toplevelStatement bool, parent components.BlockType, addComponentToParent bool) (b *components.Block, err error) {
 	b = components.NewBlock(toplevelStatement, parent)
 
 	for _, s := range stmts {

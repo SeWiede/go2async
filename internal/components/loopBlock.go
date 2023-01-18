@@ -26,7 +26,7 @@ type LoopBlock struct {
 
 var loopBlockNr = 0
 
-func NewLoopBlock(loopCond *SelectorBlock, body BodyComponentType, parent *Block) *LoopBlock {
+func NewLoopBlock(loopCond *SelectorBlock, body BodyComponentType, parent BlockType) *LoopBlock {
 	nr := loopBlockNr
 	loopBlockNr++
 
@@ -34,7 +34,7 @@ func NewLoopBlock(loopCond *SelectorBlock, body BodyComponentType, parent *Block
 	lb := &LoopBlock{
 		BodyComponent: BodyComponent{
 			archName: archPrefix + name,
-			In: &HandshakeChannel{
+			/* In: &HandshakeChannel{
 				Out: false,
 			},
 			Out: &HandshakeChannel{
@@ -43,7 +43,7 @@ func NewLoopBlock(loopCond *SelectorBlock, body BodyComponentType, parent *Block
 				Data:      name + "_data",
 				Out:       true,
 				DataWidth: parent.GetCurrentVariableSize(),
-			},
+			}, */
 
 			parentBlock: parent,
 		},

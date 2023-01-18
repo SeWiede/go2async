@@ -22,7 +22,7 @@ type CallBlock struct {
 
 var cbNr = 0
 
-func NewCallBlock(paramsResults *variable.FuncInterface, fi variable.VariableDef, parent *Block) (*CallBlock, error) {
+func NewCallBlock(paramsResults *variable.FuncInterface, fi variable.VariableDef, parent BlockType) (*CallBlock, error) {
 	if fi.FuncIntf() == nil {
 		return nil, errors.New("invalid function variable '" + fi.Name() + "'")
 	}
@@ -36,7 +36,7 @@ func NewCallBlock(paramsResults *variable.FuncInterface, fi variable.VariableDef
 		BodyComponent: BodyComponent{
 			archName: archPrefix + name,
 
-			In: &HandshakeChannel{
+			/* In: &HandshakeChannel{
 				Out: false,
 			},
 
@@ -46,7 +46,7 @@ func NewCallBlock(paramsResults *variable.FuncInterface, fi variable.VariableDef
 				Data:      name + "_data",
 				Out:       true,
 				DataWidth: parent.GetCurrentVariableSize(),
-			},
+			}, */
 
 			parentBlock: parent,
 		},

@@ -33,7 +33,7 @@ type OperandInfo struct {
 
 var bebNr = 0
 
-func NewBinExprBlock(op string, oi *OperandInfo, parent *Block) (*BinExprBlock, error) {
+func NewBinExprBlock(op string, oi *OperandInfo, parent BlockType) (*BinExprBlock, error) {
 	nr := bebNr
 	bebNr++
 
@@ -44,17 +44,19 @@ func NewBinExprBlock(op string, oi *OperandInfo, parent *Block) (*BinExprBlock, 
 			number:   nr,
 			archName: archPrefix + name,
 
-			In: &HandshakeChannel{
-				Out: false,
-			},
+			/*
+				In: &HandshakeChannel{
+					Out: false,
+				},
 
-			Out: &HandshakeChannel{
-				Req:       name + "_o_req",
-				Ack:       name + "_o_ack",
-				Data:      name + "_data",
-				Out:       true,
-				DataWidth: parent.GetCurrentVariableSize(),
-			},
+				Out: &HandshakeChannel{
+					Req:       name + "_o_req",
+					Ack:       name + "_o_ack",
+					Data:      name + "_data",
+					Out:       true,
+					DataWidth: parent.GetCurrentVariableSize(),
+				},
+			*/
 
 			parentBlock: parent,
 
@@ -79,7 +81,7 @@ func NewBinExprBlock(op string, oi *OperandInfo, parent *Block) (*BinExprBlock, 
 			opDescription += fmt.Sprintf(" %s [size %d, len %d, index %s; const %s]", oi.Y.Name_, oi.Y.Size_, oi.Y.Len_, oi.Y.Index_, oi.Y.Const_)
 		}
 
-		infoPrinter.DebugPrintln("Creating " + opDescription + " - parent: " + parent.archName)
+		infoPrinter.DebugPrintfln("[%s]: Creating %s - parent: ", parent.ArchName(), opDescription)
 
 		opDescription += fmt.Sprintf("\n")
 
@@ -98,7 +100,97 @@ func NewBinExprBlock(op string, oi *OperandInfo, parent *Block) (*BinExprBlock, 
 	return ret, nil
 }
 
-func getOperandOwnersAndSetNewOwner(bt BodyComponentType, parent *Block, oi *OperandInfo) (BodyComponentType, error) {
+func getInputSources(bt BodyComponentType, parent BlockType, oi *OperandInfo, resultType string) error {
+	// get sources of X, Y
+	{
+		if oi.X == nil {
+			constVar, err := variable.MakeConst("0", resultType)
+			if err != nil {
+				return err
+			}
+
+			oi.X = constVar
+		}
+
+		if oi.X.DefinedOnly_ {
+			panic("using defined only variable")
+		}
+
+		if oi.X.Const_ != "" {
+			oi.X.Typ_ = resultType
+			infoPrinter.DebugPrintfln("[%s]: X Input '%s' is const '%s' with type %s inferred from result", bt.Name(), oi.X.Name_, oi.X.Const_, resultType)
+		}
+
+		addedVar, err := bt.AddInputVariable(oi.X)
+		if err != nil {
+			return err
+		}
+		oi.X = addedVar
+
+		infoPrinter.DebugPrintfln("[%s]: X Input '%s' type %s", bt.Name(), oi.X.Name_, resultType)
+
+		ownX, ok := parent.GetVariableOwnerMap()[oi.X.Name_]
+		if !ok {
+			// Shouldn't happen
+			return errors.New("No owner for X operator")
+		}
+
+		latestOwner := ownX.ownerList.lastest
+		ownX.ownerList.AddSuccessorToLatest(bt)
+
+		bt.AddPredecessor(latestOwner)
+		latestOwner.AddSuccessor(bt)
+
+		infoPrinter.DebugPrintfln("[%s]: Previous component of X input '%s' is '%s'", bt.Name(), oi.X.Name_, latestOwner.Name())
+	}
+
+	{
+		if oi.Y == nil {
+			constVar, err := variable.MakeConst("0", resultType)
+			if err != nil {
+				return err
+			}
+
+			oi.Y = constVar
+		}
+
+		if oi.Y.DefinedOnly_ {
+			panic("using defined only variable")
+		}
+
+		if oi.Y.Const_ != "" {
+			oi.Y.Typ_ = resultType
+			infoPrinter.DebugPrintfln("[%s]: Y Input '%s' is const '%s' with type %s inferred from result", bt.Name(), oi.Y.Name_, oi.Y.Const_, resultType)
+		}
+
+		addedVar, err := bt.AddInputVariable(oi.Y)
+		if err != nil {
+			return err
+		}
+		oi.Y = addedVar
+
+		infoPrinter.DebugPrintfln("[%s]: Y Input '%s' type %s", bt.Name(), oi.Y.Name_, resultType)
+
+		ownY, ok := parent.GetVariableOwnerMap()[oi.Y.Name_]
+		if !ok {
+			// Shouldn't happen
+			return errors.New("No owner for Y operator")
+		}
+
+		latestOwner := ownY.ownerList.lastest
+		ownY.ownerList.AddSuccessorToLatest(bt)
+
+		bt.AddPredecessor(latestOwner)
+
+		latestOwner.AddSuccessor(bt)
+
+		infoPrinter.DebugPrintfln("[%s]: Previous component of Y input '%s' is '%s'", bt.Name(), oi.Y.Name_, latestOwner.Name())
+	}
+
+	return nil
+}
+
+func getOperandOwnersAndSetNewOwner(bt BodyComponentType, parent BlockType, oi *OperandInfo) (BodyComponentType, error) {
 	resultType := ""
 
 	// Do this step first, to fetch the resultType
@@ -116,100 +208,19 @@ func getOperandOwnersAndSetNewOwner(bt BodyComponentType, parent *Block, oi *Ope
 		panic("Missing result var")
 	}
 
-	// get sources of X, Y
-	{
-		if oi.X == nil {
-			constVar, err := variable.MakeConst("0", resultType)
-			if err != nil {
-				return nil, err
-			}
-
-			oi.X = constVar
-		}
-
-		if oi.X.DefinedOnly_ {
-			panic("using defined only variable")
-		}
-
-		if oi.X.Const_ != "" {
-			oi.X.Typ_ = resultType
-			infoPrinter.DebugPrintfln("[%s]: X Input '%s' is const '%s' with type %s inferred from result", bt.Name(), oi.X.Name_, oi.X.Const_, resultType)
-		}
-
-		addedVar, err := bt.AddInputVariable(oi.X)
-		if err != nil {
-			return nil, err
-		}
-		oi.X = addedVar
-
-		infoPrinter.DebugPrintfln("[%s]: X Input '%s' type %s", bt.Name(), oi.X.Name_, resultType)
-
-		ownX, ok := parent.VariableOwner[oi.X.Name_]
-		if !ok {
-			// Shouldn't happen
-			return nil, errors.New("No owner for X operator")
-		}
-
-		latestOwner := ownX.ownerList.lastest
-		ownX.ownerList.AddSuccessorToLatest(bt)
-
-		bt.AddPredecessor(latestOwner)
-		latestOwner.AddSuccessor(bt)
-
-		infoPrinter.DebugPrintfln("[%s]: Previous component of X input '%s' is '%s'", bt.Name(), oi.X.Name_, latestOwner.Name())
-	}
-
-	{
-		if oi.Y == nil {
-			constVar, err := variable.MakeConst("0", resultType)
-			if err != nil {
-				return nil, err
-			}
-
-			oi.Y = constVar
-		}
-
-		if oi.Y.DefinedOnly_ {
-			panic("using defined only variable")
-		}
-
-		if oi.Y.Const_ != "" {
-			oi.Y.Typ_ = resultType
-			infoPrinter.DebugPrintfln("[%s]: Y Input '%s' is const '%s' with type %s inferred from result", bt.Name(), oi.Y.Name_, oi.Y.Const_, resultType)
-		}
-
-		addedVar, err := bt.AddInputVariable(oi.Y)
-		if err != nil {
-			return nil, err
-		}
-		oi.Y = addedVar
-
-		infoPrinter.DebugPrintfln("[%s]: Y Input '%s' type %s", bt.Name(), oi.Y.Name_, resultType)
-
-		ownY, ok := parent.VariableOwner[oi.Y.Name_]
-		if !ok {
-			// Shouldn't happen
-			return nil, errors.New("No owner for Y operator")
-		}
-
-		latestOwner := ownY.ownerList.lastest
-		ownY.ownerList.AddSuccessorToLatest(bt)
-
-		bt.AddPredecessor(latestOwner)
-
-		latestOwner.AddSuccessor(bt)
-
-		infoPrinter.DebugPrintfln("[%s]: Previous component of Y input '%s' is '%s'", bt.Name(), oi.Y.Name_, latestOwner.Name())
+	err := getInputSources(bt, parent, oi, resultType)
+	if err != nil {
+		return nil, err
 	}
 
 	// Set new owner of result variable after getting previous owners! - R is not nil here!
-	if own, ok := parent.VariableOwner[oi.R.Name()]; ok {
+	if own, ok := parent.GetVariableOwnerMap()[oi.R.Name()]; ok {
 		own.vi = oi.R
 		own.ownerList.AddOwner(bt)
 	} else {
 		infoPrinter.DebugPrintfln("Adding variable '%s' to ownermap of '%s'", oi.R.Name_, parent.Name())
 
-		parent.VariableOwner[oi.R.Name()] = &variableOwner{
+		parent.GetVariableOwnerMap()[oi.R.Name()] = &variableOwner{
 			ownerList: NewOwnerList(bt),
 			vi:        oi.R,
 		}
@@ -374,6 +385,7 @@ func (bep *BinExprBlock) getCalcProcess() string {
 			resultMap += "out_data(offset + result'length -1 downto offset) <= result;\n"
 		} */
 	}
+
 	return processStart + xcalc + ycalc + compute + resultMap + `
 	end process;`
 }

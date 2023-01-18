@@ -1,6 +1,8 @@
 package components
 
 import (
+	"go2async/internal/infoPrinter"
+	"go2async/internal/variable"
 	"strconv"
 	"strings"
 )
@@ -14,8 +16,6 @@ var comperatorDelays map[string]string = map[string]string{"==": "ADD_DELAY", "!
 type SelectorBlock struct {
 	BodyComponent
 
-	Nr int
-
 	Operation string
 	Oi        *OperandInfo
 	Inverted  bool
@@ -25,14 +25,16 @@ var selectorNr = 0
 
 var selecTorOutDataWith = 1
 
-func NewSelectorBlock(op string, oi *OperandInfo, inverted bool, parent *Block) *SelectorBlock {
+func NewSelectorBlock(op string, oi *OperandInfo, inverted bool, parent BlockType) *SelectorBlock {
 	nr := selectorNr
 	selectorNr++
 
-	name := strings.ToLower(selectorprefix + strconv.Itoa(nr))
+	name := selectorprefix + strconv.Itoa(nr)
 
 	ret := &SelectorBlock{
 		BodyComponent: BodyComponent{
+			number: nr,
+
 			archName: archPrefix + name,
 			In: &HandshakeChannel{
 				Out: false,
@@ -46,42 +48,56 @@ func NewSelectorBlock(op string, oi *OperandInfo, inverted bool, parent *Block) 
 			},
 
 			parentBlock: parent,
-		},
 
-		Nr: nr,
+			inputVariables:  variable.NewScopedVariables(),
+			outputVariables: variable.NewScopedVariables(),
+
+			predecessors: map[string]BodyComponentType{},
+			successors:   map[string]BodyComponentType{},
+		},
 
 		Operation: op,
 		Oi:        oi,
 		Inverted:  inverted,
 	}
 
-	getOperandOwnersAndSetNewOwner(ret, parent, oi)
+	err := getInputSources(ret, parent, oi, "uint8")
+	if err != nil {
+		panic("getInputSource failed!")
+	}
+
+	infoPrinter.DebugPrintfln("[%s] finished getting inputs of [%s]", parent.Name(), ret.Name())
+
+	// Add dummy successor
+	ret.successors["asdf"] = nil
 
 	return ret
 }
 
-func (sb *SelectorBlock) ComponentStr() string {
-	name := selectorprefix + strconv.Itoa(sb.Nr)
+func (sb *SelectorBlock) Name() string {
+	return strings.ToLower(selectorprefix + strconv.Itoa(sb.number))
+}
 
-	/* 	prependStr := ""
+func (sb *SelectorBlock) ComponentStr() string { /* 	prependStr := ""
 	if *sb.GetVariablesSize() > *sb.predecessor.GetVariablesSize() {
 		prependStr = `(` + strconv.Itoa(*sb.GetVariablesSize()) + ` - 1 downto ` + strconv.Itoa(*sb.predecessor.GetVariablesSize()) + ` => '0') & `
 	} */
 
-	return name + `: entity work.Selector(` + sb.archName + `)
+	return sb.Name() + `: entity work.Selector(` + sb.ArchName() + `)
 	generic map(
-	  DATA_WIDTH =>  DATA_WIDTH
+	  DATA_WIDTH =>  ` + strconv.Itoa(sb.inputVariables.Size) + `
 	)
 	port map (
 	  -- Input channel
-	  in_req  => ` + sb.In.Req + `,
-	  in_ack  => ` + sb.In.Ack + `, 
-	  in_data =>  std_logic_vector(resize(unsigned(` + sb.In.Data + `), ` + strconv.Itoa(sb.GetVariableSize()) + `)),
+	  in_req  => ` + sb.Name() + `_in_req,
+	  in_ack  => ` + sb.Name() + `_in_ack, 
+	  x => ` + sb.Name() + `_x,
+	  y => ` + sb.Name() + `_y,
 	  -- Output channel
-	  out_req => ` + sb.Out.Req + `,
-	  out_ack => ` + sb.Out.Ack + `,
-	  selector  => ` + sb.Out.Data + `
-	  );`
+	  out_req =>  ` + sb.Name() + `_out_req, 
+	  out_ack =>  ` + sb.Name() + `_out_ack, 
+	  selector  =>  ` + sb.Name() + `_selector
+	);`
 	//` & (` + strconv.Itoa(*sb.GetVariablesSize()) + ` - 1 downto ` + strconv.Itoa(*sb.predecessor.GetVariablesSize()) + ` => '0'),
 }
 
@@ -122,32 +138,33 @@ func (sb *SelectorBlock) getCalcProcess() string {
 		y = "to_unsigned(" + sb.Oi.Y.Const_ + ", " + strconv.Itoa(sb.Oi.Y.Size_) + ")"
 	}
 
-	xcalc := ""
-	ycalc := ""
+	/*
+		xcalc := ""
+		ycalc := ""
 
-	if sb.Oi.X.IndexIdent_ != nil {
-		x = "unsigned(x)"
-		xcalc = "x <= in_data(baseX + (to_integer(unsigned(offsetX)) + 1) * x'length - 1 downto baseX + to_integer(unsigned(offsetX)) * x'length);\n"
+		 if sb.Oi.X.IndexIdent_ != nil {
+			x = "unsigned(x)"
+			xcalc = "x <= in_data(baseX + (to_integer(unsigned(offsetX)) + 1) * x'length - 1 downto baseX + to_integer(unsigned(offsetX)) * x'length);\n"
 
-	}
+		}
 
-	if sb.Oi.Y != nil && sb.Oi.Y.IndexIdent_ != nil {
-		y = "unsigned(y)"
-		ycalc = "y <= in_data(baseY + (to_integer(unsigned(offsetY)) + 1) * y'length - 1 downto baseY + to_integer(unsigned(offsetY)) * y'length);\n"
-	}
+		if sb.Oi.Y != nil && sb.Oi.Y.IndexIdent_ != nil {
+			y = "unsigned(y)"
+			ycalc = "y <= in_data(baseY + (to_integer(unsigned(offsetY)) + 1) * y'length - 1 downto baseY + to_integer(unsigned(offsetY)) * y'length);\n"
+		}
+	*/
 
 	compute := "selector(0) <= '1' when " + x + " " + SupportedComperators[sb.Operation] + " " + y + " else '0';\n"
 	if sb.Inverted {
 		compute = "selector(0) <= '0' when " + x + " " + SupportedComperators[sb.Operation] + " " + y + " else '1';\n"
 	}
 
-	return xcalc + ycalc + compute
+	return /*xcalc + ycalc +*/ compute
 }
 
 func (sb *SelectorBlock) Architecture() string {
 
-	return `architecture ` + sb.archName + ` of Selector is
-	` + sb.getAliases() + `
+	return `architecture ` + sb.ArchName() + ` of Selector is
   
     --attribute dont_touch : string;
 	--attribute dont_touch of  x, y, selector: signal is "true";
@@ -169,15 +186,30 @@ func (sb *SelectorBlock) Architecture() string {
     
     ` + sb.getCalcProcess() + `
 
-  end ` + sb.archName + `;
+  end ` + sb.ArchName() + `;
   `
 }
 
 func (sb *SelectorBlock) EntityName() string {
-	return "Selector"
+	return "selector_" + sb.Name()
 }
 
 func (sb *SelectorBlock) Entity() string {
+	op1Size := 0
+	op2Size := 0
+
+	if op1, err := sb.InputVariables().GetVariableInfoAt(0); err == nil {
+		op1Size = op1.TotalSize()
+	} else {
+		panic(sb.Name() + " invalid x")
+	}
+
+	if op2, err := sb.InputVariables().GetVariableInfoAt(1); err == nil {
+		op2Size = op2.TotalSize()
+	} else {
+		panic(sb.Name() + " invalid y")
+	}
+
 	return `LIBRARY IEEE;
 USE IEEE.STD_LOGIC_1164.ALL;
 USE ieee.std_logic_unsigned.ALL;
@@ -190,13 +222,31 @@ ENTITY ` + sb.EntityName() + ` IS
   );
   PORT (
     -- Data
-    in_data : IN STD_LOGIC_VECTOR(DATA_WIDTH - 1 DOWNTO 0);
     in_req : IN STD_LOGIC;
     in_ack : OUT STD_LOGIC;
+    x : IN STD_LOGIC_VECTOR(` + strconv.Itoa(op1Size) + ` - 1 DOWNTO 0);
+	y : IN STD_LOGIC_VECTOR(` + strconv.Itoa(op2Size) + ` - 1 DOWNTO 0);
     -- Selector
     selector : OUT STD_LOGIC_VECTOR(0 DOWNTO 0);
     out_req : OUT STD_LOGIC;
     out_ack : IN STD_LOGIC
   );
 END ` + sb.EntityName() + `;`
+}
+
+func (ib *SelectorBlock) GetXTotalSize() int {
+	x, err := ib.InputVariables().GetVariableInfoAt(0)
+	if err != nil {
+		panic(ib.Name() + " invalid x")
+	}
+
+	return x.TotalSize()
+}
+func (ib *SelectorBlock) GetYTotalSize() int {
+	y, err := ib.InputVariables().GetVariableInfoAt(1)
+	if err != nil {
+		panic(ib.Name() + " invalid y")
+	}
+
+	return y.TotalSize()
 }

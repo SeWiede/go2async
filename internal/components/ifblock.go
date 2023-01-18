@@ -1,6 +1,8 @@
 package components
 
 import (
+	"go2async/internal/infoPrinter"
+	"go2async/internal/variable"
 	"strconv"
 	"strings"
 )
@@ -8,9 +10,7 @@ import (
 const ifBlockPrefix = "IF_"
 
 type IfBlock struct {
-	BodyComponent
-
-	Nr int
+	Block
 
 	entryFork *Fork
 	cond      *SelectorBlock
@@ -22,32 +22,43 @@ type IfBlock struct {
 
 var ifBlockNr = 0
 
-func NewIfBlock(cond *SelectorBlock, thenBody, elseBody BodyComponentType, parent *Block) *IfBlock {
+func NewIfBlock(parent BlockType) *IfBlock {
 	nr := ifBlockNr
 	ifBlockNr++
 
 	name := strings.ToLower(ifBlockPrefix + strconv.Itoa(nr))
 	ib := &IfBlock{
-		BodyComponent: BodyComponent{
-			archName: archPrefix + name,
-			In: &HandshakeChannel{
-				Out: false,
-			},
-			Out: &HandshakeChannel{
-				Req:       name + "_o_req",
-				Ack:       name + "_o_ack",
-				Data:      name + "_data",
-				Out:       true,
-				DataWidth: parent.GetCurrentVariableSize(),
-			},
+		Block: Block{
+			BodyComponent: BodyComponent{
+				number: nr,
 
-			parentBlock: parent,
+				archName: archPrefix + name,
+				/* In: &HandshakeChannel{
+					Out: false,
+				},
+				Out: &HandshakeChannel{
+					Req:       name + "_o_req",
+					Ack:       name + "_o_ack",
+					Data:      name + "_data",
+					Out:       true,
+					DataWidth: parent.GetCurrentVariableSize(),
+				}, */
+
+				parentBlock: parent,
+
+				inputVariables:  variable.NewScopedVariables(),
+				outputVariables: variable.NewScopedVariables(),
+
+				predecessors: map[string]BodyComponentType{},
+				successors:   map[string]BodyComponentType{},
+			},
+			ExternalInterfaces: make(map[string]*variable.VariableInfo),
+			VariableOwner:      make(map[string]*variableOwner),
 		},
-		Nr: nr,
 	}
 
-	ib.thenBody = thenBody
-	ib.elseBody = elseBody
+	//ib.thenBody = thenBody
+	//ib.elseBody = elseBody
 
 	entryIn := &HandshakeChannel{
 		Req:  "in_req",
@@ -59,71 +70,81 @@ func NewIfBlock(cond *SelectorBlock, thenBody, elseBody BodyComponentType, paren
 	ib.entryFork = NewFork("DATA_WIDTH")
 	ib.entryFork.In = entryIn
 
-	ib.cond = cond
-	ib.entryFork.Out1.Connect(ib.cond.In)
+	// ib.cond = cond
+	// ib.entryFork.Out1.Connect(ib.cond.In)
 
 	ib.demux = NewDEMUX()
-	ib.entryFork.Out2.Connect(ib.demux.In)
-	ib.cond.Out.Connect(ib.demux.Select)
+	// ib.entryFork.Out2.Connect(ib.demux.In)
+	// ib.cond.Out.Connect(ib.demux.Select)
 
-	ib.demux.Out1.Connect(thenBody.InChannel())
-	ib.demux.Out2.Connect(elseBody.InChannel())
+	// ib.demux.Out1.Connect(thenBody.InChannel())
+	// ib.demux.Out2.Connect(elseBody.InChannel())
 
 	ib.merger = NewMerge()
-	ib.thenBody.OutChannel().Connect(ib.merger.In1)
-	ib.elseBody.OutChannel().Connect(ib.merger.In2)
+	// ib.thenBody.OutChannel().Connect(ib.merger.In1)
+	// ib.elseBody.OutChannel().Connect(ib.merger.In2)
 
-	ib.merger.Out = ib.Out
+	// ib.merger.Out = ib.Out
+
+	infoPrinter.DebugPrintfln("[%s]: Added ifBlock", ib.Name())
 
 	return ib
 }
 
-func (ib *IfBlock) ComponentStr() string {
-	name := ifBlockPrefix + strconv.Itoa(ib.Nr)
+func (ib *IfBlock) AssignBodyComponents(cond *SelectorBlock, thenBody BodyComponentType, elseBody BodyComponentType) {
+	ib.cond = cond
+	ib.thenBody = thenBody
+	ib.elseBody = elseBody
+}
 
-	return name + `: entity work.IfBlock(` + ib.archName + `)
+func (ib *IfBlock) Name() string {
+	return strings.ToLower(ifBlockPrefix + strconv.Itoa(ib.number))
+}
+
+func (ib *IfBlock) ComponentStr() string {
+	return ib.Name() + `: entity work.IfBlock(` + ib.archName + `)
   generic map(
-    DATA_WIDTH => ` + strconv.Itoa(ib.GetVariableSize()) + `
+    DATA_WIDTH => ` + strconv.Itoa(ib.inputVariables.Size) + `
   )
   port map (
     rst => rst,
-    in_ack => ` + ib.In.Ack + `,
-    in_req => ` + ib.In.Req + `,
-    in_data => std_logic_vector(resize(unsigned(` + ib.In.Data + `), ` + strconv.Itoa(ib.GetVariableSize()) + `)),
+    in_req => ` + ib.Name() + `_in_req,
+    in_ack => ` + ib.Name() + `_in_ack,
+    in_data => ` + ib.Name() + `_in_data,
     -- Output channel
-    out_req => ` + ib.Out.Req + `,
-    out_data => ` + ib.Out.Data + `,
-    out_ack => ` + ib.Out.Ack + `
+    out_req => ` + ib.Name() + `_out_req,
+    out_ack => ` + ib.Name() + `_out_ack,
+    out_data => ` + ib.Name() + `_out_data,
   );
   `
 }
 
-func (ib *IfBlock) signalDefs() string {
-	ret := ib.entryFork.Out1.SignalsString()
-	ret += ib.entryFork.Out2.SignalsString()
-	ret += ib.demux.Out1.SignalsString()
-	ret += ib.demux.Out2.SignalsString()
-	ret += ib.thenBody.OutChannel().SignalsString()
-	ret += ib.elseBody.OutChannel().SignalsString()
-	ret += ib.merger.Out.SignalsString()
-
-	ret += "signal " + ib.cond.Out.Req + ", " + ib.cond.Out.Ack + " : std_logic;"
-	ret += "signal " + ib.cond.Out.Data + " : std_logic_vector(0 downto 0);\n"
-	return ret
-}
-
 func (ib *IfBlock) Architecture() string {
-	ret := `architecture ` + ib.archName + ` of IfBlock is
-	`
+	dataSignalAssignments := ib.getDefaultSignalAssignments()
 
-	ret += ib.signalDefs()
+	signalDefs, forks, joins := ib.getSignalDefsJoinsAndForks()
+
+	handshakeOverwrites := ib.getHandshakeOverwrites(forks, joins)
+
+	ret := "architecture " + ib.archName + " of IfBlock is"
+	ret += "\n"
+	ret += signalDefs
 	ret += "\n"
 	ret += "begin"
 	ret += "\n"
 
-	ret += "out_req <= " + ib.OutChannel().Req + "; \n"
-	ret += ib.OutChannel().Ack + " <= out_ack; \n"
-	ret += "out_data <= " + ib.OutChannel().Data + "; \n"
+	ret += "signalAssignments: process(all)"
+	ret += "\n"
+	ret += "begin"
+	ret += "\n"
+
+	ret += dataSignalAssignments
+	ret += "\n"
+
+	ret += handshakeOverwrites
+	ret += "\n"
+
+	ret += "end process;"
 
 	ret += "\n"
 
@@ -171,4 +192,72 @@ PORT (
 );
 END ` + ib.EntityName() + `;`
 
+}
+
+func (b *IfBlock) GetVariableLocation(name string) (string, error) {
+	sv, err := b.inputVariables.GetVariableInfo(name)
+	if err != nil {
+		return "", err
+	}
+
+	idx := getIndex(sv.Index_)
+	totalSize := sv.TotalSize()
+	if idx > 0 {
+		totalSize = sv.Size_
+	}
+
+	position := strconv.Itoa(sv.Position_+totalSize*(idx+1)) + " - 1 downto " + strconv.Itoa(sv.Position_+totalSize*idx)
+
+	return b.Name() + "_in_data(" + position + ")", nil
+}
+
+func (b *IfBlock) GetVariable(name string) (*variable.VariableInfo, error) {
+	infoPrinter.DebugPrintfln("[%s]: Getting variable %s", b.Name(), name)
+
+	own, ok := b.VariableOwner[name]
+	if ok {
+		infoPrinter.DebugPrintfln("Variable %s's latest owner is %s", name, own.ownerList.lastest.Name())
+		return own.vi, nil
+	} else {
+		if b.Parent() == nil {
+			return nil, ErrVariableNotFound(name)
+		}
+
+		// Get variable info form parent.
+		vi, err := b.Parent().GetVariable(name)
+		if err != nil {
+			return nil, err
+		}
+
+		b.AddPredecessor(b.Parent())
+		//prevComps = append(prevComps, b.Parent())
+
+		//nextComps := b.Parent().Successors()
+		b.Parent().AddSuccessor(b)
+
+		// Track variables that are coming from outside this block's scope.
+		vi, err = b.NewScopeVariable(vi)
+		if err != nil {
+			return nil, err
+		}
+
+		vi.DefinedOnly_ = false
+
+		// New owner of variable in current block is the current block.
+		b.Parent().GetVariableOwnerMap()[vi.Name()].ownerList.AddOwner(b)
+
+		b.InputVariables().AddVariable(vi)
+
+		infoPrinter.DebugPrintfln("[%s]: Variable %s is from outside the block's scope. Added to inputs (current size = %d).", b.Name(), name, b.InputVariables().Size)
+
+		return vi, nil
+	}
+
+	/* v, err := b.GetScopedVariables().GetVariableInfo(name)
+	if err != nil {
+
+	} else {
+		infoPrinter.DebugPrintfln("Variable %s's owner is %s", name, own.bc.Name())
+		return v, nil
+	} */
 }

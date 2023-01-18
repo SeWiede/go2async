@@ -20,23 +20,17 @@ type regBodyPair struct {
 	Bc  BodyComponentType
 }
 
-type variableOwner struct {
-	// Linked list of predecessors
-	ownerList *ownerList
-	vi        *variable.VariableInfo
-}
-
 type Block struct {
 	BodyComponent
 	Nr int
 
 	TopLevel       bool
-	RegBlockPairs  []*regBodyPair
 	BodyComponents []BodyComponentType
 
+	VariableOwner      map[string]*variableOwner
 	ExternalInterfaces map[string]*variable.VariableInfo
 
-	VariableOwner map[string]*variableOwner
+	RegBlockPairs []*regBodyPair
 }
 
 func NewScopedVariables() *variable.ScopedVariables {
@@ -50,7 +44,7 @@ func NewScopedVariables() *variable.ScopedVariables {
 
 var blockNr = 0
 
-func NewBlock(toplevel bool, parent *Block) *Block {
+func NewBlock(toplevel bool, parent BlockType) *Block {
 	nr := blockNr
 	blockNr++
 
@@ -74,7 +68,8 @@ func NewBlock(toplevel bool, parent *Block) *Block {
 			},
 			parentBlock: parent,
 
-			inputVariables: NewScopedVariables(),
+			inputVariables:  NewScopedVariables(),
+			outputVariables: NewScopedVariables(),
 
 			predecessors: map[string]BodyComponentType{},
 			successors:   map[string]BodyComponentType{},
@@ -82,10 +77,10 @@ func NewBlock(toplevel bool, parent *Block) *Block {
 			isBlock: true,
 		},
 
-		TopLevel: toplevel,
-
 		ExternalInterfaces: make(map[string]*variable.VariableInfo),
 		VariableOwner:      make(map[string]*variableOwner),
+
+		TopLevel: toplevel,
 	}
 
 	return b
@@ -120,10 +115,11 @@ func (b *Block) Name() string {
 }
 
 func (b *Block) AddComponent(bodyComponent BodyComponentType) {
-	b.Out = bodyComponent.OutChannel()
+	b.RegBlockPairs = append(b.RegBlockPairs, &regBodyPair{Bc: bodyComponent})
+	/* b.Out = bodyComponent.OutChannel()
 
 	// TODO: explore top-level behaviour!
-	if /* b.TopLevel */ false {
+	if b.TopLevel *false {
 		newreg := NewReg(bodyComponent.GetVariableSize(), false, "0")
 		newreg.Out.Connect(bodyComponent.InChannel())
 
@@ -152,7 +148,7 @@ func (b *Block) AddComponent(bodyComponent BodyComponentType) {
 		}
 
 		b.RegBlockPairs = append(b.RegBlockPairs, &regBodyPair{Bc: bodyComponent})
-	}
+	} */
 }
 
 func (b *Block) EntityName() string {
@@ -216,23 +212,6 @@ func (b *Block) ComponentStr() string {
   );
   `
 	//in_data => std_logic_vector(resize(unsigned(` + b.In.Data + `), ` + strconv.Itoa(b.GetVariableSize()) + `)),
-}
-
-func (b *Block) signalDefs() string {
-	if len(b.RegBlockPairs) == 0 {
-		return ""
-	}
-
-	ret := ""
-
-	for _, c := range b.RegBlockPairs {
-		if c.Reg != nil {
-			ret += c.Reg.OutChannel().SignalsString()
-		}
-		ret += c.Bc.OutChannel().SignalsString()
-	}
-
-	return ret
 }
 
 func (b *Block) ioChannels() string {
@@ -399,7 +378,7 @@ func (b *Block) NewScopeVariable(vdef variable.VariableDef) (*variable.VariableI
 }
 
 func (b *Block) GetVariable(name string) (*variable.VariableInfo, error) {
-	infoPrinter.DebugPrintfln("Getting variable %s in block %s", name, b.Name())
+	infoPrinter.DebugPrintfln("[%s]: Getting variable %s", b.Name(), name)
 
 	own, ok := b.VariableOwner[name]
 	if ok {
@@ -519,6 +498,11 @@ func (b *Block) getComponentSignalDefJoinsAndForks(currentComponent BodyComponen
 		signalDefs += "signal " + currentComponent.Name() + "_x : std_logic_vector(" + strconv.Itoa(bep.GetXTotalSize()) + "- 1 downto 0) := (others => '0');"
 		signalDefs += "signal " + currentComponent.Name() + "_y : std_logic_vector(" + strconv.Itoa(bep.GetYTotalSize()) + "- 1 downto 0) := (others => '0');"
 		signalDefs += "signal " + currentComponent.Name() + "_result : std_logic_vector(" + strconv.Itoa(bep.GetRTotalSize()) + "- 1 downto 0);"
+
+	} else if sb, ok := currentComponent.(*SelectorBlock); ok {
+		signalDefs += "signal " + currentComponent.Name() + "_x : std_logic_vector(" + strconv.Itoa(sb.GetXTotalSize()) + "- 1 downto 0) := (others => '0');"
+		signalDefs += "signal " + currentComponent.Name() + "_y : std_logic_vector(" + strconv.Itoa(sb.GetYTotalSize()) + "- 1 downto 0) := (others => '0');"
+		signalDefs += "signal " + currentComponent.Name() + "_selector : std_logic_vector(0 downto 0);"
 	} else {
 		signalDefs += "signal " + currentComponent.Name() + "_in_data : std_logic_vector(" + strconv.Itoa(currentComponent.InputVariables().Size) + "- 1 downto 0);"
 		signalDefs += "signal " + currentComponent.Name() + "_out_data : std_logic_vector(" + strconv.Itoa(currentComponent.OutputVariables().Size) + "- 1 downto 0);"
@@ -616,25 +600,27 @@ func (b *Block) getSignalDefsJoinsAndForks() (string, []*MultiHsFork, []*MultiHs
 	forks = append(forks, f...)
 	joins = append(joins, j...)
 
-	// Add end-of-block join
-	endJoin, err := NewMultiHsJoin(openEndComps, b)
-	if err != nil {
-		panic("error while building endJoin")
+	if len(openEndComps) > 1 {
+		// Add end-of-block join
+		endJoin, err := NewMultiHsJoin(openEndComps, b)
+		if err != nil {
+			panic("error while building endJoin")
+		}
+
+		signalDefs += "signal " + endJoin.Name() + "_in_req : std_logic_vector(" + strconv.Itoa(endJoin.NumHsComponents) + "- 1 downto 0);"
+		signalDefs += "signal " + endJoin.Name() + "_out_req : std_logic;"
+
+		signalDefs += "signal " + endJoin.Name() + "_in_ack : std_logic_vector(" + strconv.Itoa(endJoin.NumHsComponents) + "- 1 downto 0);"
+		signalDefs += "signal " + endJoin.Name() + "_out_ack : std_logic;"
+
+		signalDefs += "\n"
+
+		joins = append(joins, endJoin)
+
+		b.RegBlockPairs = append(b.RegBlockPairs, &regBodyPair{
+			Bc: endJoin,
+		})
 	}
-
-	signalDefs += "signal " + endJoin.Name() + "_in_req : std_logic_vector(" + strconv.Itoa(endJoin.NumHsComponents) + "- 1 downto 0);"
-	signalDefs += "signal " + endJoin.Name() + "_out_req : std_logic;"
-
-	signalDefs += "signal " + endJoin.Name() + "_in_ack : std_logic_vector(" + strconv.Itoa(endJoin.NumHsComponents) + "- 1 downto 0);"
-	signalDefs += "signal " + endJoin.Name() + "_out_ack : std_logic;"
-
-	signalDefs += "\n"
-
-	joins = append(joins, endJoin)
-
-	b.RegBlockPairs = append(b.RegBlockPairs, &regBodyPair{
-		Bc: endJoin,
-	})
 
 	return signalDefs, forks, joins
 }
@@ -655,6 +641,8 @@ func (b *Block) getDefaultSignalAssignments() string {
 	for _, rbp := range b.RegBlockPairs {
 		currentComponent := rbp.Bc
 
+		infoPrinter.DebugPrintfln("[%s]: getting default signalassignment of child %s", b.Name(), currentComponent.Name())
+
 		// Signal assigments
 
 		// signalAssignments :=
@@ -671,14 +659,19 @@ func (b *Block) getDefaultSignalAssignments() string {
 
 		if _, ok := currentComponent.(*BinExprBlock); ok {
 
+		} else if _, ok := currentComponent.(*SelectorBlock); ok {
+
 		} else {
 			signalAssignments += recipient + " <= "
 		}
 
 		infoPrinter.DebugPrintfln("%s's has %d inputs", currentComponent.Name(), len(currentComponent.InputVariables().VariableList))
 
-		// default predecessor and successor is the parent block.
+		if len(currentComponent.InputVariables().VariableList) <= 0 {
+			panic("No input variables for component " + currentComponent.Name())
+		}
 
+		// default predecessor and successor is the parent block.
 		for i, input := range currentComponent.InputVariables().VariableList {
 			currentInputAssignment := ""
 
@@ -702,7 +695,7 @@ func (b *Block) getDefaultSignalAssignments() string {
 
 				predecessor, err := varOwner.ownerList.GetOwnerOf(currentComponent)
 				if err != nil {
-					panic("There was no predecessor for " + currentComponent.Name() + " for variable " + input.Name())
+					panic("[" + currentComponent.Name() + "]: There was no predecessor for variable " + input.Name() + "; error: " + err.Error())
 				}
 
 				currentInputAssignment, err = predecessor.GetVariableLocation(input.Name_)
@@ -717,6 +710,14 @@ func (b *Block) getDefaultSignalAssignments() string {
 					signalAssignments += recipient + " <= " + currentInputAssignment
 				} else if i == 1 {
 					recipient = bep.Name() + "_y"
+					signalAssignments += recipient + " <= " + currentInputAssignment
+				}
+			} else if sb, ok := currentComponent.(*SelectorBlock); ok {
+				if i == 0 {
+					recipient = sb.Name() + "_x"
+					signalAssignments += recipient + " <= " + currentInputAssignment
+				} else if i == 1 {
+					recipient = sb.Name() + "_y"
 					signalAssignments += recipient + " <= " + currentInputAssignment
 				}
 			} else {

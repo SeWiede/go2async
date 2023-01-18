@@ -34,10 +34,12 @@ func (ol *ownerList) AddSuccessorToLatest(n BodyComponentType) {
 }
 
 func (ol *ownerList) GetOwnerOf(n BodyComponentType) (BodyComponentType, error) {
-
 	ret, ok := ol.predecessorMap[n.Name()]
 	if !ok {
 		return nil, errors.New("No suitable owner found")
+	}
+	if ret == nil {
+		return nil, errors.New("Nil Owner")
 	}
 
 	return ret, nil

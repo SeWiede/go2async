@@ -67,51 +67,7 @@ func (m *MultiHsFork) ComponentStr() string {
 }
 
 func (m *MultiHsFork) Architecture() string {
-	// TODO: delays (click)
-
-	// -- click <= (outC_ack AND outB_ack AND NOT(phase)) OR (NOT(outC_ack) AND NOT(outB_ack) AND phase) AFTER AND3_DELAY + OR2_DELAY;
-
-	return `ARCHITECTURE ` + m.archName + ` OF multiHsFork IS
-
-  SIGNAL click : STD_LOGIC;
-  SIGNAL phase : STD_LOGIC := PHASE_INIT;
-
-  ATTRIBUTE dont_touch : STRING;
-  ATTRIBUTE dont_touch OF phase : SIGNAL IS "true";
-  ATTRIBUTE dont_touch OF click : SIGNAL IS "true";
-
-  SIGNAL out_ack_and : STD_LOGIC_VECTOR(out_ack'length - 1 downto 0) := (others => '0');
-  SIGNAL out_ack_nand : STD_LOGIC_VECTOR(out_ack'length - 1 downto 0) := (others => '0');
-BEGIN
-  -- Control Path
-  out_req <= (others => in_req);
-
-  in_ack <= phase;
-
-  
-  out_ack: for i in 0 to out_ack'length - 1 generate
-    out_ack_and <= out_ack(i) AND out_ack(i+1);
-  end generate;
-  
-  out_ack_n: for i in 0 to out_ack'length - 1 generate
-    out_ack_nand <= NOT(out_ack(i)) AND NOT(out_ack(i+1));
-  end generate;
-  
-  click <= (out_ack_and AND NOT(phase)) OR (out_ack_nand AND phase) AFTER AND3_DELAY + OR2_DELAY;
-  
-  clock_regs : PROCESS (click, rst)
-  BEGIN
-    IF rst = '1' THEN
-      phase <= PHASE_INIT;
-    ELSE
-      IF rising_edge(click) THEN
-        phase <= NOT phase AFTER REG_CQ_DELAY;
-      END IF;
-    END IF;
-  END PROCESS clock_regs;
-
-  end ` + m.archName + `;
-`
+	panic("MultiHsFork has predefined architecture")
 }
 
 func (m *MultiHsFork) EntityName() string {

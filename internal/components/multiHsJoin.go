@@ -65,51 +65,7 @@ func (m *MultiHsJoin) ComponentStr() string {
 }
 
 func (m *MultiHsJoin) Architecture() string {
-	// TODO: delays (click)
-
-	// click <= (inA_req and inB_req and not(phase)) or (not(inA_req) and not(inB_req) and phase) after AND3_DELAY + OR2_DELAY;
-
-	return `ARCHITECTURE ` + m.ArchName() + ` OF multiHsJoin IS
-
-  SIGNAL click : STD_LOGIC;
-  SIGNAL phase : STD_LOGIC := PHASE_INIT;
-
-  ATTRIBUTE dont_touch : STRING;
-  ATTRIBUTE dont_touch OF phase : SIGNAL IS "true";
-  ATTRIBUTE dont_touch OF click : SIGNAL IS "true";
-
-  SIGNAL in_req_and : STD_LOGIC_VECTOR(in_req'length - 1 downto 0) := (others => '0');
-  SIGNAL in_req_nand : STD_LOGIC_VECTOR(in_req'length - 1 downto 0) := (others => '0');
-BEGIN
-  -- Control Path
-  out_req <= phase;
-
-  in_ack <= (others => out_ack);
-
-  
-  in_req: for i in 0 to in_req'length - 1 generate
-    in_req_and <= in_req(i) AND in_req(i+1);
-  end generate;
-  
-  in_req_n: for i in 0 to in_req'length - 1 generate
-    in_req_nand <= NOT(in_req(i)) AND NOT(in_req(i+1));
-  end generate;
-
-  click <= (in_req_and AND NOT(phase)) OR (in_req_nand AND phase) AFTER AND3_DELAY + OR2_DELAY;
-  
-  clock_regs : PROCESS (click, rst)
-  BEGIN
-    IF rst = '1' THEN
-      phase <= PHASE_INIT;
-    ELSE
-      IF rising_edge(click) THEN
-        phase <= NOT phase AFTER REG_CQ_DELAY;
-      END IF;
-    END IF;
-  END PROCESS clock_regs;
-
-  end ` + m.ArchName() + `;
-`
+	panic("multiJSJoin has predefined architecture")
 }
 
 func (m *MultiHsJoin) EntityName() string {
