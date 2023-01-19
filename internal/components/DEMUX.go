@@ -8,8 +8,7 @@ import (
 const demuxPrefix = "DX_"
 
 type DEMUX struct {
-	Nr       int
-	archName string
+	BodyComponent
 
 	In     *HandshakeChannel
 	Out1   *HandshakeChannel
@@ -23,13 +22,14 @@ func NewDEMUX() *DEMUX {
 	nr := demuxNr
 	demuxNr++
 
-	name := strings.ToLower(demuxPrefix + strconv.Itoa(nr))
-	demuxNr++
 	return &DEMUX{
-		Nr:       nr,
-		archName: defaultArch,
-		In: &HandshakeChannel{
-			Out: false,
+		BodyComponent: BodyComponent{
+			number:   nr,
+			archName: defaultArch,
+		},
+
+		/*In: &HandshakeChannel{
+		 	Out: false,
 		},
 		Out1: &HandshakeChannel{
 			Req:  name + "_b_o_req",
@@ -45,12 +45,12 @@ func NewDEMUX() *DEMUX {
 		},
 		Select: &HandshakeChannel{
 			Out: false,
-		},
+		}, */
 	}
 }
 
 func (d *DEMUX) Name() string {
-	return demuxPrefix + strconv.Itoa(d.Nr)
+	return strings.ToLower(demuxPrefix + strconv.Itoa(d.number))
 }
 
 func (d *DEMUX) ComponentStr() string {
@@ -68,9 +68,8 @@ func (d *DEMUX) ComponentStr() string {
     outB_data => ` + d.Name() + `_outB_data,
     
     outC_req => ` + d.Name() + `_outC_req,
-    outC_ack => ` + d.Name() + `outC_ack,
+    outC_ack => ` + d.Name() + `_outC_ack,
     outC_data => ` + d.Name() + `_outC_data,
-    
 
     inSel_req => ` + d.Name() + `_inSel_req,
     inSel_ack => ` + d.Name() + `_inSel_ack,
@@ -132,4 +131,12 @@ end ` + d.archName + `;
 
 func (d *DEMUX) ArchName() string {
 	return d.archName
+}
+
+func (d *DEMUX) Entity() string {
+	panic("demux is predefined")
+}
+
+func (d *DEMUX) EntityName() string {
+	return "demux"
 }

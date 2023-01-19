@@ -8,8 +8,7 @@ import (
 const mergePrefix = "ME_"
 
 type Merge struct {
-	Nr       int
-	archName string
+	BodyComponent
 
 	In1 *HandshakeChannel
 	In2 *HandshakeChannel
@@ -22,12 +21,13 @@ func NewMerge() *Merge {
 	nr := mergeNr
 	mergeNr++
 
-	name := strings.ToLower(mergePrefix + strconv.Itoa(nr))
-	mergeNr++
 	return &Merge{
-		Nr:       nr,
-		archName: defaultArch,
-		In1: &HandshakeChannel{
+		BodyComponent: BodyComponent{
+			number:   nr,
+			archName: defaultArch,
+		},
+
+		/* In1: &HandshakeChannel{
 			Out: false,
 		},
 		In2: &HandshakeChannel{
@@ -38,12 +38,12 @@ func NewMerge() *Merge {
 			Ack:  name + "_c_o_ack",
 			Data: name + "_c_data",
 			Out:  true,
-		},
+		}, */
 	}
 }
 
 func (d *Merge) Name() string {
-	return mergePrefix + strconv.Itoa(d.Nr)
+	return strings.ToLower(mergePrefix + strconv.Itoa(d.number))
 }
 
 func (d *Merge) ComponentStr() string {
@@ -61,7 +61,7 @@ func (d *Merge) ComponentStr() string {
     inB_data => ` + d.Name() + `_inB_data,
     
     outC_req => ` + d.Name() + `_outC_req,
-    outC_ack => ` + d.Name() + `outC_ack,
+    outC_ack => ` + d.Name() + `_outC_ack,
     outC_data => ` + d.Name() + `_outC_data,
     
     rst => rst
@@ -121,4 +121,12 @@ end ` + d.archName + `;`
 
 func (d *Merge) ArchName() string {
 	return d.archName
+}
+
+func (d *Merge) Entity() string {
+	panic("merge is predefined")
+}
+
+func (d *Merge) EntityName() string {
+	return "merge"
 }
