@@ -10,6 +10,8 @@ const demuxPrefix = "DX_"
 type DEMUX struct {
 	BodyComponent
 
+	DataWidth int
+
 	In     *HandshakeChannel
 	Out1   *HandshakeChannel
 	Out2   *HandshakeChannel
@@ -18,7 +20,7 @@ type DEMUX struct {
 
 var demuxNr = 0
 
-func NewDEMUX() *DEMUX {
+func NewDEMUX(dataWidth int) *DEMUX {
 	nr := demuxNr
 	demuxNr++
 
@@ -27,6 +29,8 @@ func NewDEMUX() *DEMUX {
 			number:   nr,
 			archName: defaultArch,
 		},
+
+		DataWidth: dataWidth,
 
 		/*In: &HandshakeChannel{
 		 	Out: false,
@@ -56,7 +60,7 @@ func (d *DEMUX) Name() string {
 func (d *DEMUX) ComponentStr() string {
 	return d.Name() + `: entity work.demux
   generic map (
-    DATA_WIDTH => DATA_WIDTH
+    DATA_WIDTH => ` + strconv.Itoa(d.DataWidth) + `
   )
   port map (
     inA_req => ` + d.Name() + `_inA_req,

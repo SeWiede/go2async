@@ -8,10 +8,9 @@ import (
 const forkPrefix = "F_"
 
 type Fork struct {
-	Nr       int
-	archName string
+	BodyComponent
 
-	DataWidth string
+	DataWidth int
 
 	In   *HandshakeChannel
 	Out1 *HandshakeChannel
@@ -20,20 +19,19 @@ type Fork struct {
 
 var forkNr = 0
 
-func NewFork(datawdith string) *Fork {
+func NewFork(dataWidth int) *Fork {
 	nr := forkNr
 	forkNr++
 
-	if datawdith == "" {
-		datawdith = "DATA_WIDTH"
-	}
-
-	name := strings.ToLower(forkPrefix + strconv.Itoa(nr))
 	return &Fork{
-		Nr:        nr,
-		archName:  defaultArch,
-		DataWidth: datawdith,
-		In: &HandshakeChannel{
+		BodyComponent: BodyComponent{
+			number:   nr,
+			archName: defaultArch,
+		},
+
+		DataWidth: dataWidth,
+
+		/* In: &HandshakeChannel{
 			Out: false,
 		},
 		Out1: &HandshakeChannel{
@@ -47,28 +45,36 @@ func NewFork(datawdith string) *Fork {
 			Ack:  name + "_c_o_ack",
 			Data: name + "_c_data",
 			Out:  true,
-		},
+		}, */
 	}
 }
 
+func (f *Fork) Name() string {
+	return strings.ToLower(forkPrefix + strconv.Itoa(f.number))
+}
+
 func (f *Fork) ComponentStr() string {
-	name := forkPrefix + strconv.Itoa(f.Nr)
-	return name + `: entity work.fork
+	return f.Name() + `: entity work.fork
   generic map(
-    DATA_WIDTH => ` + f.DataWidth + `,
+    DATA_WIDTH => ` + strconv.Itoa(f.DataWidth) + `,
     PHASE_INIT => '0'
   )
   port map(
-    inA_ack => ` + f.In.Ack + `,
-    inA_req => ` + f.In.Req + `,
-    inA_data => ` + f.In.Data + `,
-    -- Output Channel
-    outB_ack => ` + f.Out1.Ack + `,
-    outB_req => ` + f.Out1.Req + `,
-    outB_data => ` + f.Out1.Data + `,
-    outC_ack => ` + f.Out2.Ack + `,
-    outC_req => ` + f.Out2.Req + `,
-    outC_data => ` + f.Out2.Data + `,
+    -- Input Channel
+    inA_req => ` + f.Name() + `_inA_req,
+    inA_ack => ` + f.Name() + `_inA_ack,
+    inA_data => ` + f.Name() + `_inA_data,
+
+    -- Output Channel 1
+    outB_req => ` + f.Name() + `_outB_req,
+    outB_ack => ` + f.Name() + `_outB_ack,
+    outB_data => ` + f.Name() + `_out_B_data,
+
+    -- Output Channel 2
+    outC_req => ` + f.Name() + `_outC_req,
+    outC_ack => ` + f.Name() + `_outC_ack,
+    outC_data => ` + f.Name() + `_outC_data,
+
     rst => rst
   );
     `
@@ -111,4 +117,12 @@ end ` + f.archName + `;
 
 func (f *Fork) ArchName() string {
 	return f.archName
+}
+
+func (f *Fork) Entity() string {
+	panic("demux is predefined")
+}
+
+func (f *Fork) EntityName() string {
+	return "demux"
 }

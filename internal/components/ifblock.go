@@ -60,14 +60,14 @@ func NewIfBlock(parent BlockType) *IfBlock {
 	//ib.thenBody = thenBody
 	//ib.elseBody = elseBody
 
-	entryIn := &HandshakeChannel{
+	/*entryIn := &HandshakeChannel{
 		Req:  "in_req",
 		Ack:  "in_ack",
 		Data: "in_data",
 		Out:  true,
 	}
 
-	ib.entryFork = NewFork("DATA_WIDTH")
+	 ib.entryFork = NewFork("DATA_WIDTH")
 	ib.entryFork.In = entryIn
 
 	// ib.cond = cond
@@ -84,7 +84,7 @@ func NewIfBlock(parent BlockType) *IfBlock {
 	// ib.thenBody.OutChannel().Connect(ib.merger.In1)
 	// ib.elseBody.OutChannel().Connect(ib.merger.In2)
 
-	// ib.merger.Out = ib.Out
+	// ib.merger.Out = ib.Out */
 
 	infoPrinter.DebugPrintfln("[%s]: Added ifBlock", ib.Name())
 
@@ -120,6 +120,13 @@ func (ib *IfBlock) ComponentStr() string {
 }
 
 func (ib *IfBlock) Architecture() string {
+	ib.entryFork = NewFork(ib.InputVariables().Size)
+	ib.demux = NewDEMUX(ib.InputVariables().Size)
+	ib.merger = NewMerge(ib.InputVariables().Size)
+
+	if ib.entryFork == nil {
+		panic("missing entryFork in ifBlock")
+	}
 	if ib.cond == nil {
 		panic("missing cond in ifBlock")
 	}
@@ -342,6 +349,7 @@ func (b *IfBlock) getDefaultSignalAssignments() string {
 func (b *IfBlock) getSignalDefs() string {
 	signalDefs := ""
 
+	signalDefs += b.getComponentSignalDefs(b.entryFork)
 	signalDefs += b.getComponentSignalDefs(b.cond)
 	signalDefs += b.getComponentSignalDefs(b.demux)
 	signalDefs += b.getComponentSignalDefs(b.thenBody)
@@ -376,30 +384,58 @@ func (b *IfBlock) getComponentSignalDefs(currentComponent BodyComponentType) str
 		signalDefs += "signal " + currentComponent.Name() + "_x : std_logic_vector(" + strconv.Itoa(sb.GetXTotalSize()) + "- 1 downto 0) := (others => '0');"
 		signalDefs += "signal " + currentComponent.Name() + "_y : std_logic_vector(" + strconv.Itoa(sb.GetYTotalSize()) + "- 1 downto 0) := (others => '0');"
 		signalDefs += "signal " + currentComponent.Name() + "_selector : std_logic_vector(0 downto 0);"
-	} else if _, ok := currentComponent.(*Merge); ok {
+	} else if f, ok := currentComponent.(*Fork); ok {
+		/*
+		   inA_req => ` + f.Name() + `_inA_req,
+		   inA_ack => ` + f.Name() + `_inA_ack,
+		   inA_data => ` + f.Name() + `_inA_data,
+
+		   -- Output Channel 1
+		   outB_req => ` + f.Name() + `_outB_req,
+		   outB_ack => ` + f.Name() + `_outB_ack,
+		   outB_data => ` + f.Name() + `_out_B_data,
+
+		   -- Output Channel 2
+		   outC_req => ` + f.Name() + `_outC_req,
+		   outC_ack => ` + f.Name() + `_outC_ack,
+		   outC_data => ` + f.Name() + `_outC_data,
+		*/
+
 		signalDefs += "signal " + currentComponent.Name() + "_inA_req : std_logic;"
 		signalDefs += "signal " + currentComponent.Name() + "_inA_ack : std_logic;"
-		signalDefs += "signal " + currentComponent.Name() + "_inA_data : std_logic_logic(" + strconv.Itoa(b.InputVariables().Size) + " - 1 downto 0);"
-
-		signalDefs += "signal " + currentComponent.Name() + "_inB_req : std_logic;"
-		signalDefs += "signal " + currentComponent.Name() + "_inB_ack : std_logic;"
-		signalDefs += "signal " + currentComponent.Name() + "_inB_data : std_logic_logic(" + strconv.Itoa(b.InputVariables().Size) + " - 1 downto 0);"
-
-		signalDefs += "signal " + currentComponent.Name() + "_outC_req : std_logic;"
-		signalDefs += "signal " + currentComponent.Name() + "_outC_ack : std_logic;"
-		signalDefs += "signal " + currentComponent.Name() + "_outC_data : std_logic_logic(" + strconv.Itoa(b.InputVariables().Size) + " - 1 downto 0);"
-	} else if _, ok := currentComponent.(*DEMUX); ok {
-		signalDefs += "signal " + currentComponent.Name() + "_inA_req : std_logic;"
-		signalDefs += "signal " + currentComponent.Name() + "_inA_ack : std_logic;"
-		signalDefs += "signal " + currentComponent.Name() + "_inA_data : std_logic_logic(" + strconv.Itoa(b.InputVariables().Size) + " - 1 downto 0);"
+		signalDefs += "signal " + currentComponent.Name() + "_inA_data : std_logic_logic(" + strconv.Itoa(f.DataWidth) + " - 1 downto 0);"
 
 		signalDefs += "signal " + currentComponent.Name() + "_outB_req : std_logic;"
 		signalDefs += "signal " + currentComponent.Name() + "_outB_ack : std_logic;"
-		signalDefs += "signal " + currentComponent.Name() + "_outB_data : std_logic_logic(" + strconv.Itoa(b.InputVariables().Size) + " - 1 downto 0);"
+		signalDefs += "signal " + currentComponent.Name() + "_outB_data : std_logic_logic(" + strconv.Itoa(f.DataWidth) + " - 1 downto 0);"
 
 		signalDefs += "signal " + currentComponent.Name() + "_outC_req : std_logic;"
 		signalDefs += "signal " + currentComponent.Name() + "_outC_ack : std_logic;"
-		signalDefs += "signal " + currentComponent.Name() + "_outC_data : std_logic_logic(" + strconv.Itoa(b.InputVariables().Size) + " - 1 downto 0);"
+		signalDefs += "signal " + currentComponent.Name() + "_outC_data : std_logic_logic(" + strconv.Itoa(f.DataWidth) + " - 1 downto 0);"
+	} else if m, ok := currentComponent.(*Merge); ok {
+		signalDefs += "signal " + currentComponent.Name() + "_inA_req : std_logic;"
+		signalDefs += "signal " + currentComponent.Name() + "_inA_ack : std_logic;"
+		signalDefs += "signal " + currentComponent.Name() + "_inA_data : std_logic_logic(" + strconv.Itoa(m.DataWidth) + " - 1 downto 0);"
+
+		signalDefs += "signal " + currentComponent.Name() + "_inB_req : std_logic;"
+		signalDefs += "signal " + currentComponent.Name() + "_inB_ack : std_logic;"
+		signalDefs += "signal " + currentComponent.Name() + "_inB_data : std_logic_logic(" + strconv.Itoa(m.DataWidth) + " - 1 downto 0);"
+
+		signalDefs += "signal " + currentComponent.Name() + "_outC_req : std_logic;"
+		signalDefs += "signal " + currentComponent.Name() + "_outC_ack : std_logic;"
+		signalDefs += "signal " + currentComponent.Name() + "_outC_data : std_logic_logic(" + strconv.Itoa(m.DataWidth) + " - 1 downto 0);"
+	} else if d, ok := currentComponent.(*DEMUX); ok {
+		signalDefs += "signal " + currentComponent.Name() + "_inA_req : std_logic;"
+		signalDefs += "signal " + currentComponent.Name() + "_inA_ack : std_logic;"
+		signalDefs += "signal " + currentComponent.Name() + "_inA_data : std_logic_logic(" + strconv.Itoa(d.DataWidth) + " - 1 downto 0);"
+
+		signalDefs += "signal " + currentComponent.Name() + "_outB_req : std_logic;"
+		signalDefs += "signal " + currentComponent.Name() + "_outB_ack : std_logic;"
+		signalDefs += "signal " + currentComponent.Name() + "_outB_data : std_logic_logic(" + strconv.Itoa(d.DataWidth) + " - 1 downto 0);"
+
+		signalDefs += "signal " + currentComponent.Name() + "_outC_req : std_logic;"
+		signalDefs += "signal " + currentComponent.Name() + "_outC_ack : std_logic;"
+		signalDefs += "signal " + currentComponent.Name() + "_outC_data : std_logic_logic(" + strconv.Itoa(d.DataWidth) + " - 1 downto 0);"
 
 		signalDefs += "signal " + currentComponent.Name() + "_inSel_req : std_logic;"
 		signalDefs += "signal " + currentComponent.Name() + "_inSel_ack : std_logic;"
@@ -433,11 +469,22 @@ func (b *IfBlock) getSignalAssignments() string {
 	signalAssignments += "out_data <= " + b.Name() + "_out_data;\n"
 	signalAssignments += "\n"
 
-	signalAssignments += b.cond.Name() + "_in_req <= ;"
-	signalAssignments += b.cond.Name() + "_in_ack <= ;"
+	// Selector
+	signalAssignments += b.cond.Name() + "_in_req <= _in_req;"
+	signalAssignments += b.cond.Name() + "_in_ack <= _in_ack;"
 
-	signalAssignments += b.cond.Name() + "_out_req <= ;"
-	signalAssignments += b.cond.Name() + "_out_ack <= ;"
+	signalAssignments += b.cond.Name() + "_out_req <= _out_req;"
+	signalAssignments += b.cond.Name() + "_out_ack <= _out_ack;"
+
+	// DEMUX
+
+	// then
+
+	// else
+
+	// merge
+
+	// block output
 
 	/* signalDefs += "signal " + currentComponent.Name() + "_out_ack"
 

@@ -10,6 +10,8 @@ const mergePrefix = "ME_"
 type Merge struct {
 	BodyComponent
 
+	DataWidth int
+
 	In1 *HandshakeChannel
 	In2 *HandshakeChannel
 	Out *HandshakeChannel
@@ -17,7 +19,7 @@ type Merge struct {
 
 var mergeNr = 0
 
-func NewMerge() *Merge {
+func NewMerge(dataWitdth int) *Merge {
 	nr := mergeNr
 	mergeNr++
 
@@ -27,6 +29,7 @@ func NewMerge() *Merge {
 			archName: defaultArch,
 		},
 
+		DataWidth: dataWitdth,
 		/* In1: &HandshakeChannel{
 			Out: false,
 		},
@@ -49,7 +52,7 @@ func (d *Merge) Name() string {
 func (d *Merge) ComponentStr() string {
 	return d.Name() + `: entity work.merge
   generic map (
-    DATA_WIDTH => DATA_WIDTH
+    DATA_WIDTH => ` + strconv.Itoa(d.DataWidth) + `
   )
   port map (
     inA_req => ` + d.Name() + `_inA_req,

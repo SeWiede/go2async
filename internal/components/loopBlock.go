@@ -65,7 +65,7 @@ func NewLoopBlock(loopCond *SelectorBlock, body BodyComponentType, parent BlockT
 	lb.entryMux.Out.Connect(lb.initRegFork.In)
 
 	lb.initRegFork.Out1.Connect(lb.loopCond.In)
-	lb.condFork = NewFork("1")
+	lb.condFork = NewFork(1)
 	lb.loopCond.Out.Connect(lb.condFork.In)
 	lb.condFork.Out1.Data = "open"
 	lb.condFork.Out2.Data = "open"
@@ -78,7 +78,7 @@ func NewLoopBlock(loopCond *SelectorBlock, body BodyComponentType, parent BlockT
 	lb.condReg.Out.Connect(lb.entryMux.Select)
 	//to demux
 
-	lb.exitDemux = NewDEMUX()
+	lb.exitDemux = NewDEMUX(-1)
 	lb.exitDemux.Out1 = lb.OutChannel()
 	lb.condFork.Out2.Connect(lb.exitDemux.Select)
 	lb.exitDemux.Select.Data = lb.loopCond.Out.Data
