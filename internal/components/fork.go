@@ -1,6 +1,7 @@
 package components
 
 import (
+	"go2async/internal/variable"
 	"strconv"
 	"strings"
 )
@@ -10,8 +11,6 @@ const forkPrefix = "F_"
 type Fork struct {
 	BodyComponent
 
-	DataWidth int
-
 	In   *HandshakeChannel
 	Out1 *HandshakeChannel
 	Out2 *HandshakeChannel
@@ -19,7 +18,11 @@ type Fork struct {
 
 var forkNr = 0
 
-func NewFork(dataWidth int) *Fork {
+func NewFork(inputVariables *variable.ScopedVariables) *Fork {
+	if inputVariables == nil {
+		panic("nil inputvariables")
+	}
+
 	nr := forkNr
 	forkNr++
 
@@ -27,9 +30,9 @@ func NewFork(dataWidth int) *Fork {
 		BodyComponent: BodyComponent{
 			number:   nr,
 			archName: defaultArch,
-		},
 
-		DataWidth: dataWidth,
+			inputVariables: inputVariables,
+		},
 
 		/* In: &HandshakeChannel{
 			Out: false,
@@ -56,7 +59,7 @@ func (f *Fork) Name() string {
 func (f *Fork) ComponentStr() string {
 	return f.Name() + `: entity work.fork
   generic map(
-    DATA_WIDTH => ` + strconv.Itoa(f.DataWidth) + `,
+    DATA_WIDTH => ` + strconv.Itoa(f.InputVariables().Size) + `,
     PHASE_INIT => '0'
   )
   port map(

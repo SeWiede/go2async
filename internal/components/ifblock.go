@@ -120,8 +120,10 @@ func (ib *IfBlock) ComponentStr() string {
 }
 
 func (ib *IfBlock) Architecture() string {
-	ib.entryFork = NewFork(ib.InputVariables().Size)
+	ib.entryFork = NewFork(ib.inputVariables)
+
 	ib.demux = NewDEMUX(ib.InputVariables().Size)
+
 	ib.merger = NewMerge(ib.InputVariables().Size)
 
 	if ib.entryFork == nil {
@@ -385,33 +387,17 @@ func (b *IfBlock) getComponentSignalDefs(currentComponent BodyComponentType) str
 		signalDefs += "signal " + currentComponent.Name() + "_y : std_logic_vector(" + strconv.Itoa(sb.GetYTotalSize()) + "- 1 downto 0) := (others => '0');"
 		signalDefs += "signal " + currentComponent.Name() + "_selector : std_logic_vector(0 downto 0);"
 	} else if f, ok := currentComponent.(*Fork); ok {
-		/*
-		   inA_req => ` + f.Name() + `_inA_req,
-		   inA_ack => ` + f.Name() + `_inA_ack,
-		   inA_data => ` + f.Name() + `_inA_data,
-
-		   -- Output Channel 1
-		   outB_req => ` + f.Name() + `_outB_req,
-		   outB_ack => ` + f.Name() + `_outB_ack,
-		   outB_data => ` + f.Name() + `_out_B_data,
-
-		   -- Output Channel 2
-		   outC_req => ` + f.Name() + `_outC_req,
-		   outC_ack => ` + f.Name() + `_outC_ack,
-		   outC_data => ` + f.Name() + `_outC_data,
-		*/
-
 		signalDefs += "signal " + currentComponent.Name() + "_inA_req : std_logic;"
 		signalDefs += "signal " + currentComponent.Name() + "_inA_ack : std_logic;"
-		signalDefs += "signal " + currentComponent.Name() + "_inA_data : std_logic_logic(" + strconv.Itoa(f.DataWidth) + " - 1 downto 0);"
+		signalDefs += "signal " + currentComponent.Name() + "_inA_data : std_logic_logic(" + strconv.Itoa(f.InputVariables().Size) + " - 1 downto 0);"
 
 		signalDefs += "signal " + currentComponent.Name() + "_outB_req : std_logic;"
 		signalDefs += "signal " + currentComponent.Name() + "_outB_ack : std_logic;"
-		signalDefs += "signal " + currentComponent.Name() + "_outB_data : std_logic_logic(" + strconv.Itoa(f.DataWidth) + " - 1 downto 0);"
+		signalDefs += "signal " + currentComponent.Name() + "_outB_data : std_logic_logic(" + strconv.Itoa(f.InputVariables().Size) + " - 1 downto 0);"
 
 		signalDefs += "signal " + currentComponent.Name() + "_outC_req : std_logic;"
 		signalDefs += "signal " + currentComponent.Name() + "_outC_ack : std_logic;"
-		signalDefs += "signal " + currentComponent.Name() + "_outC_data : std_logic_logic(" + strconv.Itoa(f.DataWidth) + " - 1 downto 0);"
+		signalDefs += "signal " + currentComponent.Name() + "_outC_data : std_logic_logic(" + strconv.Itoa(f.InputVariables().Size) + " - 1 downto 0);"
 	} else if m, ok := currentComponent.(*Merge); ok {
 		signalDefs += "signal " + currentComponent.Name() + "_inA_req : std_logic;"
 		signalDefs += "signal " + currentComponent.Name() + "_inA_ack : std_logic;"
@@ -440,7 +426,6 @@ func (b *IfBlock) getComponentSignalDefs(currentComponent BodyComponentType) str
 		signalDefs += "signal " + currentComponent.Name() + "_inSel_req : std_logic;"
 		signalDefs += "signal " + currentComponent.Name() + "_inSel_ack : std_logic;"
 		signalDefs += "signal " + currentComponent.Name() + "_selector : std_logic_logic(0 downto 0);"
-
 	} else {
 		signalDefs += "signal " + currentComponent.Name() + "_in_req : std_logic;"
 		signalDefs += "signal " + currentComponent.Name() + "_out_req : std_logic;"
@@ -469,9 +454,14 @@ func (b *IfBlock) getSignalAssignments() string {
 	signalAssignments += "out_data <= " + b.Name() + "_out_data;\n"
 	signalAssignments += "\n"
 
+	// EntryFork
+	signalAssignments += b.entryFork.Name() + "_inA_req <= in_req;"
+	signalAssignments += "in_ack <= " + b.entryFork.Name() + "_inA_ack;"
+	signalAssignments += b.entryFork.Name() + "_inA_data <= in_data;"
+
 	// Selector
-	signalAssignments += b.cond.Name() + "_in_req <= _in_req;"
-	signalAssignments += b.cond.Name() + "_in_ack <= _in_ack;"
+	signalAssignments += b.cond.Name() + "_in_req <= " + b.entryFork.Name() + "_outB_req;"
+	signalAssignments += b.entryFork.Name() + "_outB_ack <= " + b.cond.Name() + "_in_ack;"
 
 	signalAssignments += b.cond.Name() + "_out_req <= _out_req;"
 	signalAssignments += b.cond.Name() + "_out_ack <= _out_ack;"
