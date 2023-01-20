@@ -445,26 +445,48 @@ func (b *IfBlock) getSignalAssignments() string {
 	signalAssignments := ""
 
 	// Block defaults
-	signalAssignments += b.Name() + "_out_req <= in_req;\n"
-	signalAssignments += "in_ack <= " + b.Name() + "_out_ack;\n"
-	signalAssignments += b.Name() + "_in_data <= in_data;\n"
+	signalAssignments += b.Name() + "_out_req <= in_req;"
+	signalAssignments += "\n"
+	signalAssignments += "in_ack <= " + b.Name() + "_out_ack;"
+	signalAssignments += "\n"
+	signalAssignments += b.Name() + "_in_data <= in_data;"
+	signalAssignments += "\n"
 
-	signalAssignments += "out_req <= " + b.Name() + "_in_req;\n"
-	signalAssignments += b.Name() + "_in_ack <= out_ack;\n"
-	signalAssignments += "out_data <= " + b.Name() + "_out_data;\n"
+	signalAssignments += "out_req <= " + b.Name() + "_in_req;"
+	signalAssignments += "\n"
+	signalAssignments += b.Name() + "_in_ack <= out_ack;"
+	signalAssignments += "\n"
+	signalAssignments += "out_data <= " + b.Name() + "_out_data;"
 	signalAssignments += "\n"
 
 	// EntryFork
 	signalAssignments += b.entryFork.Name() + "_inA_req <= in_req;"
+	signalAssignments += "\n"
 	signalAssignments += "in_ack <= " + b.entryFork.Name() + "_inA_ack;"
+	signalAssignments += "\n"
 	signalAssignments += b.entryFork.Name() + "_inA_data <= in_data;"
+	signalAssignments += "\n"
+	signalAssignments += "\n"
 
 	// Selector
 	signalAssignments += b.cond.Name() + "_in_req <= " + b.entryFork.Name() + "_outB_req;"
+	signalAssignments += "\n"
 	signalAssignments += b.entryFork.Name() + "_outB_ack <= " + b.cond.Name() + "_in_ack;"
+	signalAssignments += "\n"
 
-	signalAssignments += b.cond.Name() + "_out_req <= _out_req;"
-	signalAssignments += b.cond.Name() + "_out_ack <= _out_ack;"
+	condXVar, err := b.cond.InputVariables().GetVariableInfoAt(0)
+	if err != nil {
+		panic("did not get condXVar")
+	}
+	signalAssignments += b.cond.Name() + "_x <= " + b.getInputStr(b.cond, condXVar) + ";"
+	signalAssignments += "\n"
+
+	condYVar, err := b.cond.InputVariables().GetVariableInfoAt(1)
+	if err != nil {
+		panic("did not get condXVar")
+	}
+	signalAssignments += b.cond.Name() + "_y <= " + b.getInputStr(b.cond, condYVar) + ";"
+	signalAssignments += "\n"
 
 	// DEMUX
 

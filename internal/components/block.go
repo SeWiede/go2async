@@ -673,57 +673,19 @@ func (b *Block) getDefaultSignalAssignments() string {
 
 		// default predecessor and successor is the parent block.
 		for i, input := range currentComponent.InputVariables().VariableList {
-			currentInputAssignment := ""
+			currentInputAssignment := b.getInputStr(currentComponent, input)
 
-			if input.Const_ != "" {
-				currentInputAssignment += "std_logic_vector(to_signed(" + input.Const_ + ", "
-
+			switch currentComponent.(type) {
+			case *BinExprBlock, *SelectorBlock:
 				if i == 0 {
-					currentInputAssignment += currentComponent.Name() + "_x'length"
-				} else if i == 1 {
-					currentInputAssignment += currentComponent.Name() + "_y'length"
-				}
-
-				currentInputAssignment += "))"
-			} else {
-				varOwner, ok := b.VariableOwner[input.Name_]
-				if !ok {
-					/* inputAssignment += "<???>"
-					infoPrinter.DebugPrintfln("%s's input var %s not found!", currentComponent.Name(), input.Name_) */
-					panic("Could not find var " + input.Name_ + "'s owner const is: " + input.Const_)
-				}
-
-				predecessor, err := varOwner.ownerList.GetOwnerOf(currentComponent)
-				if err != nil {
-					panic("[" + currentComponent.Name() + "]: There was no predecessor for variable " + input.Name() + "; error: " + err.Error())
-				}
-
-				currentInputAssignment, err = predecessor.GetVariableLocation(input.Name_)
-				if err != nil {
-					panic(err.Error())
-				}
-			}
-
-			if bep, ok := currentComponent.(*BinExprBlock); ok {
-				if i == 0 {
-					recipient = bep.Name() + "_x"
+					recipient = currentComponent.Name() + "_x"
 					signalAssignments += recipient + " <= " + currentInputAssignment
 				} else if i == 1 {
-					recipient = bep.Name() + "_y"
+					recipient = currentComponent.Name() + "_y"
 					signalAssignments += recipient + " <= " + currentInputAssignment
 				}
 				signalAssignments += ";\n"
-			} else if sb, ok := currentComponent.(*SelectorBlock); ok {
-				if i == 0 {
-					recipient = sb.Name() + "_x"
-					signalAssignments += recipient + " <= " + currentInputAssignment
-				} else if i == 1 {
-					recipient = sb.Name() + "_y"
-					signalAssignments += recipient + " <= " + currentInputAssignment
-				}
-				signalAssignments += ";\n"
-			} else {
-
+			default:
 				inputAssignment += currentInputAssignment
 
 				if i+1 < len(currentComponent.InputVariables().VariableList) {
@@ -881,4 +843,32 @@ func (b *Block) SetOutput(vis []*variable.VariableInfo) error {
 	}
 
 	return nil
+}
+
+func (b *Block) getInputStr(currentComponent BodyComponentType, input *variable.VariableInfo) string {
+	currentInputAssignment := ""
+	if input.Const_ != "" {
+		currentInputAssignment += "std_logic_vector(to_signed(" + input.Const_ + ", "
+
+		currentInputAssignment += strconv.Itoa(input.TotalSize())
+
+		currentInputAssignment += "))"
+	} else {
+		varOwner, ok := b.VariableOwner[input.Name_]
+		if !ok {
+			panic("Could not find var " + input.Name_ + "'s owner const is: " + input.Const_)
+		}
+
+		predecessor, err := varOwner.ownerList.GetOwnerOf(currentComponent)
+		if err != nil {
+			panic("[" + currentComponent.Name() + "]: There was no predecessor for variable " + input.Name() + "; error: " + err.Error())
+		}
+
+		currentInputAssignment, err = predecessor.GetVariableLocation(input.Name_)
+		if err != nil {
+			panic(err.Error())
+		}
+	}
+
+	return currentInputAssignment
 }
