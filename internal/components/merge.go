@@ -133,3 +133,8 @@ func (d *Merge) Entity() string {
 func (d *Merge) EntityName() string {
 	return "merge"
 }
+
+func (d *Merge) GetSignalDefs() string {
+	panic("signaldefs not implemented")
+	return ""
+}

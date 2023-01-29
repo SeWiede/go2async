@@ -177,6 +177,8 @@ type BodyComponentType interface {
 	AddOutputVariable(*variable.VariableInfo) (*variable.VariableInfo, error)
 
 	GetVariableLocation(string) (string, error)
+
+	GetSignalDefs() string
 }
 
 type BodyComponent struct {

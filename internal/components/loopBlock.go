@@ -203,3 +203,17 @@ ENTITY ` + lb.EntityName() + ` IS
     out_data : OUT STD_LOGIC_VECTOR(DATA_WIDTH - 1 DOWNTO 0));
 END ` + lb.EntityName() + `;`
 }
+
+func (lb *LoopBlock) GetSignalDefs() string {
+	signalDefs := ""
+
+	signalDefs += "signal " + lb.Name() + "_in_req : std_logic;"
+	signalDefs += "signal " + lb.Name() + "_out_req : std_logic;"
+	signalDefs += "signal " + lb.Name() + "_in_ack : std_logic;"
+	signalDefs += "signal " + lb.Name() + "_out_ack : std_logic;"
+
+	signalDefs += "signal " + lb.Name() + "_in_data : std_logic_vector(" + strconv.Itoa(lb.InputVariables().Size) + "- 1 downto 0);"
+	signalDefs += "signal " + lb.Name() + "_out_data : std_logic_vector(" + strconv.Itoa(lb.OutputVariables().Size) + "- 1 downto 0);"
+
+	return signalDefs
+}

@@ -95,3 +95,15 @@ ENTITY MultiHsFork IS
   );
 END MultiHsFork;`
 }
+
+func (m *MultiHsFork) GetSignalDefs() string {
+	signalDefs := ""
+
+	signalDefs += "signal " + m.Name() + "_in_req : std_logic;"
+	signalDefs += "signal " + m.Name() + "_out_req : std_logic_vector(" + strconv.Itoa(m.NumHsComponents) + "- 1 downto 0);"
+
+	signalDefs += "signal " + m.Name() + "_in_ack : std_logic;"
+	signalDefs += "signal " + m.Name() + "_out_ack : std_logic_vector(" + strconv.Itoa(m.NumHsComponents) + "- 1 downto 0);"
+
+	return signalDefs
+}

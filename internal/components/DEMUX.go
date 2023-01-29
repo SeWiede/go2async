@@ -144,3 +144,8 @@ func (d *DEMUX) Entity() string {
 func (d *DEMUX) EntityName() string {
 	return "demux"
 }
+
+func (d *DEMUX) GetSignalDefs() string {
+	panic("signaldefs not implemented")
+	return ""
+}

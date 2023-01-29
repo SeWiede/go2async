@@ -262,3 +262,8 @@ func (fb *FuncBlock) Architecture() string {
   end ` + fb.archName + `;
   `
 }
+
+func (fb *FuncBlock) GetSignalDefs() string {
+	panic("signaldefs not implemented")
+	return ""
+}

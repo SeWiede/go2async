@@ -227,9 +227,9 @@ ENTITY ` + sb.EntityName() + ` IS
     x : IN STD_LOGIC_VECTOR(` + strconv.Itoa(op1Size) + ` - 1 DOWNTO 0);
 	y : IN STD_LOGIC_VECTOR(` + strconv.Itoa(op2Size) + ` - 1 DOWNTO 0);
     -- Selector
-    selector : OUT STD_LOGIC_VECTOR(0 DOWNTO 0);
     out_req : OUT STD_LOGIC;
-    out_ack : IN STD_LOGIC
+    out_ack : IN STD_LOGIC;
+    selector : OUT STD_LOGIC_VECTOR(0 DOWNTO 0)
   );
 END ` + sb.EntityName() + `;`
 }
@@ -249,4 +249,19 @@ func (ib *SelectorBlock) GetYTotalSize() int {
 	}
 
 	return y.TotalSize()
+}
+
+func (ib *SelectorBlock) GetSignalDefs() string {
+	signalDefs := ""
+
+	signalDefs += "signal " + ib.Name() + "_in_req : std_logic;"
+	signalDefs += "signal " + ib.Name() + "_out_req : std_logic;"
+	signalDefs += "signal " + ib.Name() + "_in_ack : std_logic;"
+	signalDefs += "signal " + ib.Name() + "_out_ack : std_logic;"
+
+	signalDefs += "signal " + ib.Name() + "_x : std_logic_vector(" + strconv.Itoa(ib.GetXTotalSize()) + "- 1 downto 0) := (others => '0');"
+	signalDefs += "signal " + ib.Name() + "_y : std_logic_vector(" + strconv.Itoa(ib.GetYTotalSize()) + "- 1 downto 0) := (others => '0');"
+	signalDefs += "signal " + ib.Name() + "_selector : std_logic_vector(0 downto 0);"
+
+	return signalDefs
 }

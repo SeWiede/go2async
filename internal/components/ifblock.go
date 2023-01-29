@@ -449,14 +449,15 @@ func (b *IfBlock) getSignalAssignments() string {
 	signalAssignments += "\n"
 	signalAssignments += "in_ack <= " + b.Name() + "_out_ack;"
 	signalAssignments += "\n"
-	signalAssignments += b.Name() + "_in_data <= in_data;"
+	signalAssignments += b.Name() + "_out_data <= in_data;"
 	signalAssignments += "\n"
 
 	signalAssignments += "out_req <= " + b.Name() + "_in_req;"
 	signalAssignments += "\n"
 	signalAssignments += b.Name() + "_in_ack <= out_ack;"
 	signalAssignments += "\n"
-	signalAssignments += "out_data <= " + b.Name() + "_out_data;"
+	signalAssignments += "out_data <= " + b.Name() + "_in_data;"
+	signalAssignments += "\n"
 	signalAssignments += "\n"
 
 	// EntryFork
@@ -469,9 +470,9 @@ func (b *IfBlock) getSignalAssignments() string {
 	signalAssignments += "\n"
 
 	// Selector
-	signalAssignments += b.cond.Name() + "_in_req <= " + b.entryFork.Name() + "_outB_req;"
+	signalAssignments += b.cond.Name() + "_in_req <= " + b.entryFork.Name() + "_outA_req;"
 	signalAssignments += "\n"
-	signalAssignments += b.entryFork.Name() + "_outB_ack <= " + b.cond.Name() + "_in_ack;"
+	signalAssignments += b.entryFork.Name() + "_outA_ack <= " + b.cond.Name() + "_in_ack;"
 	signalAssignments += "\n"
 
 	condXVar, err := b.cond.InputVariables().GetVariableInfoAt(0)
@@ -487,8 +488,22 @@ func (b *IfBlock) getSignalAssignments() string {
 	}
 	signalAssignments += b.cond.Name() + "_y <= " + b.getInputStr(b.cond, condYVar) + ";"
 	signalAssignments += "\n"
+	signalAssignments += "\n"
 
 	// DEMUX
+	// in_req
+	signalAssignments += b.demux.Name() + "_in_req <= " + b.entryFork.Name() + "_outB_req;"
+	signalAssignments += "\n"
+	signalAssignments += b.entryFork.Name() + "_outB_ack <= " + b.demux.Name() + "_in_ack;"
+	signalAssignments += "\n"
+	signalAssignments += b.demux.Name() + "_in_data <= " + b.Name() + "_in_data;"
+	signalAssignments += "\n"
+
+	// demux-selector
+	signalAssignments += b.demux.Name() + "_inSel_req <= " + b.cond.Name() + "_out_req;"
+	signalAssignments += "\n"
+	signalAssignments += b.cond.Name() + "_out_ack <= " + b.demux.Name() + "_inSel_ack;"
+	signalAssignments += "\n"
 
 	// then
 

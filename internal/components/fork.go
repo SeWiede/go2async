@@ -129,3 +129,8 @@ func (f *Fork) Entity() string {
 func (f *Fork) EntityName() string {
 	return "demux"
 }
+
+func (f *Fork) GetSignalDefs() string {
+	panic("signaldefs not implemented")
+	return ""
+}

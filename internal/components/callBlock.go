@@ -267,3 +267,17 @@ func (cb *CallBlock) Architecture() string {
   end ` + cb.archName + `;
   `
 }
+
+func (cb *CallBlock) GetSignalDefs() string {
+	signalDefs := ""
+
+	signalDefs += "signal " + cb.Name() + "_in_req : std_logic;"
+	signalDefs += "signal " + cb.Name() + "_out_req : std_logic;"
+	signalDefs += "signal " + cb.Name() + "_in_ack : std_logic;"
+	signalDefs += "signal " + cb.Name() + "_out_ack : std_logic;"
+
+	signalDefs += "signal " + cb.Name() + "_in_data : std_logic_vector(" + strconv.Itoa(cb.InputVariables().Size) + "- 1 downto 0);"
+	signalDefs += "signal " + cb.Name() + "_out_data : std_logic_vector(" + strconv.Itoa(cb.OutputVariables().Size) + "- 1 downto 0);"
+
+	return signalDefs
+}

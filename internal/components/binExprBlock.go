@@ -475,3 +475,18 @@ func (bep *BinExprBlock) GetVariableLocation(name string) (string, error) {
 
 	return bep.Name() + "_result", nil
 }
+
+func (bep *BinExprBlock) GetSignalDefs() string {
+	signalDefs := ""
+
+	signalDefs += "signal " + bep.Name() + "_in_req : std_logic;"
+	signalDefs += "signal " + bep.Name() + "_out_req : std_logic;"
+	signalDefs += "signal " + bep.Name() + "_in_ack : std_logic;"
+	signalDefs += "signal " + bep.Name() + "_out_ack : std_logic;"
+
+	signalDefs += "signal " + bep.Name() + "_x : std_logic_vector(" + strconv.Itoa(bep.GetXTotalSize()) + "- 1 downto 0) := (others => '0');"
+	signalDefs += "signal " + bep.Name() + "_y : std_logic_vector(" + strconv.Itoa(bep.GetYTotalSize()) + "- 1 downto 0) := (others => '0');"
+	signalDefs += "signal " + bep.Name() + "_result : std_logic_vector(" + strconv.Itoa(bep.GetRTotalSize()) + "- 1 downto 0);"
+
+	return signalDefs
+}
