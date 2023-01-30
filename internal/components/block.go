@@ -52,9 +52,11 @@ func NewBlock(toplevel bool, parent BlockType) *Block {
 
 	b := &Block{
 		BodyComponent: BodyComponent{
+			name: strings.ToLower(blockPrefix + strconv.Itoa(nr)),
+
 			number:   nr,
 			archName: archPrefix + name,
-			In: &HandshakeChannel{
+			/* In: &HandshakeChannel{
 				Req:  "in_req",
 				Ack:  "in_ack",
 				Data: "in_data",
@@ -65,7 +67,7 @@ func NewBlock(toplevel bool, parent BlockType) *Block {
 				Ack:  "bl_" + strconv.Itoa(nr) + "_out_ack",
 				Data: "bl_" + strconv.Itoa(nr) + "_data_out",
 				Out:  true,
-			},
+			}, */
 			parentBlock: parent,
 
 			inputVariables: NewScopedVariables(),
@@ -111,7 +113,7 @@ func NewParamDummyBlock(params map[string]*variable.VariableInfo) *Block {
 }
 
 func (b *Block) Name() string {
-	return strings.ToLower(blockPrefix + strconv.Itoa(b.number))
+	return b.name
 }
 
 func (b *Block) AddComponent(bodyComponent BodyComponentType) {
@@ -221,9 +223,9 @@ func (b *Block) ioChannels() string {
 		ret += "in_ack <= out_ack; \n"
 		ret += "out_data <= in_data; \n"
 	} else {
-		ret += "out_req <= " + b.OutChannel().Req + "; \n"
+		/* ret += "out_req <= " + b.OutChannel().Req + "; \n"
 		ret += b.OutChannel().Ack + " <= out_ack; \n"
-		ret += "out_data <= std_logic_vector(resize(unsigned(" + b.OutChannel().Data + "), out_data'length)); \n"
+		ret += "out_data <= std_logic_vector(resize(unsigned(" + b.OutChannel().Data + "), out_data'length)); \n" */
 	}
 
 	return ret

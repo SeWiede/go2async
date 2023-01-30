@@ -50,7 +50,7 @@ func NewLoopBlock(loopCond *SelectorBlock, body BodyComponentType, parent BlockT
 		Nr: nr,
 	}
 
-	entryIn := &HandshakeChannel{
+	/* entryIn := &HandshakeChannel{
 		Req:  "in_req",
 		Ack:  "in_ack",
 		Data: "in_data",
@@ -94,32 +94,34 @@ func NewLoopBlock(loopCond *SelectorBlock, body BodyComponentType, parent BlockT
 	body.OutChannel().Connect(lb.entryMux.In2)
 
 	lb.exitDemux.Out2.Connect(lb.bodyReg.In)
-	lb.bodyReg.Out.Connect(body.InChannel())
+	lb.bodyReg.Out.Connect(body.InChannel()) */
 
 	return lb
 }
 
-func (lb *LoopBlock) ComponentStr() string {
-	name := loopBlockPrefix + strconv.Itoa(lb.Nr)
+func (lb *LoopBlock) Name() string {
+	return loopBlockPrefix + strconv.Itoa(lb.Nr)
+}
 
-	return name + `: entity work.LoopBlock(` + lb.archName + `)
+func (lb *LoopBlock) ComponentStr() string {
+	return lb.Name() + `: entity work.LoopBlock(` + lb.archName + `)
   generic map(
     DATA_WIDTH => ` + strconv.Itoa(lb.GetVariableSize()) + `
   )
   port map (
     rst => rst,
-    in_ack => ` + lb.In.Ack + `,
-    in_req => ` + lb.In.Req + `,
-    in_data => std_logic_vector(resize(unsigned(` + lb.In.Data + `), ` + strconv.Itoa(lb.GetVariableSize()) + `)),
+    in_req => ` + lb.Name() + `_in_req,
+    in_ack => ` + lb.Name() + `_in_ack,
+    in_data => std_logic_vector(resize(unsigned(` + lb.Name() + `_in_data), ` + strconv.Itoa(lb.GetVariableSize()) + `)),
     -- Output channel
-    out_req => ` + lb.Out.Req + `,
-    out_data => ` + lb.Out.Data + `,
-    out_ack => ` + lb.Out.Ack + `
+    out_req => ` + lb.Name() + `_out_req,
+    out_ack => ` + lb.Name() + `_out_ack,
+    out_data => ` + lb.Name() + `_out_data
   );
   `
 }
 
-func (lb *LoopBlock) signalDefs() string {
+/* func (lb *LoopBlock) signalDefs() string {
 	ret := lb.body.OutChannel().SignalsString()
 	ret += lb.entryMux.Out.SignalsString()
 	ret += lb.initRegFork.Out1.SignalsString()
@@ -134,13 +136,13 @@ func (lb *LoopBlock) signalDefs() string {
 	ret += "signal " + lb.condReg.Out.Req + ", " + lb.condReg.Out.Ack + " : std_logic;"
 	ret += "signal " + lb.condReg.Out.Data + " : std_logic_vector(0 downto 0);\n"
 	return ret
-}
+} */
 
 func (lb *LoopBlock) Architecture() string {
 	// TODO: add inner components
 	ret := `architecture ` + lb.archName + ` of LoopBlock is
 	`
-	ret += lb.signalDefs()
+	//ret += lb.signalDefs()
 
 	ret += "\n"
 
@@ -148,9 +150,9 @@ func (lb *LoopBlock) Architecture() string {
 
 	ret += "\n"
 
-	ret += "out_req <= " + lb.OutChannel().Req + "; \n"
+	/* ret += "out_req <= " + lb.OutChannel().Req + "; \n"
 	ret += lb.OutChannel().Ack + " <= out_ack; \n"
-	ret += "out_data <= " + lb.OutChannel().Data + "; \n"
+	ret += "out_data <= " + lb.OutChannel().Data + "; \n" */
 
 	ret += "\n"
 
@@ -216,4 +218,8 @@ func (lb *LoopBlock) GetSignalDefs() string {
 	signalDefs += "signal " + lb.Name() + "_out_data : std_logic_vector(" + strconv.Itoa(lb.OutputVariables().Size) + "- 1 downto 0);"
 
 	return signalDefs
+}
+
+func (lb *LoopBlock) Connect(bc BodyComponentType, x interface{}) {
+	panic("not implemented")
 }

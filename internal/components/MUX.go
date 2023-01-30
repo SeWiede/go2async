@@ -23,48 +23,55 @@ func NewMUX() *MUX {
 	nr := muxNr
 	muxNr++
 
-	name := strings.ToLower(muxprefix + strconv.Itoa(nr))
+	//name := strings.ToLower(muxprefix + strconv.Itoa(nr))
 	return &MUX{
 		Nr:       nr,
 		archName: defaultArch,
-		In1: &HandshakeChannel{
+		/* In1: &HandshakeChannel{
 			Out: false,
 		},
 		In2: &HandshakeChannel{
 			Out: false,
 		},
 		Out: &HandshakeChannel{
-			Req:  name + "_o_req",
-			Ack:  name + "_o_ack",
-			Data: name + "_data",
-			Out:  true,
-		},
+			From:    name + "_o_req",
+			FromAck: name + "_o_ack",
+			Data:    name + "_data",
+			Out:     true,
+		}, */
 		Select: &HandshakeChannel{
 			Out: false,
 		},
 	}
 }
 
+func (m *MUX) Name() string {
+	return strings.ToLower(muxprefix + strconv.Itoa(m.Nr))
+}
+
 func (m *MUX) ComponentStr() string {
-	name := muxprefix + strconv.Itoa(m.Nr)
-	return name + `: entity work.mux
+	return m.Name() + `: entity work.mux
   generic map (
     DATA_WIDTH => DATA_WIDTH
   )
   port map (
-    inA_req => ` + m.In1.Req + `,
-    inA_ack => ` + m.In1.Ack + `,
-    inA_data => ` + m.In1.Data + `,
-    inB_ack => ` + m.In2.Ack + `,
-    inB_data => ` + m.In2.Data + `(DATA_WIDTH - 1 downto 0),
-    inB_req => ` + m.In2.Req + `,
-    outC_ack => ` + m.Out.Ack + `,
-    outC_data => ` + m.Out.Data + `,
-    outC_req => ` + m.Out.Req + `,
-    rst => rst,
-    inSel_ack => ` + m.Select.Ack + `,
-    inSel_req => ` + m.Select.Req + `,
-    selector => ` + m.Select.Data + `
+    inA_req => ` + m.Name() + `_inA_req,
+    inA_ack => ` + m.Name() + `_inA_ack,
+    inA_data => ` + m.Name() + `_inA_data,
+
+    inB_req => ` + m.Name() + `_inB_req,
+    inB_ack => ` + m.Name() + `_inB_ack,
+    inB_data => ` + m.Name() + `_inB_data,
+    
+    outC_req => ` + m.Name() + `_outC_req,
+    outC_ack => ` + m.Name() + `_outC_ack,
+    outC_data => ` + m.Name() + `_outC_data,
+    
+    inSel_req => ` + m.Name() + `_inSel_req,
+    inSel_ack => ` + m.Name() + `_inSel_ack,
+    selector => ` + m.Name() + `_selector,
+    
+    rst => rst
   );
   `
 }

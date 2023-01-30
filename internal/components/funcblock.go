@@ -65,14 +65,6 @@ func NewFuncBlock(paramsResults *variable.FuncInterface, fi variable.VariableDef
 	return ret, nil
 }
 
-func (fb *FuncBlock) InChannel() *HandshakeChannel {
-	return fb.In
-}
-
-func (fb *FuncBlock) OutChannel() *HandshakeChannel {
-	return fb.Out
-}
-
 func (fb *FuncBlock) EntityName() string {
 	return defaultFuncBlockEntityName + "_" + fb.externalInterface.Name()
 }
@@ -112,10 +104,12 @@ func (fb *FuncBlock) Entity() string {
 	END ` + fb.EntityName() + `;`
 }
 
-func (fb *FuncBlock) ComponentStr() string {
-	name := funcBlockPrefix + strconv.Itoa(fb.Nr)
+func (fb *FuncBlock) Name() string {
+	return funcBlockPrefix + strconv.Itoa(fb.Nr)
+}
 
-	return name + `: entity work.` + fb.EntityName() + `(` + fb.archName + `)
+func (fb *FuncBlock) ComponentStr() string {
+	return fb.Name() + `: entity work.` + fb.EntityName() + `(` + fb.archName + `)
 	generic map(
 	  DATA_WIDTH => ` + strconv.Itoa(fb.GetVariableSize()) + `,
 	  ` + fb.externalInterface.Name() + `_IN_DATA_WIDTH => ` + fb.externalInterface.Name() + `_IN_DATA_WIDTH,
@@ -123,13 +117,13 @@ func (fb *FuncBlock) ComponentStr() string {
 	)
 	port map (
 		-- Input channel
-		in_req  => ` + fb.In.Req + `,
-		in_ack  => ` + fb.In.Ack + `, 
-		in_data => std_logic_vector(resize(unsigned(` + fb.In.Data + `), ` + strconv.Itoa(fb.GetVariableSize()) + `)),
+		in_req  => ` + fb.Name() + `_in_req,
+		in_ack  => ` + fb.Name() + `_in_ack, 
+		in_data => std_logic_vector(resize(unsigned(` + fb.Name() + `_in_data), ` + strconv.Itoa(fb.GetVariableSize()) + `)),
 		-- Output channel
-		out_req => ` + fb.Out.Req + `,
-		out_ack => ` + fb.Out.Ack + `,
-		out_data  => ` + fb.Out.Data + `,
+		out_req => ` + fb.Name() + `_out_req,
+		out_ack => ` + fb.Name() + `_out_ack,
+		out_data  => ` + fb.Name() + `_out_data,
 
 		--External Interface
 		-- Input channel
@@ -266,4 +260,8 @@ func (fb *FuncBlock) Architecture() string {
 func (fb *FuncBlock) GetSignalDefs() string {
 	panic("signaldefs not implemented")
 	return ""
+}
+
+func (fb *FuncBlock) Connect(bc BodyComponentType, x interface{}) {
+	panic("not implemented")
 }

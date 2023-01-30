@@ -25,7 +25,7 @@ func NewReg(dataWidth int, phaseOut bool, startValue string) *Reg {
 	nr := regNr
 	regNr++
 
-	name := strings.ToLower(regPrefix + strconv.Itoa(nr))
+	// name := strings.ToLower(regPrefix + strconv.Itoa(nr))
 
 	return &Reg{
 		Nr:         nr,
@@ -33,16 +33,16 @@ func NewReg(dataWidth int, phaseOut bool, startValue string) *Reg {
 		DataWidth:  dataWidth,
 		PhaseOut:   phaseOut,
 		StartValue: startValue,
-		In: &HandshakeChannel{
+		/* In: &HandshakeChannel{
 			Out: false,
 		},
 		Out: &HandshakeChannel{
-			Req:       name + "_o_req",
-			Ack:       name + "_o_ack",
+			From:      name + "_o_req",
+			FromAck:   name + "_o_ack",
 			Data:      name + "_data",
 			Out:       true,
 			DataWidth: dataWidth,
-		},
+		}, */
 	}
 }
 
@@ -55,7 +55,7 @@ func (r *Reg) OutChannel() *HandshakeChannel {
 }
 
 func (r *Reg) Name() string {
-	return regPrefix + strconv.Itoa(r.Nr)
+	return strings.ToLower(regPrefix + strconv.Itoa(r.Nr))
 }
 
 func (r *Reg) ComponentStr() string {

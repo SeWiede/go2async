@@ -161,8 +161,8 @@ func (b *DefaultBlock) GetAndAssignFunctionInterface(fname string) (*variable.Va
 
 type BodyComponentType interface {
 	Component
-	InChannel() *HandshakeChannel
-	OutChannel() *HandshakeChannel
+	InChannels() []*HandshakeChannel
+	OutChannels() []*HandshakeChannel
 
 	GetVariableSize() int
 
@@ -182,14 +182,15 @@ type BodyComponentType interface {
 }
 
 type BodyComponent struct {
+	name        string
 	parentBlock BlockType
 
 	number int
 
 	archName string
 
-	In  *HandshakeChannel
-	Out *HandshakeChannel
+	In  []*HandshakeChannel
+	Out []*HandshakeChannel
 
 	predecessors map[string]BodyComponentType
 	successors   map[string]BodyComponentType
@@ -202,7 +203,7 @@ type BodyComponent struct {
 
 // Type checks
 func (bc *BodyComponent) Name() string {
-	panic("Encountered unnamed component " + bc.archName)
+	return bc.name
 }
 
 func (bc *BodyComponent) ArchName() string {
@@ -213,11 +214,11 @@ func (bc *BodyComponent) Parent() BlockType {
 	return bc.parentBlock
 }
 
-func (bc *BodyComponent) InChannel() *HandshakeChannel {
+func (bc *BodyComponent) InChannels() []*HandshakeChannel {
 	return bc.In
 }
 
-func (bc *BodyComponent) OutChannel() *HandshakeChannel {
+func (bc *BodyComponent) OutChannels() []*HandshakeChannel {
 	return bc.Out
 }
 
@@ -281,4 +282,17 @@ func (bc *BodyComponent) AddOutputVariable(vtd *variable.VariableInfo) (*variabl
 
 func (bc *BodyComponent) GetVariableLocation(name string) (string, error) {
 	return "", errors.New("not implemented")
+}
+
+func (bc *BodyComponent) GetSignalDefs() string {
+	signalDefs := ""
+
+	for _, in := range bc.In {
+		signalDefs += in.SignalDefs()
+	}
+	for _, out := range bc.Out {
+		signalDefs += out.SignalDefs()
+	}
+
+	return signalDefs
 }

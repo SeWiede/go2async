@@ -134,3 +134,7 @@ func (f *Fork) GetSignalDefs() string {
 	panic("signaldefs not implemented")
 	return ""
 }
+
+func (f *Fork) Connect(bc BodyComponentType, x interface{}) {
+	panic("not implemented")
+}

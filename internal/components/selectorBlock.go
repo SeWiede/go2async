@@ -36,7 +36,8 @@ func NewSelectorBlock(op string, oi *OperandInfo, inverted bool, parent BlockTyp
 			number: nr,
 
 			archName: archPrefix + name,
-			In: &HandshakeChannel{
+
+			/* In: &HandshakeChannel{
 				Out: false,
 			},
 			Out: &HandshakeChannel{
@@ -45,7 +46,7 @@ func NewSelectorBlock(op string, oi *OperandInfo, inverted bool, parent BlockTyp
 				Data:      name + "_select",
 				Out:       true,
 				DataWidth: selecTorOutDataWith,
-			},
+			}, */
 
 			parentBlock: parent,
 

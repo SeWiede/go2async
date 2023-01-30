@@ -16,6 +16,7 @@ type MultiHsFork struct {
 	Sender    BodyComponentType
 
 	NumHsComponents int
+	currentOut      int
 }
 
 var multiHsForkNr = 0
@@ -39,6 +40,7 @@ func NewMultiHsFork(receivers map[string]BodyComponentType, sender BodyComponent
 		Sender:    sender,
 
 		NumHsComponents: comps,
+		currentOut:      0,
 	}, nil
 }
 
@@ -106,4 +108,8 @@ func (m *MultiHsFork) GetSignalDefs() string {
 	signalDefs += "signal " + m.Name() + "_out_ack : std_logic_vector(" + strconv.Itoa(m.NumHsComponents) + "- 1 downto 0);"
 
 	return signalDefs
+}
+
+func (m *MultiHsFork) Connect(bc BodyComponentType, x interface{}) {
+	panic("not implemented")
 }

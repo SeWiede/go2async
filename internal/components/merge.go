@@ -138,3 +138,7 @@ func (d *Merge) GetSignalDefs() string {
 	panic("signaldefs not implemented")
 	return ""
 }
+
+func (d *Merge) Connect(bc BodyComponentType, x interface{}) {
+	panic("not implemented")
+}

@@ -13,6 +13,7 @@ type MultiHsJoin struct {
 	Receiver BodyComponentType
 
 	NumHsComponents int
+	currentIn       int
 }
 
 var multiHsJoinNr = 0
@@ -37,6 +38,7 @@ func NewMultiHsJoin(senders map[string]BodyComponentType, receiver BodyComponent
 		Receiver: receiver,
 
 		NumHsComponents: comps,
+		currentIn:       0,
 	}, nil
 }
 
@@ -104,4 +106,8 @@ func (m *MultiHsJoin) GetSignalDefs() string {
 	signalDefs += "signal " + m.Name() + "_out_ack : std_logic;"
 
 	return signalDefs
+}
+
+func (m *MultiHsJoin) Connect(bc BodyComponentType, x interface{}) {
+	panic("not implemented")
 }

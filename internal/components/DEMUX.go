@@ -149,3 +149,7 @@ func (d *DEMUX) GetSignalDefs() string {
 	panic("signaldefs not implemented")
 	return ""
 }
+
+func (d *DEMUX) Connect(bc BodyComponentType, x interface{}) {
+	panic("not implemented")
+}

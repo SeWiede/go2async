@@ -42,7 +42,7 @@ func NewScope(name string, block *Block) *Scope {
 		},
 	}
 
-	entryIn := &HandshakeChannel{
+	/* entryIn := &HandshakeChannel{
 		Req:  "in_req",
 		Ack:  "in_ack",
 		Data: "in_data",
@@ -50,17 +50,17 @@ func NewScope(name string, block *Block) *Scope {
 	}
 
 	s.Block.In = entryIn
-
+	*/
 	rs := 0
 	for _, s := range s.ReturnVars {
 		rs += s.Size_
 	}
 
 	s.OutReg = NewReg(s.Block.OutputVariables().Size, false, "0")
+	/*
+		s.Block.Out.Connect(s.OutReg.In)
 
-	s.Block.Out.Connect(s.OutReg.In)
-
-	s.Out = s.OutReg.Out
+		s.Out = s.OutReg.Out */
 
 	return s
 }

@@ -39,24 +39,12 @@ func NewBinExprBlock(op string, oi *OperandInfo, parent BlockType) (*BinExprBloc
 
 	name := binexprblockprefix + strconv.Itoa(nr)
 
-	ret := &BinExprBlock{
+	bep := &BinExprBlock{
 		BodyComponent: BodyComponent{
+			name: strings.ToLower(binexprblockprefix + strconv.Itoa(nr)),
+
 			number:   nr,
 			archName: archPrefix + name,
-
-			/*
-				In: &HandshakeChannel{
-					Out: false,
-				},
-
-				Out: &HandshakeChannel{
-					Req:       name + "_o_req",
-					Ack:       name + "_o_ack",
-					Data:      name + "_data",
-					Out:       true,
-					DataWidth: parent.GetCurrentVariableSize(),
-				},
-			*/
 
 			parentBlock: parent,
 
@@ -73,7 +61,7 @@ func NewBinExprBlock(op string, oi *OperandInfo, parent BlockType) (*BinExprBloc
 
 	if *globalArguments.Debug {
 		opDescription := fmt.Sprintf("binExprBlock '%s': %s [size %d, len %d, index %s; const %s] = %s [size %d, len %d, index %s; const %s] ",
-			ret.Name(), oi.R.Name_, oi.R.Size_, oi.R.Len_, oi.R.Index_, oi.R.Const_, oi.X.Name_, oi.X.Size_, oi.X.Len_, oi.X.Index_, oi.X.Const_)
+			bep.Name(), oi.R.Name_, oi.R.Size_, oi.R.Len_, oi.R.Index_, oi.R.Const_, oi.X.Name_, oi.X.Size_, oi.X.Len_, oi.X.Index_, oi.X.Const_)
 
 		opDescription += op
 
@@ -85,19 +73,32 @@ func NewBinExprBlock(op string, oi *OperandInfo, parent BlockType) (*BinExprBloc
 
 		opDescription += fmt.Sprintf("\n")
 
-		ret.opDescription = opDescription
+		bep.opDescription = opDescription
 	}
 
 	if op != "NOP" {
 		// get sources of X, Y
-		if _, err := getOperandOwnersAndSetNewOwner(ret, parent, oi); err != nil {
+		if _, err := getOperandOwnersAndSetNewOwner(bep, parent, oi); err != nil {
 			return nil, err
 		}
 
-		infoPrinter.DebugPrintfln("[%s] finished owner assignments of [%s]", parent.Name(), ret.Name())
+		infoPrinter.DebugPrintfln("[%s] finished owner assignments of [%s]", parent.Name(), bep.Name())
 	}
 
-	return ret, nil
+	inputChannel := NewDefaultInputHandshakeChannel(bep.Name())
+
+	inputChannel.AddDataChannel(bep.Name()+"_x", bep.GetXTotalSize())
+	inputChannel.AddDataChannel(bep.Name()+"_y", bep.GetYTotalSize())
+
+	bep.In = append(bep.In, inputChannel)
+
+	outputChannel := NewDefaultOutputHandshakeChannel(bep.Name())
+
+	outputChannel.AddDataChannel(bep.Name()+"_result", bep.GetRTotalSize())
+
+	bep.Out = append(bep.Out, outputChannel)
+
+	return bep, nil
 }
 
 func getInputSources(bt BodyComponentType, parent BlockType, oi *OperandInfo, resultType string) error {
@@ -257,21 +258,21 @@ func (bep *BinExprBlock) GetRTotalSize() int {
 }
 
 func (bep *BinExprBlock) Name() string {
-	return strings.ToLower(binexprblockprefix + strconv.Itoa(bep.number))
+	return bep.name
 }
 
 func (bep *BinExprBlock) ComponentStr() string {
 	return bep.Name() + `: entity work.` + bep.EntityName() + `(` + bep.ArchName() + `)
 	port map (
 	  -- Input channel
-	  in_req  => ` + bep.Name() + `_in_req,
-	  in_ack  => ` + bep.Name() + `_in_ack, 
-	  x => ` + bep.Name() + `_x,
-	  y => ` + bep.Name() + `_y,
+	  in_req  => ` + bep.In[0].GetReqSignalName() + `,
+	  in_ack  => ` + bep.In[0].GetAckSignalName() + `, 
+	  x => ` + bep.In[0].GetDataSignalNameAt(0) + `,
+	  y => ` + bep.In[0].GetDataSignalNameAt(1) + `,
 	  -- Output channel
-	  out_req => ` + bep.Name() + `_out_req,
-	  out_ack => ` + bep.Name() + `_out_ack,
-	  result  => ` + bep.Name() + `_result
+	  out_req => ` + bep.Out[0].GetReqSignalName() + `,
+	  out_ack => ` + bep.Out[0].GetAckSignalName() + `,
+	  result  => ` + bep.Out[0].GetDataSignalName() + `
 	);
 	`
 }
@@ -474,19 +475,4 @@ func (bep *BinExprBlock) GetVariableLocation(name string) (string, error) {
 	}
 
 	return bep.Name() + "_result", nil
-}
-
-func (bep *BinExprBlock) GetSignalDefs() string {
-	signalDefs := ""
-
-	signalDefs += "signal " + bep.Name() + "_in_req : std_logic;"
-	signalDefs += "signal " + bep.Name() + "_out_req : std_logic;"
-	signalDefs += "signal " + bep.Name() + "_in_ack : std_logic;"
-	signalDefs += "signal " + bep.Name() + "_out_ack : std_logic;"
-
-	signalDefs += "signal " + bep.Name() + "_x : std_logic_vector(" + strconv.Itoa(bep.GetXTotalSize()) + "- 1 downto 0) := (others => '0');"
-	signalDefs += "signal " + bep.Name() + "_y : std_logic_vector(" + strconv.Itoa(bep.GetYTotalSize()) + "- 1 downto 0) := (others => '0');"
-	signalDefs += "signal " + bep.Name() + "_result : std_logic_vector(" + strconv.Itoa(bep.GetRTotalSize()) + "- 1 downto 0);"
-
-	return signalDefs
 }

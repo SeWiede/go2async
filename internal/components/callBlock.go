@@ -61,14 +61,6 @@ func NewCallBlock(paramsResults *variable.FuncInterface, fi variable.VariableDef
 	return ret, nil
 }
 
-func (cb *CallBlock) InChannel() *HandshakeChannel {
-	return cb.In
-}
-
-func (cb *CallBlock) OutChannel() *HandshakeChannel {
-	return cb.Out
-}
-
 func (cb *CallBlock) EntityName() string {
 	return defaultCallBlockEntityName + "_" + cb.funcIntf.Name()
 }
@@ -102,23 +94,25 @@ func (cb *CallBlock) Entity() string {
 	END ` + cb.EntityName() + `;`
 }
 
-func (cb *CallBlock) ComponentStr() string {
-	name := callBlockPrefix + strconv.Itoa(cb.Nr)
+func (cb *CallBlock) Name() string {
+	return callBlockPrefix + strconv.Itoa(cb.Nr)
+}
 
-	return name + `: entity work.` + cb.EntityName() + `(` + cb.archName + `)
+func (cb *CallBlock) ComponentStr() string {
+	return cb.Name() + `: entity work.` + cb.EntityName() + `(` + cb.archName + `)
 	generic map(
 	  DATA_WIDTH => ` + strconv.Itoa(cb.GetVariableSize()) + `
 	)
 	port map (
 		rst => rst,
 		-- Input channel
-		in_req  => ` + cb.In.Req + `,
-		in_ack  => ` + cb.In.Ack + `, 
-		in_data => std_logic_vector(resize(unsigned(` + cb.In.Data + `), ` + strconv.Itoa(cb.GetVariableSize()) + `)),
+		in_req  => ` + cb.Name() + `_in_req,
+		in_ack  => ` + cb.Name() + `_in_ack, 
+		in_data => std_logic_vector(resize(unsigned(` + cb.Name() + `_in_data), ` + strconv.Itoa(cb.GetVariableSize()) + `)),
 		-- Output channel
-		out_req => ` + cb.Out.Req + `,
-		out_ack => ` + cb.Out.Ack + `,
-		out_data  => ` + cb.Out.Data + `
+		out_req => ` + cb.Name() + `_out_req,
+		out_ack => ` + cb.Name() + `_out_ack,
+		out_data  => ` + cb.Name() + `_out_data
 	);
 	`
 }
@@ -280,4 +274,8 @@ func (cb *CallBlock) GetSignalDefs() string {
 	signalDefs += "signal " + cb.Name() + "_out_data : std_logic_vector(" + strconv.Itoa(cb.OutputVariables().Size) + "- 1 downto 0);"
 
 	return signalDefs
+}
+
+func (cb *CallBlock) Connect(bc BodyComponentType, x interface{}) {
+	panic("not implemented")
 }

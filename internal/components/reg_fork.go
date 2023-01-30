@@ -22,46 +22,52 @@ func NewRegFork() *RegFork {
 	nr := regForkNr
 	regForkNr++
 
-	name := strings.ToLower(regForkPrefix + strconv.Itoa(nr))
+	//name := strings.ToLower(regForkPrefix + strconv.Itoa(nr))
 	return &RegFork{
 		Nr:       nr,
 		archName: defaultArch,
-		In: &HandshakeChannel{
+		/* In: &HandshakeChannel{
 			Out: false,
 		},
 		Out1: &HandshakeChannel{
-			Req:  name + "_b_o_req",
-			Ack:  name + "_b_o_ack",
-			Data: name + "_b_data",
-			Out:  true,
+			From:    name + "_b_o_req",
+			FromAck: name + "_b_o_ack",
+			Data:    name + "_b_data",
+			Out:     true,
 		},
 		Out2: &HandshakeChannel{
-			Req:  name + "_c_o_req",
-			Ack:  name + "_c_o_ack",
-			Data: name + "_c_data",
-			Out:  true,
-		},
+			From:    name + "_c_o_req",
+			FromAck: name + "_c_o_ack",
+			Data:    name + "_c_data",
+			Out:     true,
+		}, */
 	}
 }
 
+func (rf *RegFork) Name() string {
+	return strings.ToLower(regForkPrefix + strconv.Itoa(rf.Nr))
+}
+
 func (rf *RegFork) ComponentStr() string {
-	name := regForkPrefix + strconv.Itoa(rf.Nr)
-	return name + `: entity work.reg_fork
+	return rf.Name() + `: entity work.reg_fork
   generic map(
     DATA_WIDTH => DATA_WIDTH,
     PHASE_INIT_A => '0',
     PHASE_INIT_B =>'0',
     PHASE_INIT_C => '0')
   port map (
-    inA_ack => ` + rf.In.Ack + `,
-    inA_data => ` + rf.In.Data + `,
-    inA_req => ` + rf.In.Req + `,
-    outB_ack => ` + rf.Out1.Ack + `,
-    outB_data => ` + rf.Out1.Data + `,
-    outB_req => ` + rf.Out1.Req + `,
-    outC_ack => ` + rf.Out2.Ack + `,
-    outC_data=> ` + rf.Out2.Data + `,
-    outC_req => ` + rf.Out2.Req + `,
+    inA_req => ` + rf.Name() + `_inA_req,
+    inA_ack => ` + rf.Name() + `_inA_ack,
+    inA_data => ` + rf.Name() + `_inA_data,
+
+    outB_req => ` + rf.Name() + `_outB_req,
+    outB_ack => ` + rf.Name() + `_outB_ack,
+    outB_data => ` + rf.Name() + `_outB_data,
+    
+    outC_req => ` + rf.Name() + `_outC_req,
+    outC_ack => ` + rf.Name() + `_outC_ack,
+    outC_data=> ` + rf.Name() + `_outC_data,
+    
     rst => rst
   );`
 }
