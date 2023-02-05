@@ -254,3 +254,31 @@ func NewLocalVariable(v VariableDef) (*VariableInfo, error) {
 		FuncIntf_: funcIntf,
 	}, nil
 }
+
+type VariableLocation struct {
+	Upperbound    int
+	UpperboundStr string
+	Lowerbound    int
+	LowerboundStr string
+	Size          int
+}
+
+func (vi *VariableInfo) GetVariableVectorBounds() *VariableLocation {
+	idx, _ := strconv.Atoi(vi.Index_)
+	totalSize := vi.TotalSize()
+	if idx > 0 {
+		totalSize = vi.Size_
+	}
+
+	ub := vi.Position_ + totalSize*(idx+1)
+	lb := vi.Position_ + totalSize*idx
+
+	return &VariableLocation{
+		Upperbound:    ub,
+		UpperboundStr: strconv.Itoa(ub),
+		Lowerbound:    lb,
+		LowerboundStr: strconv.Itoa(lb),
+		Size:          totalSize,
+	}
+
+}

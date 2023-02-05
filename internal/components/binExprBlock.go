@@ -59,6 +59,18 @@ func NewBinExprBlock(op string, oi *OperandInfo, parent BlockType) (*BinExprBloc
 		Oi:        oi,
 	}
 
+	inputChannel := NewDefaultInputHandshakeChannel(bep)
+	bep.In = append(bep.In, inputChannel)
+
+	outputChannel := NewDefaultOutputHandshakeChannel(bep)
+
+	bep.Out = append(bep.Out, outputChannel)
+
+	bep.InData = append(bep.InData, NewDataChannel(bep, bep.InputVariables(), bep.Name()+"_x", false))
+	bep.InData = append(bep.InData, NewDataChannel(bep, bep.InputVariables(), bep.Name()+"_y", false))
+
+	bep.OutData = append(bep.OutData, NewDataChannel(bep, bep.OutputVariables(), bep.Name()+"_result", true))
+
 	if *globalArguments.Debug {
 		opDescription := fmt.Sprintf("binExprBlock '%s': %s [size %d, len %d, index %s; const %s] = %s [size %d, len %d, index %s; const %s] ",
 			bep.Name(), oi.R.Name_, oi.R.Size_, oi.R.Len_, oi.R.Index_, oi.R.Const_, oi.X.Name_, oi.X.Size_, oi.X.Len_, oi.X.Index_, oi.X.Const_)
@@ -84,19 +96,6 @@ func NewBinExprBlock(op string, oi *OperandInfo, parent BlockType) (*BinExprBloc
 
 		infoPrinter.DebugPrintfln("[%s] finished owner assignments of [%s]", parent.Name(), bep.Name())
 	}
-
-	inputChannel := NewDefaultInputHandshakeChannel(bep.Name())
-
-	inputChannel.AddDataChannel(bep.Name()+"_x", bep.GetXTotalSize())
-	inputChannel.AddDataChannel(bep.Name()+"_y", bep.GetYTotalSize())
-
-	bep.In = append(bep.In, inputChannel)
-
-	outputChannel := NewDefaultOutputHandshakeChannel(bep.Name())
-
-	outputChannel.AddDataChannel(bep.Name()+"_result", bep.GetRTotalSize())
-
-	bep.Out = append(bep.Out, outputChannel)
 
 	return bep, nil
 }
@@ -142,6 +141,12 @@ func getInputSources(bt BodyComponentType, parent BlockType, oi *OperandInfo, re
 		bt.AddPredecessor(latestOwner)
 		latestOwner.AddSuccessor(bt)
 
+		// X is first inDataChannel
+		// Assume components only have 1 outputDataChannel here
+		bt.InDataChannels()[0].ConnectData(latestOwner.OutDataChannels()[0])
+
+		bt.InChannels()[0].ConnectHandshake(latestOwner.OutChannels()[0])
+
 		infoPrinter.DebugPrintfln("[%s]: Previous component of X input '%s' is '%s'", bt.Name(), oi.X.Name_, latestOwner.Name())
 	}
 
@@ -182,8 +187,13 @@ func getInputSources(bt BodyComponentType, parent BlockType, oi *OperandInfo, re
 		ownY.ownerList.AddSuccessorToLatest(bt)
 
 		bt.AddPredecessor(latestOwner)
-
 		latestOwner.AddSuccessor(bt)
+
+		// Y is second inDataChannel
+		// Assume components only have 1 outputDataChannel here
+		bt.InDataChannels()[1].ConnectData(latestOwner.OutDataChannels()[0])
+
+		bt.InChannels()[0].ConnectHandshake(latestOwner.OutChannels()[0])
 
 		infoPrinter.DebugPrintfln("[%s]: Previous component of Y input '%s' is '%s'", bt.Name(), oi.Y.Name_, latestOwner.Name())
 	}
@@ -232,6 +242,33 @@ func getOperandOwnersAndSetNewOwner(bt BodyComponentType, parent BlockType, oi *
 	return bt, nil
 }
 
+func (bc *BinExprBlock) AddInputVariable(vtd *variable.VariableInfo) (*variable.VariableInfo, error) {
+	// Allow both inputs to be the same
+	vi, err := bc.InputVariables().AddVariable(vtd)
+	if err != nil {
+		vi, err = bc.InputVariables().GetVariableInfo(vtd.Name())
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if !bc.isBlock {
+		// Check owner map
+		parent := bc.parentBlock
+		if _, ok := parent.GetVariableOwnerMap()[vi.Name()]; !ok {
+
+			parent.GetVariableOwnerMap()[vi.Name()] = &variableOwner{
+				ownerList: NewOwnerList(parent),
+				vi:        vtd,
+			}
+
+			infoPrinter.DebugPrintfln("[%s]: No owner for variable '%s' found. Making parent %s owner", bc.archName, vi.Name(), parent.Name())
+		}
+	}
+
+	return vi, err
+}
+
 func (bep *BinExprBlock) GetXTotalSize() int {
 	x, err := bep.InputVariables().GetVariableInfoAt(0)
 	if err != nil {
@@ -267,12 +304,12 @@ func (bep *BinExprBlock) ComponentStr() string {
 	  -- Input channel
 	  in_req  => ` + bep.In[0].GetReqSignalName() + `,
 	  in_ack  => ` + bep.In[0].GetAckSignalName() + `, 
-	  x => ` + bep.In[0].GetDataSignalNameAt(0) + `,
-	  y => ` + bep.In[0].GetDataSignalNameAt(1) + `,
+	  x => ` + bep.InData[0].GetDataSignalName() + `,
+	  y => ` + bep.InData[1].GetDataSignalName() + `,
 	  -- Output channel
 	  out_req => ` + bep.Out[0].GetReqSignalName() + `,
 	  out_ack => ` + bep.Out[0].GetAckSignalName() + `,
-	  result  => ` + bep.Out[0].GetDataSignalName() + `
+	  result  => ` + bep.OutData[0].GetDataSignalName() + `
 	);
 	`
 }
@@ -431,19 +468,19 @@ func (bep *BinExprBlock) Entity() string {
 	op2Size := 0
 	resSize := 0
 
-	if op1, err := bep.InputVariables().GetVariableInfoAt(0); err == nil {
+	if op1, err := bep.InputVariables().GetVariableInfo(bep.Oi.X.Name()); err == nil {
 		op1Size = op1.TotalSize()
 	} else {
 		panic(bep.Name() + " invalid x")
 	}
 
-	if op2, err := bep.InputVariables().GetVariableInfoAt(1); err == nil {
+	if op2, err := bep.InputVariables().GetVariableInfo(bep.Oi.Y.Name()); err == nil {
 		op2Size = op2.TotalSize()
 	} else {
 		panic(bep.Name() + " invalid y")
 	}
 
-	if res, err := bep.OutputVariables().GetVariableInfoAt(0); err == nil {
+	if res, err := bep.OutputVariables().GetVariableInfo(bep.Oi.R.Name()); err == nil {
 		resSize = res.TotalSize()
 	} else {
 		panic(bep.Name() + " invalid result")

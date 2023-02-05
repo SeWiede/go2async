@@ -55,114 +55,13 @@ func (b *IfBlock) GetVariableOwnerMap() map[string]*variableOwner {
 	return b.VariableOwner
 }
 
-/*
-type DefaultBlock struct {
-	BodyComponent
-
-	VariableOwner      map[string]*variableOwner
-	ExternalInterfaces map[string]*variable.VariableInfo
-
-	RegBlockPairs []*regBodyPair
-}
-
-func (b *DefaultBlock) NewScopeVariable(vdef variable.VariableDef) (*variable.VariableInfo, error) {
-	infoPrinter.DebugPrintfln("[%s]: Adding variable %s ", b.ArchName(), vdef.Name())
-
-	vi, err := variable.FromDef(vdef)
-	if err != nil {
-		return nil, err
-	}
-
-	b.VariableOwner[vdef.Name()] = &variableOwner{
-		ownerList: NewOwnerList(b),
-		vi:        vi,
-	}
-
-	return vi, nil
-}
-
-func (b *DefaultBlock) GetVariable(name string) (*variable.VariableInfo, error) {
-	infoPrinter.DebugPrintfln("[%s]: Getting variable %s", b.Name(), name)
-
-	own, ok := b.VariableOwner[name]
-	if ok {
-		infoPrinter.DebugPrintfln("Variable %s's latest owner is %s", name, own.ownerList.lastest.Name())
-		return own.vi, nil
-	} else {
-		if b.Parent() == nil {
-			return nil, ErrVariableNotFound(name)
-		}
-
-		// Get variable info form parent.
-		vi, err := b.Parent().GetVariable(name)
-		if err != nil {
-			return nil, err
-		}
-
-		b.AddPredecessor(b.Parent())
-		b.Parent().AddSuccessor(b)
-
-		// Track variables that are coming from outside this block's scope.
-		vi, err = b.NewScopeVariable(vi)
-		if err != nil {
-			return nil, err
-		}
-
-		vi.DefinedOnly_ = false
-
-		// New owner of variable in current block is the current block.
-		b.VariableOwner[vi.Name()] = &variableOwner{
-			ownerList: NewOwnerList(b),
-			vi:        vi,
-		}
-
-		b.InputVariables().AddVariable(vi)
-
-		infoPrinter.DebugPrintfln("[%s]: Variable %s is from outside the block's scope. Added to inputs (current size = %d).", b.Name(), name, b.InputVariables().Size)
-
-		return vi, nil
-	}
-}
-
-func (b *DefaultBlock) GetExternalInterfaces() map[string]*variable.VariableInfo {
-	return b.ExternalInterfaces
-}
-
-func (b *DefaultBlock) GetVariableOwnerMap() map[string]*variableOwner {
-	return b.VariableOwner
-}
-
-func (b *DefaultBlock) AddComponent(bodyComponent BodyComponentType) {
-	b.RegBlockPairs = append(b.RegBlockPairs, &regBodyPair{Bc: bodyComponent})
-}
-
-func (b *DefaultBlock) GetAndAssignFunctionInterface(fname string) (*variable.VariableInfo, error) {
-	if f, ok := b.ExternalInterfaces[fname]; ok {
-		return f, nil
-	}
-
-	infoPrinter.DebugPrintf("[%s] Function '%s' not found - searching parent\n", b.ArchName(), fname)
-
-	if b.Parent() != nil {
-		f, err := b.Parent().GetAndAssignFunctionInterface(fname)
-		if err == nil {
-			// parent-stack had the function defined: add the interface to block
-			fiCopy := f.Copy()
-			b.ExternalInterfaces[f.Name_] = fiCopy
-
-			infoPrinter.DebugPrintf("[%s] Found function '%s' on parent stack and registerd function '%s'\n", b.ArchName(), f.Name_, f.Name_)
-
-			return fiCopy, nil
-		}
-	}
-
-	return nil, errors.New("No function '" + fname + "' found ")
-}*/
-
 type BodyComponentType interface {
 	Component
 	InChannels() []*HandshakeChannel
 	OutChannels() []*HandshakeChannel
+
+	InDataChannels() []*DataChannel
+	OutDataChannels() []*DataChannel
 
 	GetVariableSize() int
 
@@ -191,6 +90,9 @@ type BodyComponent struct {
 
 	In  []*HandshakeChannel
 	Out []*HandshakeChannel
+
+	InData  []*DataChannel
+	OutData []*DataChannel
 
 	predecessors map[string]BodyComponentType
 	successors   map[string]BodyComponentType
@@ -222,6 +124,14 @@ func (bc *BodyComponent) OutChannels() []*HandshakeChannel {
 	return bc.Out
 }
 
+func (bc *BodyComponent) InDataChannels() []*DataChannel {
+	return bc.InData
+}
+
+func (bc *BodyComponent) OutDataChannels() []*DataChannel {
+	return bc.OutData
+}
+
 func (bc *BodyComponent) GetVariableSize() int {
 	return bc.InputVariables().Size
 }
@@ -249,6 +159,9 @@ func (bc *BodyComponent) InputVariables() *variable.ScopedVariables {
 func (bc *BodyComponent) AddInputVariable(vtd *variable.VariableInfo) (*variable.VariableInfo, error) {
 
 	vi, err := bc.InputVariables().AddVariable(vtd)
+	if err != nil {
+		return nil, err
+	}
 
 	if !bc.isBlock {
 		// Check owner map
@@ -264,6 +177,12 @@ func (bc *BodyComponent) AddInputVariable(vtd *variable.VariableInfo) (*variable
 		}
 	}
 
+	/* 	if len(bc.InData) > 0 {
+	   		bc.InData[0].AddVariable(vi)
+	   	} else {
+	   		infoPrinter.DebugPrintfln("[%s]: has no inData", bc.Name())
+	   	} */
+
 	return vi, err
 }
 
@@ -277,6 +196,12 @@ func (bc *BodyComponent) OutputVariables() *variable.ScopedVariables {
 }
 
 func (bc *BodyComponent) AddOutputVariable(vtd *variable.VariableInfo) (*variable.VariableInfo, error) {
+	/* if len(bc.OutData) > 0 {
+		bc.OutData[0].AddVariable(vtd)
+	} else {
+		infoPrinter.DebugPrintfln("[%s]: has no outData", bc.Name())
+	} */
+
 	return bc.OutputVariables().AddVariable(vtd)
 }
 
@@ -291,6 +216,13 @@ func (bc *BodyComponent) GetSignalDefs() string {
 		signalDefs += in.SignalDefs()
 	}
 	for _, out := range bc.Out {
+		signalDefs += out.SignalDefs()
+	}
+
+	for _, in := range bc.InData {
+		signalDefs += in.SignalDefs()
+	}
+	for _, out := range bc.OutData {
 		signalDefs += out.SignalDefs()
 	}
 

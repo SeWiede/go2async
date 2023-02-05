@@ -12,11 +12,11 @@ var ErrInvalidNumberOfHsComponents = errors.New("Invalid number of handshake com
 type MultiHsFork struct {
 	BodyComponent
 
-	Receivers map[string]BodyComponentType
-	Sender    BodyComponentType
+	Receivers    map[string]BodyComponentType
+	ReceiverList []*MultiHsJoin
+	Sender       BodyComponentType
 
-	NumHsComponents int
-	currentOut      int
+	currentOut int
 }
 
 var multiHsForkNr = 0
@@ -39,13 +39,56 @@ func NewMultiHsFork(receivers map[string]BodyComponentType, sender BodyComponent
 		Receivers: receivers,
 		Sender:    sender,
 
-		NumHsComponents: comps,
-		currentOut:      0,
+		currentOut: 0,
 	}, nil
+}
+
+func NewVariableMultiHsFork(sender BodyComponentType) *MultiHsFork {
+	nr := multiHsForkNr
+	multiHsForkNr++
+
+	return &MultiHsFork{
+		BodyComponent: BodyComponent{
+			number:   nr,
+			archName: defaultArch, // beware of defaultArch!
+		},
+
+		Receivers:    map[string]BodyComponentType{},
+		ReceiverList: []*MultiHsJoin{},
+		Sender:       sender,
+
+		currentOut: 0,
+	}
+}
+
+func (m *MultiHsFork) AddReceiver(recv *MultiHsJoin) {
+	m.Receivers[recv.Name()] = recv
+	m.ReceiverList = append(m.ReceiverList, recv)
+}
+
+func (m *MultiHsFork) getJoinHsPos(partnerJoin *MultiHsJoin) int {
+	for i, f := range partnerJoin.SenderList {
+		if f.Name() == m.Name() {
+			return i
+		}
+	}
+
+	panic("invalid partnerJoin")
 }
 
 func (m *MultiHsFork) Name() string {
 	return multiHsForkprefix + strconv.Itoa(m.number)
+}
+
+func (m *MultiHsFork) GetNumReceivers() int {
+	if m.Receivers == nil && m.ReceiverList == nil {
+		panic("invalid receivers")
+	} else if m.ReceiverList == nil {
+		return len(m.ReceiverList)
+	} else {
+		return len(m.Receivers)
+
+	}
 }
 
 func (m *MultiHsFork) ComponentStr() string {
@@ -53,7 +96,7 @@ func (m *MultiHsFork) ComponentStr() string {
 
 	return name + `: entity work.multiHsFork
   generic map (
-    HANDSHAKE_COMPONENTS => ` + strconv.Itoa(m.NumHsComponents) + `,
+    HANDSHAKE_COMPONENTS => ` + strconv.Itoa(m.GetNumReceivers()) + `,
     PHASE_INIT => '0'
   )
   port map (
@@ -102,10 +145,10 @@ func (m *MultiHsFork) GetSignalDefs() string {
 	signalDefs := ""
 
 	signalDefs += "signal " + m.Name() + "_in_req : std_logic;"
-	signalDefs += "signal " + m.Name() + "_out_req : std_logic_vector(" + strconv.Itoa(m.NumHsComponents) + "- 1 downto 0);"
+	signalDefs += "signal " + m.Name() + "_out_req : std_logic_vector(" + strconv.Itoa(m.GetNumReceivers()) + "- 1 downto 0);"
 
 	signalDefs += "signal " + m.Name() + "_in_ack : std_logic;"
-	signalDefs += "signal " + m.Name() + "_out_ack : std_logic_vector(" + strconv.Itoa(m.NumHsComponents) + "- 1 downto 0);"
+	signalDefs += "signal " + m.Name() + "_out_ack : std_logic_vector(" + strconv.Itoa(m.GetNumReceivers()) + "- 1 downto 0);"
 
 	return signalDefs
 }

@@ -1,147 +1,175 @@
 package components
 
 import (
+	"go2async/internal/infoPrinter"
+	"go2async/internal/variable"
 	"strconv"
 )
 
-type ChannelData struct {
-	Data      string
-	DataWidth int
-}
+type DataChannel struct {
+	Owner BodyComponentType
 
-type Channel struct {
-	Datas []*ChannelData
-}
+	DataName string
 
-type HandshakeChannel struct {
-	Channel
+	variables *variable.ScopedVariables
 
-	Req      string
-	ReqWidth int
-
-	Ack      string
-	AckWidth int
-
-	To *HandshakeChannel
+	To []*DataChannel
 
 	Out bool
 }
 
-func NewDefaultInputHandshakeChannel(componentName string) *HandshakeChannel {
-	return NewHandshakeChannel(componentName+"_in_req", componentName+"_in_ack", false)
-}
-func NewDefaultOutputHandshakeChannel(componentName string) *HandshakeChannel {
-	return NewHandshakeChannel(componentName+"_out_req", componentName+"_out_ack", true)
+type HandshakeChannel struct {
+	Owner BodyComponentType
+	Req   string
+	Ack   string
+
+	Width int
+
+	fork *MultiHsFork
+	join *MultiHsJoin
+
+	To []*HandshakeChannel
+
+	Out bool
 }
 
-func NewInputHandshakeChannel(reqSignalName, ackSignalName string) *HandshakeChannel {
-	return NewHandshakeChannel(reqSignalName, ackSignalName, false)
+func NewDefaultInputHandshakeChannel(owner BodyComponentType) *HandshakeChannel {
+	return NewHandshakeChannel(owner, owner.Name()+"_in_req", owner.Name()+"_in_ack", false)
+}
+func NewDefaultOutputHandshakeChannel(owner BodyComponentType) *HandshakeChannel {
+	return NewHandshakeChannel(owner, owner.Name()+"_out_req", owner.Name()+"_out_ack", true)
 }
 
-func NewOutputHandshakeChannel(reqSignalName, ackSignalName string) *HandshakeChannel {
-	return NewHandshakeChannel(reqSignalName, ackSignalName, true)
+func NewInputHandshakeChannel(owner BodyComponentType, reqSignalName, ackSignalName string) *HandshakeChannel {
+	return NewHandshakeChannel(owner, reqSignalName, ackSignalName, false)
 }
 
-func NewHandshakeChannel(reqSignalName, ackSignalName string, out bool) *HandshakeChannel {
+func NewOutputHandshakeChannel(owner BodyComponentType, reqSignalName, ackSignalName string) *HandshakeChannel {
+	return NewHandshakeChannel(owner, reqSignalName, ackSignalName, true)
+}
+
+func NewHandshakeChannel(owner BodyComponentType, reqSignalName, ackSignalName string, out bool) *HandshakeChannel {
+	var join *MultiHsJoin
+	var fork *MultiHsFork
+
+	if out {
+		fork = NewVariableMultiHsFork(owner)
+	} else {
+
+		join = NewVariableMultiHsJoin(owner)
+	}
+
 	return &HandshakeChannel{
-		Req:      reqSignalName,
-		ReqWidth: 1,
-		Ack:      ackSignalName,
-		AckWidth: 1,
-		Out:      out,
+		Owner: owner,
+		Req:   reqSignalName,
+		Ack:   ackSignalName,
+		Out:   out,
+		Width: 1,
+
+		fork: fork,
+		join: join,
 	}
 }
 
-func NewForkHandshakeChannel(reqSignalName, ackSignalName string, numReceivers int) *HandshakeChannel {
-	return &HandshakeChannel{
-		Req:      reqSignalName,
-		ReqWidth: 1,
-		Ack:      ackSignalName,
-		AckWidth: numReceivers,
+func NewDefaultInDataChannel(owner BodyComponentType, inputScope *variable.ScopedVariables) *DataChannel {
+	return NewDataChannel(owner, inputScope, owner.Name()+"_in_data", false)
+}
+
+func NewDefaultOutDataChannel(owner BodyComponentType, inputScope *variable.ScopedVariables) *DataChannel {
+	return NewDataChannel(owner, inputScope, owner.Name()+"_out_data", true)
+}
+
+func NewDataChannel(owner BodyComponentType, inputScope *variable.ScopedVariables, dataSignalName string, out bool) *DataChannel {
+	return &DataChannel{
+		Owner:     owner,
+		DataName:  dataSignalName,
+		variables: inputScope,
+		Out:       out,
 	}
 }
 
-func NewJoinHandshakeChannel(reqSignalName, ackSignalName string, numSenders int) *HandshakeChannel {
-	return &HandshakeChannel{
-		Req:      reqSignalName,
-		ReqWidth: numSenders,
-		Ack:      ackSignalName,
-		AckWidth: 1,
-	}
-}
+func (hw *HandshakeChannel) GetSignalAssigmentStrForkAndJoins() (string, []*MultiHsFork, []*MultiHsJoin) {
+	forks := []*MultiHsFork{}
+	joins := []*MultiHsJoin{}
 
-func (hw *HandshakeChannel) AddDataChannel(dataSignalName string, dataWidth int) {
-	hw.Datas = append(hw.Datas, &ChannelData{
-		Data:      dataSignalName,
-		DataWidth: dataWidth,
-	})
-}
-
-/* var DummyOutChannel = &HandshakeChannel{
-	Req: "DUMMY_REQ",
-	Ack: "DUMMY_ACK",
-	Channel: Channel{
-		Datas: "DUMMY_DATA",
-	},
-	Out: true,
-}
-
-var DummyInChannel = &HandshakeChannel{
-	Req: "DUMMY_REQ",
-	Ack: "DUMMY_ACK",
-	Channel: Channel{
-		Datas: "DUMMY_DATA",
-	},
-	Out: false,
-} */
-
-func (hw *HandshakeChannel) GetHandshakeAssignmentStr() string {
 	ret := ""
 
-	ret += hw.Req + " <= " + hw.To.Req
-	ret += hw.To.Ack + " <= " + hw.Ack
+	// default
+	ret += hw.Req + " <= " + hw.To[0].Req + ";\n"
+	ret += hw.To[0].Ack + " <= " + hw.Ack + ";\n"
 
-	return ret + ";\n"
+	if hw.Out {
+		hwFork := hw.fork
+		forks = append(forks, hwFork)
+
+		for i, j := range hwFork.ReceiverList {
+			istr := strconv.Itoa(i)
+			posInJoin := hwFork.getJoinHsPos(j)
+			posInJoinStr := strconv.Itoa(posInJoin)
+
+			ret += j.Name() + "_in_req(" + posInJoinStr + ") <= " + hwFork.Name() + "_out_req(" + istr + ");\n"
+		}
+	} else {
+		hwJoin := hw.join
+		joins = append(joins, hwJoin)
+
+		for i, f := range hwJoin.SenderList {
+			istr := strconv.Itoa(i)
+			posInFork := hwJoin.getForkHsPos(f)
+			posInforkStr := strconv.Itoa(posInFork)
+
+			ret += hwJoin.Name() + "_in_req(" + istr + ") <= " + f.Name() + "_out_req(" + posInforkStr + ");\n"
+		}
+	}
+
+	return ret + "\n", forks, joins
 }
 
-func (hw *HandshakeChannel) Connect(to *HandshakeChannel) {
+func (hw *HandshakeChannel) ConnectHandshake(to *HandshakeChannel) {
 	if to == nil {
 		panic("To channel was nil")
 	}
 	if hw.Out == to.Out {
 		panic("Cannot connect two channels with the same direction.")
 	}
-	/* if hw == DummyInChannel || hw == DummyOutChannel || to == DummyInChannel || to == DummyOutChannel {
-		panic("Cannot connect dummy channels")
-	} */
 
-	/* to.Req = hw.Req
-	to.Ack = hw.Ack
+	// bidirectional
+	hw.To = append(hw.To, to)
+	to.To = append(to.To, hw)
 
-	if hw.Data != "" {
-		to.Data = hw.Data
-	} */
+	if hw.Out {
+		to.join.AddSender(hw.fork)
+		hw.fork.AddReceiver(to.join)
+	} else {
+		hw.join.AddSender(to.fork)
+		to.fork.AddReceiver(hw.join)
+	}
 
-	hw.To = to
+	infoPrinter.DebugPrintfln("[HandshakeChannel]: Connected %s [%s : %s] to %s [%s : %s]", hw.Req, hw.Owner.Name(), getOutDir(hw.Out), to.Req, to.Owner.Name(), getOutDir(to.Out))
+	infoPrinter.DebugPrintfln("[HandshakeChannel]: Connected %s [%s : %s] to %s [%s : %s]", hw.Ack, hw.Owner.Name(), getOutDir(hw.Out), to.Ack, to.Owner.Name(), getOutDir(to.Out))
 }
 
 func (c *HandshakeChannel) SignalDefs() string {
 	ret := ""
 
-	if c.ReqWidth <= 1 {
+	if c.Width <= 1 {
 		ret += "signal " + c.Req + " : std_logic;"
 	} else {
-		ret += "signal " + c.Req + " : std_logic_vector(" + strconv.Itoa(c.ReqWidth) + " - 1 downto 0);"
+		ret += "signal " + c.Req + " : std_logic_vector(" + strconv.Itoa(c.Width) + " - 1 downto 0);"
 	}
-	if c.AckWidth <= 1 {
+	if c.Width <= 1 {
 		ret += "signal " + c.Ack + " : std_logic;"
 	} else {
-		ret += "signal " + c.Ack + " : std_logic_vector(" + strconv.Itoa(c.AckWidth) + " - 1 downto 0);"
+		ret += "signal " + c.Ack + " : std_logic_vector(" + strconv.Itoa(c.Width) + " - 1 downto 0);"
 	}
 
-	for _, data := range c.Datas {
-		ret += "signal " + data.Data + " : std_logic_vector(" + strconv.Itoa(data.DataWidth) + " - 1 downto 0);"
-	}
+	return ret + "\n"
+}
+
+func (c *DataChannel) SignalDefs() string {
+	ret := ""
+
+	ret += "signal " + c.DataName + " : std_logic_vector(" + strconv.Itoa(c.variables.GetSize()) + " - 1 downto 0);"
 
 	return ret + "\n"
 }
@@ -154,14 +182,93 @@ func (c *HandshakeChannel) GetAckSignalName() string {
 	return c.Ack
 }
 
-func (c *HandshakeChannel) GetDataSignalName() string {
-	return c.GetDataSignalNameAt(0)
+func (c *DataChannel) GetDataSignalName() string {
+	return c.DataName
 }
 
-func (c *HandshakeChannel) GetDataSignalNameAt(pos int) string {
-	if len(c.Datas) == 0 || len(c.Datas) <= pos {
-		panic("invalid data pos")
+func (c *DataChannel) AddVariable(vi *variable.VariableInfo) {
+	_, err := c.variables.AddVariable(vi)
+	if err != nil {
+		panic(err.Error())
+	}
+}
+
+func getOutDir(out bool) string {
+	if out {
+		return "out"
+	} else {
+		return "in"
+	}
+}
+
+func (c *DataChannel) ConnectData(to *DataChannel) {
+	if to == nil {
+		panic("To channel was nil")
+	}
+	if c.Out == to.Out {
+		panic("Cannot connect two channels with the same direction.")
 	}
 
-	return c.Datas[pos].Data
+	// bidirectional
+	c.To = append(c.To, to)
+	to.To = append(to.To, c)
+
+	infoPrinter.DebugPrintfln("[DataChannel]: Connected %s [%s : %s] to %s [%s : %s]", c.DataName, c.Owner.Name(), getOutDir(c.Out), to.DataName, to.Owner.Name(), getOutDir(to.Out))
+}
+
+type DataChannelVariable struct {
+	dc *DataChannel
+	vi *variable.VariableInfo
+}
+
+func getDataChannelsThatHaveVar(searchSpace []*DataChannel, varName string) []*DataChannelVariable {
+	ret := []*DataChannelVariable{}
+
+	for _, dc := range searchSpace {
+		v, err := dc.variables.GetVariableInfo(varName)
+
+		if err != nil {
+			ret = append(ret, &DataChannelVariable{
+				dc: dc,
+				vi: v,
+			})
+		}
+	}
+
+	return ret
+}
+
+func (c *DataChannel) GetSignalAssigmentStr() string {
+	if len(c.To) <= 0 {
+		panic("invalid destination")
+	}
+
+	dataSignalAssigmnent := ""
+
+	for _, vi := range c.variables.VariableList {
+		vb := vi.GetVariableVectorBounds()
+		from := ""
+		to := ""
+
+		from = c.DataName + " (" + vb.UpperboundStr + " - 1 downto " + vb.LowerboundStr + ")"
+
+		dcvs := getDataChannelsThatHaveVar(c.To, vi.Name())
+		if len(dcvs) == 0 {
+			panic("var " + vi.Name() + " not found in connected dataChannels")
+		}
+
+		for _, dcv := range dcvs {
+			dcvvb := dcv.vi.GetVariableVectorBounds()
+
+			to = dcv.dc.DataName + " (" + dcvvb.UpperboundStr + " - 1 downto " + dcvvb.LowerboundStr + ")"
+
+			if !c.Out {
+				dataSignalAssigmnent += from + " <= " + to + ";\n"
+			} else {
+				dataSignalAssigmnent += to + " <= " + from + ";\n"
+			}
+		}
+	}
+
+	return dataSignalAssigmnent
 }

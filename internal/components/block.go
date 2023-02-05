@@ -85,6 +85,17 @@ func NewBlock(toplevel bool, parent BlockType) *Block {
 		TopLevel: toplevel,
 	}
 
+	inputChannel := NewDefaultInputHandshakeChannel(b)
+	b.In = append(b.In, inputChannel)
+
+	outputChannel := NewDefaultOutputHandshakeChannel(b)
+
+	b.Out = append(b.Out, outputChannel)
+
+	b.InData = append(b.InData, NewDefaultInDataChannel(b, b.InputVariables()))
+
+	b.OutData = append(b.OutData, NewDefaultOutDataChannel(b, b.OutputVariables()))
+
 	return b
 }
 

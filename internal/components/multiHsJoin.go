@@ -9,11 +9,11 @@ const multiHsJoinprefix = "MHSJ_"
 type MultiHsJoin struct {
 	BodyComponent
 
-	Senders  map[string]BodyComponentType
-	Receiver BodyComponentType
+	Senders    map[string]BodyComponentType
+	SenderList []*MultiHsFork
+	Receiver   BodyComponentType
 
-	NumHsComponents int
-	currentIn       int
+	currentIn int
 }
 
 var multiHsJoinNr = 0
@@ -37,13 +37,56 @@ func NewMultiHsJoin(senders map[string]BodyComponentType, receiver BodyComponent
 		Senders:  senders,
 		Receiver: receiver,
 
-		NumHsComponents: comps,
-		currentIn:       0,
+		currentIn: 0,
 	}, nil
+}
+
+func NewVariableMultiHsJoin(Receiver BodyComponentType) *MultiHsJoin {
+	nr := multiHsForkNr
+	multiHsForkNr++
+
+	return &MultiHsJoin{
+		BodyComponent: BodyComponent{
+			number:   nr,
+			archName: defaultArch, // beware of defaultArch!
+		},
+
+		Senders:    map[string]BodyComponentType{},
+		SenderList: []*MultiHsFork{},
+		Receiver:   Receiver,
+
+		currentIn: 0,
+	}
+}
+
+func (m *MultiHsJoin) AddSender(snd *MultiHsFork) {
+	m.Senders[snd.Name()] = snd
+	m.SenderList = append(m.SenderList, snd)
+}
+
+func (m *MultiHsJoin) getForkHsPos(partnerJoin *MultiHsFork) int {
+	for i, j := range partnerJoin.ReceiverList {
+		if j.Name() == m.Name() {
+			return i
+		}
+	}
+
+	panic("invalid partnerJoin")
 }
 
 func (m *MultiHsJoin) Name() string {
 	return multiHsJoinprefix + strconv.Itoa(m.number)
+}
+
+func (m *MultiHsJoin) GetNumSenders() int {
+	if m.Senders == nil && m.SenderList == nil {
+		panic("invalid receivers")
+	} else if m.SenderList == nil {
+		return len(m.SenderList)
+	} else {
+		return len(m.Senders)
+
+	}
 }
 
 func (m *MultiHsJoin) ComponentStr() string {
@@ -51,7 +94,7 @@ func (m *MultiHsJoin) ComponentStr() string {
 
 	return name + `: entity work.multiHsJoin
   generic map (
-    HANDSHAKE_COMPONENTS => ` + strconv.Itoa(m.NumHsComponents) + `,
+    HANDSHAKE_COMPONENTS => ` + strconv.Itoa(m.GetNumSenders()) + `,
     PHASE_INIT => '0'
   )
   port map (
@@ -99,10 +142,10 @@ END MultiHsJoin;`
 func (m *MultiHsJoin) GetSignalDefs() string {
 	signalDefs := ""
 
-	signalDefs += "signal " + m.Name() + "_in_req : std_logic_vector(" + strconv.Itoa(m.NumHsComponents) + "- 1 downto 0);"
+	signalDefs += "signal " + m.Name() + "_in_req : std_logic_vector(" + strconv.Itoa(m.GetNumSenders()) + "- 1 downto 0);"
 	signalDefs += "signal " + m.Name() + "_out_req : std_logic;"
 
-	signalDefs += "signal " + m.Name() + "_in_ack : std_logic_vector(" + strconv.Itoa(m.NumHsComponents) + "- 1 downto 0);"
+	signalDefs += "signal " + m.Name() + "_in_ack : std_logic_vector(" + strconv.Itoa(m.GetNumSenders()) + "- 1 downto 0);"
 	signalDefs += "signal " + m.Name() + "_out_ack : std_logic;"
 
 	return signalDefs
