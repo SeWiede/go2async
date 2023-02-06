@@ -23,8 +23,6 @@ type HandshakeChannel struct {
 	Req   string
 	Ack   string
 
-	Width int
-
 	fork *MultiHsFork
 	join *MultiHsJoin
 
@@ -64,7 +62,6 @@ func NewHandshakeChannel(owner BodyComponentType, reqSignalName, ackSignalName s
 		Req:   reqSignalName,
 		Ack:   ackSignalName,
 		Out:   out,
-		Width: 1,
 
 		fork: fork,
 		join: join,
@@ -152,16 +149,16 @@ func (hw *HandshakeChannel) ConnectHandshake(to *HandshakeChannel) {
 func (c *HandshakeChannel) SignalDefs() string {
 	ret := ""
 
-	if c.Width <= 1 {
-		ret += "signal " + c.Req + " : std_logic;"
+	ret += "signal " + c.Req + " : std_logic;"
+	ret += "signal " + c.Ack + " : std_logic;"
+	ret += "\n"
+	if c.Out {
+		ret += c.fork.GetSignalDefs()
 	} else {
-		ret += "signal " + c.Req + " : std_logic_vector(" + strconv.Itoa(c.Width) + " - 1 downto 0);"
+
+		ret += c.join.GetSignalDefs()
 	}
-	if c.Width <= 1 {
-		ret += "signal " + c.Ack + " : std_logic;"
-	} else {
-		ret += "signal " + c.Ack + " : std_logic_vector(" + strconv.Itoa(c.Width) + " - 1 downto 0);"
-	}
+	ret += "\n"
 
 	return ret + "\n"
 }
