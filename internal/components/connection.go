@@ -15,6 +15,8 @@ type DataChannel struct {
 
 	To []*DataChannel
 
+	Connected bool
+
 	Out bool
 }
 
@@ -27,6 +29,8 @@ type HandshakeChannel struct {
 	join *MultiHsJoin
 
 	To []*HandshakeChannel
+
+	Connected bool
 
 	Out bool
 }
@@ -61,10 +65,13 @@ func NewHandshakeChannel(owner BodyComponentType, reqSignalName, ackSignalName s
 		Owner: owner,
 		Req:   reqSignalName,
 		Ack:   ackSignalName,
-		Out:   out,
 
 		fork: fork,
 		join: join,
+
+		Connected: false,
+
+		Out: out,
 	}
 }
 
@@ -76,50 +83,122 @@ func NewDefaultOutDataChannel(owner BodyComponentType, inputScope *variable.Scop
 	return NewDataChannel(owner, inputScope, owner.Name()+"_out_data", true)
 }
 
+func NewInDataChannel(owner BodyComponentType, inputScope *variable.ScopedVariables, dataSignalName string) *DataChannel {
+	return NewDataChannel(owner, inputScope, dataSignalName, false)
+}
+
+func NewOutDataChannel(owner BodyComponentType, inputScope *variable.ScopedVariables, dataSignalName string) *DataChannel {
+	return NewDataChannel(owner, inputScope, dataSignalName, true)
+}
+
 func NewDataChannel(owner BodyComponentType, inputScope *variable.ScopedVariables, dataSignalName string, out bool) *DataChannel {
 	return &DataChannel{
 		Owner:     owner,
 		DataName:  dataSignalName,
 		variables: inputScope,
+		Connected: false,
 		Out:       out,
 	}
 }
 
-func (hw *HandshakeChannel) GetSignalAssigmentStrForkAndJoins() (string, []*MultiHsFork, []*MultiHsJoin) {
-	forks := []*MultiHsFork{}
-	joins := []*MultiHsJoin{}
+func (hw *HandshakeChannel) GetSignalAssigmentStr() string {
+	if !hw.Connected {
+		hw.AssignDefaultOut()
+	}
 
-	ret := ""
+	signalAssignments := ""
 
 	// default
-	ret += hw.Req + " <= " + hw.To[0].Req + ";\n"
-	ret += hw.To[0].Ack + " <= " + hw.Ack + ";\n"
+	/* ret += hw.Req + " <= " + hw.To[0].Req + ";\n"
+	ret += hw.To[0].Ack + " <= " + hw.Ack + ";\n" */
 
 	if hw.Out {
 		hwFork := hw.fork
-		forks = append(forks, hwFork)
+
+		signalAssignments += hwFork.Name() + "_in_req <= " + hw.Req + ";"
+		signalAssignments += "\n"
+		signalAssignments += hw.Ack + " <= " + hwFork.Name() + "_in_ack;"
+		signalAssignments += "\n"
 
 		for i, j := range hwFork.ReceiverList {
 			istr := strconv.Itoa(i)
 			posInJoin := hwFork.getJoinHsPos(j)
 			posInJoinStr := strconv.Itoa(posInJoin)
 
-			ret += j.Name() + "_in_req(" + posInJoinStr + ") <= " + hwFork.Name() + "_out_req(" + istr + ");\n"
+			signalAssignments += j.Name() + "_in_req(" + posInJoinStr + ") <= " + hwFork.Name() + "_out_req(" + istr + ");"
+			signalAssignments += "\n"
+			signalAssignments += hwFork.Name() + "_out_ack(" + istr + ") <= " + j.Name() + "_in_ack(" + posInJoinStr + ");"
+			signalAssignments += "\n"
 		}
 	} else {
 		hwJoin := hw.join
-		joins = append(joins, hwJoin)
+
+		signalAssignments += hw.Req + " <= " + hwJoin.Name() + "_out_req;"
+		signalAssignments += "\n"
+		signalAssignments += hwJoin.Name() + "_out_ack <= " + hw.Ack + ";"
+		signalAssignments += "\n"
 
 		for i, f := range hwJoin.SenderList {
 			istr := strconv.Itoa(i)
 			posInFork := hwJoin.getForkHsPos(f)
-			posInforkStr := strconv.Itoa(posInFork)
+			posInForkStr := strconv.Itoa(posInFork)
 
-			ret += hwJoin.Name() + "_in_req(" + istr + ") <= " + f.Name() + "_out_req(" + posInforkStr + ");\n"
+			signalAssignments += hwJoin.Name() + "_in_req(" + istr + ") <= " + f.Name() + "_out_req(" + posInForkStr + ");"
+			signalAssignments += "\n"
+			signalAssignments += f.Name() + "_out_ack(" + posInForkStr + ") <= " + hwJoin.Name() + "_in_ack(" + istr + ");"
+			signalAssignments += "\n"
 		}
 	}
 
-	return ret + "\n", forks, joins
+	return signalAssignments
+}
+
+func (hw *HandshakeChannel) GetSignalAssigmentNoCheckStr() string {
+	signalAssignments := ""
+
+	// default
+	/* ret += hw.Req + " <= " + hw.To[0].Req + ";\n"
+	ret += hw.To[0].Ack + " <= " + hw.Ack + ";\n" */
+
+	if hw.Out {
+		hwFork := hw.fork
+
+		signalAssignments += hwFork.Name() + "_in_req <= " + hw.Req + ";"
+		signalAssignments += "\n"
+		signalAssignments += hw.Ack + " <= " + hwFork.Name() + "_in_ack;"
+		signalAssignments += "\n"
+
+		for i, j := range hwFork.ReceiverList {
+			istr := strconv.Itoa(i)
+			posInJoin := hwFork.getJoinHsPos(j)
+			posInJoinStr := strconv.Itoa(posInJoin)
+
+			signalAssignments += j.Name() + "_in_req(" + posInJoinStr + ") <= " + hwFork.Name() + "_out_req(" + istr + ");"
+			signalAssignments += "\n"
+			signalAssignments += hwFork.Name() + "_out_ack(" + istr + ") <= " + j.Name() + "_in_ack(" + posInJoinStr + ");"
+			signalAssignments += "\n"
+		}
+	} else {
+		hwJoin := hw.join
+
+		signalAssignments += hw.Req + " <= " + hwJoin.Name() + "_out_req;"
+		signalAssignments += "\n"
+		signalAssignments += hwJoin.Name() + "_out_ack <= " + hw.Ack + ";"
+		signalAssignments += "\n"
+
+		for i, f := range hwJoin.SenderList {
+			istr := strconv.Itoa(i)
+			posInFork := hwJoin.getForkHsPos(f)
+			posInForkStr := strconv.Itoa(posInFork)
+
+			signalAssignments += hwJoin.Name() + "_in_req(" + istr + ") <= " + f.Name() + "_out_req(" + posInForkStr + ");"
+			signalAssignments += "\n"
+			signalAssignments += f.Name() + "_out_ack(" + posInForkStr + ") <= " + hwJoin.Name() + "_in_ack(" + istr + ");"
+			signalAssignments += "\n"
+		}
+	}
+
+	return signalAssignments
 }
 
 func (hw *HandshakeChannel) ConnectHandshake(to *HandshakeChannel) {
@@ -142,15 +221,52 @@ func (hw *HandshakeChannel) ConnectHandshake(to *HandshakeChannel) {
 		to.fork.AddReceiver(hw.join)
 	}
 
-	infoPrinter.DebugPrintfln("[HandshakeChannel]: Connected %s [%s : %s] to %s [%s : %s]", hw.Req, hw.Owner.Name(), getOutDir(hw.Out), to.Req, to.Owner.Name(), getOutDir(to.Out))
-	infoPrinter.DebugPrintfln("[HandshakeChannel]: Connected %s [%s : %s] to %s [%s : %s]", hw.Ack, hw.Owner.Name(), getOutDir(hw.Out), to.Ack, to.Owner.Name(), getOutDir(to.Out))
+	hw.Connected = true
+	to.Connected = true
+
+	infoPrinter.DebugPrintfln("[HandshakeChannel]: Connected %s [%s : %s] to %s [%s : %s]", hw.Req, hw.Owner.Name(), getOutDirStr(hw.Out), to.Req, to.Owner.Name(), getOutDirStr(to.Out))
+	infoPrinter.DebugPrintfln("[HandshakeChannel]: Connected %s [%s : %s] to %s [%s : %s]", hw.Ack, hw.Owner.Name(), getOutDirStr(hw.Out), to.Ack, to.Owner.Name(), getOutDirStr(to.Out))
+}
+
+func (c *HandshakeChannel) AssignDefaultOut() {
+	if !c.Out {
+		panic(c.Owner.Name() + " input handshake " + c.Req + " is not connected!")
+	}
+
+	infoPrinter.DebugPrintfln("[%s]: assigning default OUT connection: Connect with parent - current Fork is %s", c.Owner.Name(), c.fork.Name())
+
+	c.Owner.ConnectHandshakeDir(c.Owner.Parent(), true)
+}
+
+func (c *DataChannel) AssignDefaultOut() {
+	if !c.Out {
+		panic(c.Owner.Name() + " input data " + c.DataName + " is not connected!")
+	}
+
+	infoPrinter.DebugPrintfln("[%s]: assigning default OUT data: connect with parent", c.Owner.Name())
+
+	c.Owner.ConnectDataDir(c.Owner.Parent(), true)
 }
 
 func (c *HandshakeChannel) SignalDefs() string {
+	if !c.Connected {
+		c.AssignDefaultOut()
+	}
+
 	ret := ""
 
 	ret += "signal " + c.Req + " : std_logic;"
 	ret += "signal " + c.Ack + " : std_logic;"
+	ret += "\n"
+
+	ret += c.SignalDefsForkJoin()
+
+	return ret + "\n"
+}
+
+func (c *HandshakeChannel) SignalDefsForkJoin() string {
+	ret := ""
+
 	ret += "\n"
 	if c.Out {
 		ret += c.fork.GetSignalDefs()
@@ -160,7 +276,7 @@ func (c *HandshakeChannel) SignalDefs() string {
 	}
 	ret += "\n"
 
-	return ret + "\n"
+	return ret
 }
 
 func (c *DataChannel) SignalDefs() string {
@@ -190,7 +306,7 @@ func (c *DataChannel) AddVariable(vi *variable.VariableInfo) {
 	}
 }
 
-func getOutDir(out bool) string {
+func getOutDirStr(out bool) string {
 	if out {
 		return "out"
 	} else {
@@ -203,14 +319,17 @@ func (c *DataChannel) ConnectData(to *DataChannel) {
 		panic("To channel was nil")
 	}
 	if c.Out == to.Out {
-		panic("Cannot connect two channels with the same direction.")
+		panic("Cannot connect two channels with the same direction. Signalnames: " + c.DataName + " <=> " + to.DataName)
 	}
 
 	// bidirectional
 	c.To = append(c.To, to)
 	to.To = append(to.To, c)
 
-	infoPrinter.DebugPrintfln("[DataChannel]: Connected %s [%s : %s] to %s [%s : %s]", c.DataName, c.Owner.Name(), getOutDir(c.Out), to.DataName, to.Owner.Name(), getOutDir(to.Out))
+	c.Connected = true
+	to.Connected = true
+
+	infoPrinter.DebugPrintfln("[DataChannel]: Connected %s [%s : %s] to %s [%s : %s]", c.DataName, c.Owner.Name(), getOutDirStr(c.Out), to.DataName, to.Owner.Name(), getOutDirStr(to.Out))
 }
 
 type DataChannelVariable struct {
@@ -224,7 +343,7 @@ func getDataChannelsThatHaveVar(searchSpace []*DataChannel, varName string) []*D
 	for _, dc := range searchSpace {
 		v, err := dc.variables.GetVariableInfo(varName)
 
-		if err != nil {
+		if err == nil {
 			ret = append(ret, &DataChannelVariable{
 				dc: dc,
 				vi: v,
@@ -236,8 +355,8 @@ func getDataChannelsThatHaveVar(searchSpace []*DataChannel, varName string) []*D
 }
 
 func (c *DataChannel) GetSignalAssigmentStr() string {
-	if len(c.To) <= 0 {
-		panic("invalid destination")
+	if !c.Connected {
+		c.AssignDefaultOut()
 	}
 
 	dataSignalAssigmnent := ""
@@ -249,20 +368,44 @@ func (c *DataChannel) GetSignalAssigmentStr() string {
 
 		from = c.DataName + " (" + vb.UpperboundStr + " - 1 downto " + vb.LowerboundStr + ")"
 
-		dcvs := getDataChannelsThatHaveVar(c.To, vi.Name())
-		if len(dcvs) == 0 {
-			panic("var " + vi.Name() + " not found in connected dataChannels")
-		}
+		if vi.Const_ != "" {
+			if c.Out {
+				panic("cannot have const out")
+			}
 
-		for _, dcv := range dcvs {
-			dcvvb := dcv.vi.GetVariableVectorBounds()
+			to = "std_logic_vector(to_signed(" + vi.Const() + ", " + strconv.Itoa(vi.TotalSize()) + "))"
 
-			to = dcv.dc.DataName + " (" + dcvvb.UpperboundStr + " - 1 downto " + dcvvb.LowerboundStr + ")"
+			dataSignalAssigmnent += from + " <= " + to + ";\n"
+		} else {
+			dcvs := getDataChannelsThatHaveVar(c.To, vi.Name())
+			if len(dcvs) == 0 {
 
-			if !c.Out {
-				dataSignalAssigmnent += from + " <= " + to + ";\n"
-			} else {
-				dataSignalAssigmnent += to + " <= " + from + ";\n"
+				infoPrinter.DebugPrintfln("[%s]: did not find var %s in connected dataChannels: ", c.Owner.Name(), vi.Name())
+
+				for _, t := range c.To {
+					for _, v := range t.Owner.OutputVariables().VariableList {
+
+						infoPrinter.DebugPrintfln("[%s]: var %s is output", t.Owner.Name(), v.Name())
+					}
+
+					infoPrinter.DebugPrintfln("[%s]: not found here", t.Owner.Name())
+				}
+
+				panic("input var " + vi.Name() + " not found in connected dataChannels")
+			}
+
+			for _, dcv := range dcvs {
+				dcvvb := dcv.vi.GetVariableVectorBounds()
+
+				to = dcv.dc.DataName + " (" + dcvvb.UpperboundStr + " - 1 downto " + dcvvb.LowerboundStr + ")"
+
+				if !c.Out {
+					dataSignalAssigmnent += from + " <= " + to + ";\n"
+				} else {
+					dataSignalAssigmnent += to + " <= " + from + ";\n"
+				}
+
+				infoPrinter.DebugPrintfln("[%s]: var %s from '%s'", c.Owner.Name(), vi.Name(), dcv.dc.Owner.Name())
 			}
 		}
 	}

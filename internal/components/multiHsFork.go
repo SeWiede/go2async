@@ -2,6 +2,7 @@ package components
 
 import (
 	"errors"
+	"go2async/internal/infoPrinter"
 	"strconv"
 )
 
@@ -62,8 +63,14 @@ func NewVariableMultiHsFork(sender BodyComponentType) *MultiHsFork {
 }
 
 func (m *MultiHsFork) AddReceiver(recv *MultiHsJoin) {
+	if _, ok := m.Receivers[recv.Name()]; ok {
+		return
+	}
+
 	m.Receivers[recv.Name()] = recv
 	m.ReceiverList = append(m.ReceiverList, recv)
+
+	infoPrinter.DebugPrintfln("[%s]: adding receiver %s now len %d", m.Name(), recv.Name(), len(m.ReceiverList))
 }
 
 func (m *MultiHsFork) getJoinHsPos(partnerJoin *MultiHsJoin) int {
@@ -100,13 +107,13 @@ func (m *MultiHsFork) ComponentStr() string {
     PHASE_INIT => '0'
   )
   port map (
-    rst => rst,
+	  in_req => ` + name + `_in_req,
+	  in_ack => ` + name + `_in_ack,
+	  
+	  out_req => ` + name + `_out_req,
+	  out_ack => ` + name + `_out_ack,
 
-    in_req => ` + name + `_in_req,
-    in_ack => ` + name + `_in_ack,
-
-    out_req => ` + name + `_out_req,
-    out_ack => ` + name + `_out_ack
+	  rst => rst
   );
   `
 }
@@ -145,10 +152,10 @@ func (m *MultiHsFork) GetSignalDefs() string {
 	signalDefs := ""
 
 	signalDefs += "signal " + m.Name() + "_in_req : std_logic;"
-	signalDefs += "signal " + m.Name() + "_out_req : std_logic_vector(" + strconv.Itoa(m.GetNumReceivers()) + "- 1 downto 0);"
+	signalDefs += "signal " + m.Name() + "_out_req : std_logic_vector(" + strconv.Itoa(m.GetNumReceivers()) + " - 1 downto 0);"
 
 	signalDefs += "signal " + m.Name() + "_in_ack : std_logic;"
-	signalDefs += "signal " + m.Name() + "_out_ack : std_logic_vector(" + strconv.Itoa(m.GetNumReceivers()) + "- 1 downto 0);"
+	signalDefs += "signal " + m.Name() + "_out_ack : std_logic_vector(" + strconv.Itoa(m.GetNumReceivers()) + " - 1 downto 0);"
 
 	return signalDefs
 }

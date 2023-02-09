@@ -98,13 +98,13 @@ func (m *MultiHsJoin) ComponentStr() string {
     PHASE_INIT => '0'
   )
   port map (
-    rst => rst,
-
-    in_req => ` + name + `_in_req,
-    in_ack => ` + name + `_in_ack,
-
-    out_req => ` + name + `_out_req,
-    out_ack => ` + name + `_out_ack
+	  in_req => ` + name + `_in_req,
+	  in_ack => ` + name + `_in_ack,
+	  
+	  out_req => ` + name + `_out_req,
+	  out_ack => ` + name + `_out_ack,
+	  
+	  rst => rst
   );
   `
 }
@@ -142,10 +142,10 @@ END MultiHsJoin;`
 func (m *MultiHsJoin) GetSignalDefs() string {
 	signalDefs := ""
 
-	signalDefs += "signal " + m.Name() + "_in_req : std_logic_vector(" + strconv.Itoa(m.GetNumSenders()) + "- 1 downto 0);"
+	signalDefs += "signal " + m.Name() + "_in_req : std_logic_vector(" + strconv.Itoa(m.GetNumSenders()) + " - 1 downto 0);"
 	signalDefs += "signal " + m.Name() + "_out_req : std_logic;"
 
-	signalDefs += "signal " + m.Name() + "_in_ack : std_logic_vector(" + strconv.Itoa(m.GetNumSenders()) + "- 1 downto 0);"
+	signalDefs += "signal " + m.Name() + "_in_ack : std_logic_vector(" + strconv.Itoa(m.GetNumSenders()) + " - 1 downto 0);"
 	signalDefs += "signal " + m.Name() + "_out_ack : std_logic;"
 
 	return signalDefs

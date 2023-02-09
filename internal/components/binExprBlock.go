@@ -25,6 +25,8 @@ type BinExprBlock struct {
 	Oi *OperandInfo
 
 	opDescription string // debug
+
+	addedInput int
 }
 
 type OperandInfo struct {
@@ -57,17 +59,18 @@ func NewBinExprBlock(op string, oi *OperandInfo, parent BlockType) (*BinExprBloc
 
 		Operation: op,
 		Oi:        oi,
+
+		addedInput: 0,
 	}
 
 	inputChannel := NewDefaultInputHandshakeChannel(bep)
 	bep.In = append(bep.In, inputChannel)
 
 	outputChannel := NewDefaultOutputHandshakeChannel(bep)
-
 	bep.Out = append(bep.Out, outputChannel)
 
-	bep.InData = append(bep.InData, NewDataChannel(bep, bep.InputVariables(), bep.Name()+"_x", false))
-	bep.InData = append(bep.InData, NewDataChannel(bep, bep.InputVariables(), bep.Name()+"_y", false))
+	bep.InData = append(bep.InData, NewDataChannel(bep, variable.NewScopedVariables(), bep.Name()+"_x", false))
+	bep.InData = append(bep.InData, NewDataChannel(bep, variable.NewScopedVariables(), bep.Name()+"_y", false))
 
 	bep.OutData = append(bep.OutData, NewDataChannel(bep, bep.OutputVariables(), bep.Name()+"_result", true))
 
@@ -141,11 +144,14 @@ func getInputSources(bt BodyComponentType, parent BlockType, oi *OperandInfo, re
 		bt.AddPredecessor(latestOwner)
 		latestOwner.AddSuccessor(bt)
 
+		//bt.InChannels()[0].ConnectHandshake(latestOwner.OutChannels()[0])
+
+		bt.ConnectHandshake(latestOwner)
+
 		// X is first inDataChannel
 		// Assume components only have 1 outputDataChannel here
-		bt.InDataChannels()[0].ConnectData(latestOwner.OutDataChannels()[0])
-
-		bt.InChannels()[0].ConnectHandshake(latestOwner.OutChannels()[0])
+		//bt.InDataChannels()[0].ConnectData(latestOwner.OutDataChannels()[0])
+		bt.ConnectDataPos(latestOwner, 0, 0)
 
 		infoPrinter.DebugPrintfln("[%s]: Previous component of X input '%s' is '%s'", bt.Name(), oi.X.Name_, latestOwner.Name())
 	}
@@ -189,11 +195,13 @@ func getInputSources(bt BodyComponentType, parent BlockType, oi *OperandInfo, re
 		bt.AddPredecessor(latestOwner)
 		latestOwner.AddSuccessor(bt)
 
+		//bt.InChannels()[0].ConnectHandshake(latestOwner.OutChannels()[0])
+		bt.ConnectHandshake(latestOwner)
+
 		// Y is second inDataChannel
 		// Assume components only have 1 outputDataChannel here
-		bt.InDataChannels()[1].ConnectData(latestOwner.OutDataChannels()[0])
-
-		bt.InChannels()[0].ConnectHandshake(latestOwner.OutChannels()[0])
+		// bt.InDataChannels()[1].ConnectData(latestOwner.OutDataChannels()[0])
+		bt.ConnectDataPos(latestOwner, 1, 0)
 
 		infoPrinter.DebugPrintfln("[%s]: Previous component of Y input '%s' is '%s'", bt.Name(), oi.Y.Name_, latestOwner.Name())
 	}
@@ -251,6 +259,17 @@ func (bc *BinExprBlock) AddInputVariable(vtd *variable.VariableInfo) (*variable.
 			return nil, err
 		}
 	}
+
+	// Add inputs to their respecting inputChannels
+	if bc.addedInput >= 2 {
+		panic("cannot add more than 2 inputs to binExpr")
+	} else if bc.addedInput == 1 {
+		bc.InDataChannels()[1].variables.AddVariable(vtd)
+	} else {
+		bc.InDataChannels()[0].variables.AddVariable(vtd)
+
+	}
+	bc.addedInput++
 
 	if !bc.isBlock {
 		// Check owner map

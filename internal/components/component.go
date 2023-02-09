@@ -37,6 +37,11 @@ type BlockType interface {
 	GetExternalInterfaces() map[string]*variable.VariableInfo
 	AddComponent(bodyComponent BodyComponentType)
 	NewScopeVariable(vdef variable.VariableDef) (*variable.VariableInfo, error)
+
+	GetInnerInData() *DataChannel
+	GetInnerOutData() *DataChannel
+	GetInnerIn() *HandshakeChannel
+	GetInnerOut() *HandshakeChannel
 }
 
 func (b *Block) GetExternalInterfaces() map[string]*variable.VariableInfo {
@@ -78,6 +83,21 @@ type BodyComponentType interface {
 	GetVariableLocation(string) (string, error)
 
 	GetSignalDefs() string
+
+	ConnectHandshake(bct BodyComponentType)
+	ConnectData(bct BodyComponentType)
+
+	ConnectHandshakeDir(bct BodyComponentType, out bool)
+	ConnectDataDir(bct BodyComponentType, out bool)
+
+	ConnectHandshakePos(bct BodyComponentType, from, to int)
+	ConnectDataPos(bct BodyComponentType, from, to int)
+
+	ConnectHandshakePosDir(bct BodyComponentType, from, to int, out bool)
+	ConnectDataPosDir(bct BodyComponentType, from, to int, out bool)
+
+	GetHandshakeSignalAssigmentStr() string
+	GetDataSignalAssigmentStr() string
 }
 
 type BodyComponent struct {
@@ -227,4 +247,127 @@ func (bc *BodyComponent) GetSignalDefs() string {
 	}
 
 	return signalDefs
+}
+
+func (bc *BodyComponent) ConnectHandshake(bct BodyComponentType) {
+	bc.ConnectHandshakePos(bct, 0, 0)
+}
+
+func (bc *BodyComponent) ConnectData(bct BodyComponentType) {
+	bc.ConnectDataPos(bct, 0, 0)
+}
+
+func (bc *BodyComponent) ConnectHandshakeDir(bct BodyComponentType, out bool) {
+	bc.ConnectHandshakePosDir(bct, 0, 0, out)
+}
+
+func (bc *BodyComponent) ConnectDataDir(bct BodyComponentType, out bool) {
+	bc.ConnectDataPosDir(bct, 0, 0, out)
+}
+
+func (bc *BodyComponent) ConnectHandshakePos(bct BodyComponentType, from, to int) {
+	bc.ConnectHandshakePosDir(bct, from, to, false)
+}
+
+func (bc *BodyComponent) ConnectDataPos(bct BodyComponentType, from, to int) {
+	bc.ConnectDataPosDir(bct, from, to, false)
+}
+
+func (bc *BodyComponent) ConnectHandshakePosDir(bct BodyComponentType, from, to int, out bool) {
+	var fromHsChannel *HandshakeChannel
+	var toHsChannel *HandshakeChannel
+
+	if out {
+		fromHsChannel = bc.OutChannels()[from]
+		toHsChannel = bct.InChannels()[to]
+	} else {
+		fromHsChannel = bc.InChannels()[from]
+		toHsChannel = bct.OutChannels()[to]
+	}
+
+	if bct == bc.parentBlock {
+		infoPrinter.DebugPrintfln("[%s]: to handshake connection is parent '%s' - using parent's inner connections", bc.name, bc.Parent().Name())
+
+		if out {
+			toHsChannel = bc.parentBlock.GetInnerOut()
+		} else {
+			toHsChannel = bc.parentBlock.GetInnerIn()
+		}
+	}
+
+	fromHsChannel.ConnectHandshake(toHsChannel)
+
+	infoPrinter.DebugPrintfln("[%s]: connected handshake to '%s'", bc.Name(), bct.Name())
+}
+
+func (bc *BodyComponent) ConnectDataPosDir(bct BodyComponentType, from, to int, out bool) {
+	var fromDataChannel *DataChannel
+	var toDataChannel *DataChannel
+
+	if out {
+		fromDataChannel = bc.OutDataChannels()[from]
+		toDataChannel = bct.InDataChannels()[to]
+	} else {
+		fromDataChannel = bc.InDataChannels()[from]
+		toDataChannel = bct.OutDataChannels()[to]
+	}
+
+	if bct == bc.parentBlock {
+		infoPrinter.DebugPrintfln("[%s]: to data connection is parent '%s' - using parent's inner connections", bc.name, bc.Parent().Name())
+
+		if out {
+			toDataChannel = bc.parentBlock.GetInnerOutData()
+		} else {
+			toDataChannel = bc.parentBlock.GetInnerInData()
+		}
+	}
+
+	fromDataChannel.ConnectData(toDataChannel)
+
+	infoPrinter.DebugPrintfln("[%s]: %s connected data to '%s' %s", bc.Name(), fromDataChannel.DataName, bct.Name(), toDataChannel.DataName)
+}
+
+func (bc *BodyComponent) GetHandshakeSignalAssigmentStr() string {
+	handShakeAssignments := "-- Handshake signals assignments for " + bc.Name()
+	handShakeAssignments += "\n"
+
+	for _, in := range bc.InChannels() {
+		handShakeAssignments += in.GetSignalAssigmentStr()
+
+		handShakeAssignments += "\n"
+	}
+
+	handShakeAssignments += "\n"
+
+	for _, out := range bc.OutChannels() {
+		handShakeAssignments += out.GetSignalAssigmentStr()
+
+		handShakeAssignments += "\n"
+	}
+
+	handShakeAssignments += "-------------------------------"
+	handShakeAssignments += "\n"
+	handShakeAssignments += "\n"
+
+	return handShakeAssignments
+}
+
+func (bc *BodyComponent) GetDataSignalAssigmentStr() string {
+	dataSignalAssignments := "-- Data signal assignments for " + bc.Name()
+	dataSignalAssignments += "\n"
+
+	for _, in := range bc.InDataChannels() {
+		dataSignalAssignments += in.GetSignalAssigmentStr()
+		dataSignalAssignments += "\n"
+	}
+
+	for _, out := range bc.OutDataChannels() {
+		dataSignalAssignments += out.GetSignalAssigmentStr()
+		dataSignalAssignments += "\n"
+	}
+	dataSignalAssignments += "-------------------------------"
+	dataSignalAssignments += "\n"
+	dataSignalAssignments += "\n"
+
+	return dataSignalAssignments
 }

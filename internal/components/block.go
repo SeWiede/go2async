@@ -31,6 +31,13 @@ type Block struct {
 	ExternalInterfaces map[string]*variable.VariableInfo
 
 	RegBlockPairs []*regBodyPair
+
+	// Inner connection
+	InnerInChannel  []*HandshakeChannel
+	InnerOutChannel []*HandshakeChannel
+
+	InnerInDataChannel  []*DataChannel
+	InnerOutDataChannel []*DataChannel
 }
 
 func NewScopedVariables() *variable.ScopedVariables {
@@ -89,12 +96,25 @@ func NewBlock(toplevel bool, parent BlockType) *Block {
 	b.In = append(b.In, inputChannel)
 
 	outputChannel := NewDefaultOutputHandshakeChannel(b)
-
 	b.Out = append(b.Out, outputChannel)
 
 	b.InData = append(b.InData, NewDefaultInDataChannel(b, b.InputVariables()))
-
 	b.OutData = append(b.OutData, NewDefaultOutDataChannel(b, b.OutputVariables()))
+
+	// Inner channels -> directions from in/out are handled reversed!
+	innerInputChannel := NewOutputHandshakeChannel(b, "in_req", "in_ack")
+	b.InnerInChannel = append(b.InnerInChannel, innerInputChannel)
+
+	innerOutputChannel := NewInputHandshakeChannel(b, "out_req", "out_ack")
+	b.InnerOutChannel = append(b.InnerOutChannel, innerOutputChannel)
+
+	innerInDataChannel := NewOutDataChannel(b, b.InputVariables(), "in_data")
+	innerInDataChannel.Connected = true
+	b.InnerInDataChannel = append(b.InnerInDataChannel, innerInDataChannel)
+
+	innerOutDataChannel := NewInDataChannel(b, b.OutputVariables(), "out_data")
+	innerOutDataChannel.Connected = true
+	b.InnerOutDataChannel = append(b.InnerOutDataChannel, innerOutDataChannel)
 
 	return b
 }
@@ -249,6 +269,14 @@ func (b *Block) componentsString() string {
 			ret += c.Reg.ComponentStr() + "\n"
 		}
 		ret += c.Bc.ComponentStr() + "\n"
+
+		for _, in := range c.Bc.InChannels() {
+			ret += in.join.ComponentStr()
+		}
+
+		for _, out := range c.Bc.OutChannels() {
+			ret += out.fork.ComponentStr()
+		}
 	}
 
 	return ret
@@ -323,11 +351,50 @@ func (b *Block) Architecture() string {
 	// Determine how many forks and joins are needed
 
 	//signalDefs := b.signalDefs()
-	dataSignalAssignments := b.getDefaultSignalAssignments()
+	/* dataSignalAssignments := b.getDefaultSignalAssignments()
 
 	signalDefs, forks, joins := b.getSignalDefsJoinsAndForks()
 
-	handshakeOverwrites := b.getHandshakeOverwrites(forks, joins)
+	handshakeOverwrites := b.getHandshakeOverwrites(forks, joins) */
+
+	signalDefs := ""
+	for _, rbp := range b.RegBlockPairs {
+		comp := rbp.Bc
+
+		signalDefs += comp.GetSignalDefs()
+
+		signalDefs += "\n"
+	}
+
+	handShakeAssignments := ""
+	dataSignalAssignments := ""
+
+	for _, rbp := range b.RegBlockPairs {
+		comp := rbp.Bc
+
+		handShakeAssignments += comp.GetHandshakeSignalAssigmentStr()
+	}
+
+	for _, rbp := range b.RegBlockPairs {
+		comp := rbp.Bc
+
+		dataSignalAssignments += comp.GetDataSignalAssigmentStr()
+
+	}
+
+	// Handle block at the end since there might be some new default connections to the parent
+
+	handShakeAssignments += "------ Block assignments"
+	handShakeAssignments += "\n"
+	handShakeAssignments += b.GetInnerHandshakeSignalAssignmentstr()
+	handShakeAssignments += "------------------------"
+	handShakeAssignments += "\n"
+	handShakeAssignments += "\n"
+
+	signalDefs += b.GetInnerSignalDefs()
+	signalDefs += "\n"
+
+	handshakeOverwrites := ""
 
 	ret := `architecture ` + b.archName + ` of ` + b.EntityName() + ` is
 	`
@@ -344,6 +411,11 @@ func (b *Block) Architecture() string {
 	ret += "begin"
 	ret += "\n"
 
+	ret += handShakeAssignments
+	ret += "\n"
+
+	ret += "\n"
+
 	ret += dataSignalAssignments
 	ret += "\n"
 
@@ -351,6 +423,7 @@ func (b *Block) Architecture() string {
 	ret += "\n"
 
 	ret += "end process;"
+	ret += "\n"
 
 	ret += "\n"
 
@@ -850,6 +923,8 @@ func (b *Block) SetOutput(vis []*variable.VariableInfo) error {
 		infoPrinter.DebugPrintfln("[%s]: Added explicit output var %s", b.Name(), vi.Name_)
 	}
 
+	b.InnerOutDataChannel[0].variables = b.OutputVariables()
+
 	return nil
 }
 
@@ -888,16 +963,50 @@ func (b *Block) getInputStr(currentComponent BodyComponentType, input *variable.
 	return currentInputAssignment
 }
 
-func (b *Block) GetSignalDefs() string {
+func (b *Block) GetInnerSignalDefs() string {
 	signalDefs := ""
 
-	signalDefs += "signal " + b.Name() + "_in_req : std_logic;"
-	signalDefs += "signal " + b.Name() + "_out_req : std_logic;"
-	signalDefs += "signal " + b.Name() + "_in_ack : std_logic;"
-	signalDefs += "signal " + b.Name() + "_out_ack : std_logic;"
-
-	signalDefs += "signal " + b.Name() + "_in_data : std_logic_vector(" + strconv.Itoa(b.InputVariables().Size) + "- 1 downto 0);"
-	signalDefs += "signal " + b.Name() + "_out_data : std_logic_vector(" + strconv.Itoa(b.OutputVariables().Size) + "- 1 downto 0);"
+	for _, in := range b.InnerInChannel {
+		signalDefs += in.SignalDefsForkJoin()
+	}
+	for _, out := range b.InnerOutChannel {
+		signalDefs += out.SignalDefsForkJoin()
+	}
 
 	return signalDefs
+}
+
+func (b *Block) GetInnerHandshakeSignalAssignmentstr() string {
+	handShakeAssignments := ""
+
+	for _, in := range b.InnerInChannel {
+		handShakeAssignments += in.GetSignalAssigmentStr()
+
+		handShakeAssignments += "\n"
+	}
+
+	handShakeAssignments += "\n"
+
+	for _, out := range b.InnerOutChannel {
+		handShakeAssignments += out.GetSignalAssigmentStr()
+
+		handShakeAssignments += "\n"
+	}
+	return handShakeAssignments
+}
+
+func (b *Block) GetInnerIn() *HandshakeChannel {
+	return b.InnerInChannel[0]
+}
+
+func (b *Block) GetInnerOut() *HandshakeChannel {
+	return b.InnerOutChannel[0]
+}
+
+func (b *Block) GetInnerInData() *DataChannel {
+	return b.InnerInDataChannel[0]
+}
+
+func (b *Block) GetInnerOutData() *DataChannel {
+	return b.InnerOutDataChannel[0]
 }
