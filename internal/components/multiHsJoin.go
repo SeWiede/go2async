@@ -60,6 +60,10 @@ func NewVariableMultiHsJoin(Receiver BodyComponentType) *MultiHsJoin {
 }
 
 func (m *MultiHsJoin) AddSender(snd *MultiHsFork) {
+	if _, ok := m.Senders[snd.Name()]; ok {
+		return
+	}
+
 	m.Senders[snd.Name()] = snd
 	m.SenderList = append(m.SenderList, snd)
 }

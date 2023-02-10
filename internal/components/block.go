@@ -279,6 +279,14 @@ func (b *Block) componentsString() string {
 		}
 	}
 
+	for _, in := range b.InnerInChannel {
+		ret += in.fork.ComponentStr()
+	}
+
+	for _, out := range b.InnerOutChannel {
+		ret += out.join.ComponentStr()
+	}
+
 	return ret
 }
 
@@ -358,13 +366,6 @@ func (b *Block) Architecture() string {
 	handshakeOverwrites := b.getHandshakeOverwrites(forks, joins) */
 
 	signalDefs := ""
-	for _, rbp := range b.RegBlockPairs {
-		comp := rbp.Bc
-
-		signalDefs += comp.GetSignalDefs()
-
-		signalDefs += "\n"
-	}
 
 	handShakeAssignments := ""
 	dataSignalAssignments := ""
@@ -372,15 +373,39 @@ func (b *Block) Architecture() string {
 	for _, rbp := range b.RegBlockPairs {
 		comp := rbp.Bc
 
+		handShakeAssignments += "-- Handshake signals assignments for " + comp.Name()
+		handShakeAssignments += "\n"
+
 		handShakeAssignments += comp.GetHandshakeSignalAssigmentStr()
+
+		handShakeAssignments += "-------------------------------"
+		handShakeAssignments += "\n"
+		handShakeAssignments += "\n"
 	}
+	handShakeAssignments += "\n"
 
 	for _, rbp := range b.RegBlockPairs {
 		comp := rbp.Bc
 
+		dataSignalAssignments += "-- Data signal assignments for " + comp.Name()
+		dataSignalAssignments += "\n"
+
 		dataSignalAssignments += comp.GetDataSignalAssigmentStr()
 
+		dataSignalAssignments += "-------------------------------"
+		dataSignalAssignments += "\n"
+		dataSignalAssignments += "\n"
 	}
+	dataSignalAssignments += "\n"
+
+	for _, rbp := range b.RegBlockPairs {
+		comp := rbp.Bc
+
+		signalDefs += comp.GetSignalDefs()
+
+		signalDefs += "\n"
+	}
+	signalDefs += "\n"
 
 	// Handle block at the end since there might be some new default connections to the parent
 

@@ -328,8 +328,7 @@ func (bc *BodyComponent) ConnectDataPosDir(bct BodyComponentType, from, to int, 
 }
 
 func (bc *BodyComponent) GetHandshakeSignalAssigmentStr() string {
-	handShakeAssignments := "-- Handshake signals assignments for " + bc.Name()
-	handShakeAssignments += "\n"
+	handShakeAssignments := ""
 
 	for _, in := range bc.InChannels() {
 		handShakeAssignments += in.GetSignalAssigmentStr()
@@ -345,16 +344,11 @@ func (bc *BodyComponent) GetHandshakeSignalAssigmentStr() string {
 		handShakeAssignments += "\n"
 	}
 
-	handShakeAssignments += "-------------------------------"
-	handShakeAssignments += "\n"
-	handShakeAssignments += "\n"
-
 	return handShakeAssignments
 }
 
 func (bc *BodyComponent) GetDataSignalAssigmentStr() string {
-	dataSignalAssignments := "-- Data signal assignments for " + bc.Name()
-	dataSignalAssignments += "\n"
+	dataSignalAssignments := ""
 
 	for _, in := range bc.InDataChannels() {
 		dataSignalAssignments += in.GetSignalAssigmentStr()
@@ -365,9 +359,6 @@ func (bc *BodyComponent) GetDataSignalAssigmentStr() string {
 		dataSignalAssignments += out.GetSignalAssigmentStr()
 		dataSignalAssignments += "\n"
 	}
-	dataSignalAssignments += "-------------------------------"
-	dataSignalAssignments += "\n"
-	dataSignalAssignments += "\n"
 
 	return dataSignalAssignments
 }

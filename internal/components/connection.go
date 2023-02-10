@@ -120,6 +120,8 @@ func (hw *HandshakeChannel) GetSignalAssigmentStr() string {
 		signalAssignments += hw.Ack + " <= " + hwFork.Name() + "_in_ack;"
 		signalAssignments += "\n"
 
+		infoPrinter.DebugPrintfln("[%s]: connecting outputs to %d forks", hw.Owner.Name(), len(hwFork.ReceiverList))
+
 		for i, j := range hwFork.ReceiverList {
 			istr := strconv.Itoa(i)
 			posInJoin := hwFork.getJoinHsPos(j)
