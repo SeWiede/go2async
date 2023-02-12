@@ -123,6 +123,7 @@ func (hw *HandshakeChannel) GetSignalAssigmentStr() string {
 		infoPrinter.DebugPrintfln("[%s]: connecting outputs to %d forks", hw.Owner.Name(), len(hwFork.ReceiverList))
 
 		for i, j := range hwFork.ReceiverList {
+			infoPrinter.DebugPrintfln("[%s]: connecting output to %s", hw.Owner.Name(), j.Receiver.Name())
 			istr := strconv.Itoa(i)
 			posInJoin := hwFork.getJoinHsPos(j)
 			posInJoinStr := strconv.Itoa(posInJoin)
@@ -361,9 +362,11 @@ func (c *DataChannel) GetSignalAssigmentStr() string {
 		c.AssignDefaultOut()
 	}
 
+	infoPrinter.DebugPrintfln("GETTING ASSIGNMENTS FOR %s", getOutDirStr(c.Out))
+
 	dataSignalAssigmnent := ""
 
-	for _, vi := range c.variables.VariableList {
+	for i, vi := range c.variables.VariableList {
 		vb := vi.GetVariableVectorBounds()
 		from := ""
 		to := ""
@@ -381,8 +384,12 @@ func (c *DataChannel) GetSignalAssigmentStr() string {
 		} else {
 			dcvs := getDataChannelsThatHaveVar(c.To, vi.Name())
 			if len(dcvs) == 0 {
+				infoPrinter.DebugPrintfln("[%s]: did not find var '%s' in %d connected dataChannels: ", c.Owner.Name(), vi.Name(), len(c.To))
 
-				infoPrinter.DebugPrintfln("[%s]: did not find var %s in connected dataChannels: ", c.Owner.Name(), vi.Name())
+				if c.Out {
+					// Unconnected out connections are allowed
+					continue
+				}
 
 				for _, t := range c.To {
 					for _, v := range t.Owner.OutputVariables().VariableList {
@@ -393,7 +400,7 @@ func (c *DataChannel) GetSignalAssigmentStr() string {
 					infoPrinter.DebugPrintfln("[%s]: not found here", t.Owner.Name())
 				}
 
-				panic("input var " + vi.Name() + " not found in connected dataChannels")
+				panic(strconv.Itoa(i+1) + ". input var '" + vi.Name() + "' not found in connected dataChannels; parent: " + c.Owner.Parent().Name())
 			}
 
 			for _, dcv := range dcvs {
@@ -407,7 +414,7 @@ func (c *DataChannel) GetSignalAssigmentStr() string {
 					dataSignalAssigmnent += to + " <= " + from + ";\n"
 				}
 
-				infoPrinter.DebugPrintfln("[%s]: var %s from '%s'", c.Owner.Name(), vi.Name(), dcv.dc.Owner.Name())
+				infoPrinter.DebugPrintfln("[%s]: %d. input (out?%t)var '%s' from '%s'", c.Owner.Name(), i+1, c.Out, vi.Name(), dcv.dc.Owner.Name())
 			}
 		}
 	}

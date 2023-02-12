@@ -31,11 +31,11 @@ func NewSelectorBlock(op string, oi *OperandInfo, inverted bool, parent BlockTyp
 
 	name := selectorprefix + strconv.Itoa(nr)
 
-	ret := &SelectorBlock{
+	sel := &SelectorBlock{
 		BodyComponent: BodyComponent{
-			number: nr,
-
+			number:   nr,
 			archName: archPrefix + name,
+			name:     strings.ToLower(selectorprefix + strconv.Itoa(nr)),
 
 			/* In: &HandshakeChannel{
 				Out: false,
@@ -62,21 +62,32 @@ func NewSelectorBlock(op string, oi *OperandInfo, inverted bool, parent BlockTyp
 		Inverted:  inverted,
 	}
 
-	err := getInputSources(ret, parent, oi, "uint8")
+	inputChannel := NewDefaultInputHandshakeChannel(sel)
+	sel.In = append(sel.In, inputChannel)
+
+	outputChannel := NewDefaultOutputHandshakeChannel(sel)
+	sel.Out = append(sel.Out, outputChannel)
+
+	sel.InData = append(sel.InData, NewDataChannel(sel, variable.NewScopedVariables(), sel.Name()+"_x", false))
+	sel.InData = append(sel.InData, NewDataChannel(sel, variable.NewScopedVariables(), sel.Name()+"_y", false))
+
+	sel.OutData = append(sel.OutData, NewDataChannel(sel, sel.OutputVariables(), sel.Name()+"_selector", true))
+
+	err := getInputSources(sel, parent, oi, "uint8")
 	if err != nil {
 		panic("getInputSource failed!")
 	}
 
-	infoPrinter.DebugPrintfln("[%s] finished getting inputs of [%s]", parent.Name(), ret.Name())
+	infoPrinter.DebugPrintfln("[%s] finished getting inputs of [%s]", parent.Name(), sel.Name())
 
 	// Add dummy successor
-	ret.successors["asdf"] = nil
+	sel.successors["asdf"] = nil
 
-	return ret
+	return sel
 }
 
 func (sb *SelectorBlock) Name() string {
-	return strings.ToLower(selectorprefix + strconv.Itoa(sb.number))
+	return sb.name
 }
 
 func (sb *SelectorBlock) ComponentStr() string { /* 	prependStr := ""
@@ -90,14 +101,14 @@ func (sb *SelectorBlock) ComponentStr() string { /* 	prependStr := ""
 	)
 	port map (
 	  -- Input channel
-	  in_req  => ` + sb.Name() + `_in_req,
-	  in_ack  => ` + sb.Name() + `_in_ack, 
-	  x => ` + sb.Name() + `_x,
-	  y => ` + sb.Name() + `_y,
+	  in_req  => ` + sb.In[0].GetReqSignalName() + `,
+	  in_ack  => ` + sb.In[0].GetAckSignalName() + `, 
+	  x => ` + sb.InData[0].GetDataSignalName() + `,
+	  y => ` + sb.InData[1].GetDataSignalName() + `,
 	  -- Output channel
-	  out_req =>  ` + sb.Name() + `_out_req, 
-	  out_ack =>  ` + sb.Name() + `_out_ack, 
-	  selector  =>  ` + sb.Name() + `_selector
+	  out_req => ` + sb.Out[0].GetReqSignalName() + `,
+	  out_ack => ` + sb.Out[0].GetAckSignalName() + `,
+	  selector  => ` + sb.OutData[0].GetDataSignalName() + `
 	);`
 	//` & (` + strconv.Itoa(*sb.GetVariablesSize()) + ` - 1 downto ` + strconv.Itoa(*sb.predecessor.GetVariablesSize()) + ` => '0'),
 }

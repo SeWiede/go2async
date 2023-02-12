@@ -7,31 +7,33 @@ import (
 
 const demuxPrefix = "DX_"
 
-type DEMUX struct {
+type Demux struct {
 	BodyComponent
 
-	DataWidth int
-
-	In     *HandshakeChannel
-	Out1   *HandshakeChannel
-	Out2   *HandshakeChannel
-	Select *HandshakeChannel
+	/*
+		 	In     *HandshakeChannel
+			Out1   *HandshakeChannel
+			Out2   *HandshakeChannel
+			Select *HandshakeChannel
+	*/
 }
 
 var demuxNr = 0
 
-func NewDEMUX(dataWidth int) *DEMUX {
+func NewDemux(parent BlockType) *Demux {
 	nr := demuxNr
 	demuxNr++
 
-	return &DEMUX{
+	newDemux := &Demux{
 		BodyComponent: BodyComponent{
 			number:   nr,
 			archName: defaultArch,
+			name:     strings.ToLower(demuxPrefix + strconv.Itoa(nr)),
+
+			parentBlock: parent,
+
+			inputVariables: parent.InputVariables(),
 		},
-
-		DataWidth: dataWidth,
-
 		/*In: &HandshakeChannel{
 		 	Out: false,
 		},
@@ -51,40 +53,54 @@ func NewDEMUX(dataWidth int) *DEMUX {
 			Out: false,
 		}, */
 	}
+
+	newDemux.In = append(newDemux.In, NewInputHandshakeChannel(newDemux, newDemux.Name()+"_inA_req", newDemux.Name()+"_inA_ack"))
+	newDemux.Out = append(newDemux.Out, NewOutputHandshakeChannel(newDemux, newDemux.Name()+"_outB_req", newDemux.Name()+"_outB_ack"))
+	newDemux.Out = append(newDemux.Out, NewOutputHandshakeChannel(newDemux, newDemux.Name()+"_outC_req", newDemux.Name()+"_outC_ack"))
+
+	newDemux.InData = append(newDemux.InData, NewInDataChannel(newDemux, newDemux.InputVariables(), newDemux.Name()+"_inA_data"))
+	newDemux.OutData = append(newDemux.OutData, NewOutDataChannel(newDemux, newDemux.InputVariables(), newDemux.Name()+"_outB_data"))
+	newDemux.OutData = append(newDemux.OutData, NewOutDataChannel(newDemux, newDemux.InputVariables(), newDemux.Name()+"_outC_data"))
+
+	// Selector
+	newDemux.In = append(newDemux.In, NewInputHandshakeChannel(newDemux, newDemux.Name()+"_inSel_req", newDemux.Name()+"_inSel_ack"))
+	newDemux.InData = append(newDemux.InData, NewInDataChannel(newDemux, newDemux.InputVariables(), newDemux.Name()+"_selector"))
+
+	return newDemux
 }
 
-func (d *DEMUX) Name() string {
-	return strings.ToLower(demuxPrefix + strconv.Itoa(d.number))
+func (d *Demux) Name() string {
+	return d.name
 }
 
-func (d *DEMUX) ComponentStr() string {
+func (d *Demux) ComponentStr() string {
 	return d.Name() + `: entity work.demux
   generic map (
-    DATA_WIDTH => ` + strconv.Itoa(d.DataWidth) + `
+    DATA_WIDTH => ` + strconv.Itoa(d.inputVariables.Size) + `
   )
   port map (
-    inA_req => ` + d.Name() + `_inA_req,
-    inA_ack => ` + d.Name() + `_inA_ack,
-    inA_data => ` + d.Name() + `_inA_data,
+    inA_req => ` + d.In[0].GetReqSignalName() + `,
+    inA_ack => ` + d.In[0].GetAckSignalName() + `,
+    inA_data => ` + d.InData[0].GetDataSignalName() + `,
 
-    outB_req => ` + d.Name() + `_outB_req,
-    outB_ack => ` + d.Name() + `_outB_ack,
-    outB_data => ` + d.Name() + `_outB_data,
+    outB_req => ` + d.Out[0].GetReqSignalName() + `,
+    outB_ack => ` + d.Out[0].GetAckSignalName() + `,
+    outB_data => ` + d.OutData[0].GetDataSignalName() + `,
     
-    outC_req => ` + d.Name() + `_outC_req,
-    outC_ack => ` + d.Name() + `_outC_ack,
-    outC_data => ` + d.Name() + `_outC_data,
+    outC_req => ` + d.Out[1].GetReqSignalName() + `,
+    outC_ack => ` + d.Out[1].GetAckSignalName() + `,
+    outC_data => ` + d.OutData[1].GetDataSignalName() + `,
 
-    inSel_req => ` + d.Name() + `_inSel_req,
-    inSel_ack => ` + d.Name() + `_inSel_ack,
-    selector => ` + d.Name() + `_selector,
+    inSel_req => ` + d.In[1].GetReqSignalName() + `,
+    inSel_ack => ` + d.In[1].GetAckSignalName() + `,
+    selector => ` + d.InData[1].GetDataSignalName() + `,
     
     rst => rst
   );
    `
 }
 
-func (d *DEMUX) Architecture() string {
+func (d *Demux) Architecture() string {
 	return `architecture ` + d.archName + ` of demux is
 
   signal phase_a : std_logic;
@@ -133,23 +149,14 @@ end ` + d.archName + `;
 `
 }
 
-func (d *DEMUX) ArchName() string {
+func (d *Demux) ArchName() string {
 	return d.archName
 }
 
-func (d *DEMUX) Entity() string {
+func (d *Demux) Entity() string {
 	panic("demux is predefined")
 }
 
-func (d *DEMUX) EntityName() string {
+func (d *Demux) EntityName() string {
 	return "demux"
-}
-
-func (d *DEMUX) GetSignalDefs() string {
-	panic("signaldefs not implemented")
-	return ""
-}
-
-func (d *DEMUX) Connect(bc BodyComponentType, x interface{}) {
-	panic("not implemented")
 }

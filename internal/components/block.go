@@ -38,6 +38,8 @@ type Block struct {
 
 	InnerInDataChannel  []*DataChannel
 	InnerOutDataChannel []*DataChannel
+
+	KeepVariableOwnership bool
 }
 
 func NewScopedVariables() *variable.ScopedVariables {
@@ -51,7 +53,7 @@ func NewScopedVariables() *variable.ScopedVariables {
 
 var blockNr = 0
 
-func NewBlock(toplevel bool, parent BlockType) *Block {
+func NewBlock(toplevel bool, keepVariableOwnership bool, parent BlockType) *Block {
 	nr := blockNr
 	blockNr++
 
@@ -89,7 +91,8 @@ func NewBlock(toplevel bool, parent BlockType) *Block {
 		ExternalInterfaces: make(map[string]*variable.VariableInfo),
 		VariableOwner:      make(map[string]*variableOwner),
 
-		TopLevel: toplevel,
+		TopLevel:              toplevel,
+		KeepVariableOwnership: keepVariableOwnership,
 	}
 
 	inputChannel := NewDefaultInputHandshakeChannel(b)
@@ -135,6 +138,7 @@ func NewParamDummyBlock(params map[string]*variable.VariableInfo) *Block {
 		ret.inputVariables.Size += v.Len_ * v.Size_
 	}
 
+	ret.name = "ParamDummyBlock"
 	ret.archName = "DummyBlock"
 
 	ret.predecessors = map[string]BodyComponentType{}
@@ -231,15 +235,17 @@ func (b *Block) ComponentStr() string {
    ` + externalIntferacesGenericsStr + `
   )
   port map (
-	rst => rst,
-	-- Input channel
-	in_req => ` + b.Name() + `_in_req,
-	in_ack => ` + b.Name() + `_in_ack,
-	in_data => ` + b.Name() + `_in_data,
-	-- Output channel
-	out_req => ` + b.Name() + `_out_req,
-	out_ack => ` + b.Name() + `_out_ack,
-	out_data => ` + b.Name() + `_out_data ` + comma + `
+	  -- Input channel
+	  in_req => ` + b.In[0].GetReqSignalName() + `,
+	  in_ack => ` + b.In[0].GetAckSignalName() + `,
+	  in_data => ` + b.InData[0].GetDataSignalName() + `,
+
+	  -- Output channel
+	  out_req => ` + b.Out[0].GetReqSignalName() + `,
+	  out_ack => ` + b.Out[0].GetAckSignalName() + `,
+	  out_data => ` + b.OutData[0].GetDataSignalName() + `,
+
+	  rst => rst` + comma + `
 	-- External interfaces
 	` + externalInterfacesStr + `
   );
@@ -390,6 +396,7 @@ func (b *Block) Architecture() string {
 		dataSignalAssignments += "-- Data signal assignments for " + comp.Name()
 		dataSignalAssignments += "\n"
 
+		infoPrinter.DebugPrintfln("[%s]: data signal assignments for "+comp.Name(), comp.Name())
 		dataSignalAssignments += comp.GetDataSignalAssigmentStr()
 
 		dataSignalAssignments += "-------------------------------"
@@ -488,29 +495,23 @@ func (b *Block) NewScopeVariable(vdef variable.VariableDef) (*variable.VariableI
 	return vi, nil
 }
 
-func (b *Block) GetVariable(name string) (*variable.VariableInfo, error) {
-	infoPrinter.DebugPrintfln("[%s]: Getting variable %s", b.Name(), name)
+func (b *Block) GetVariable(varName string) (*variable.VariableInfo, error) {
+	infoPrinter.DebugPrintfln("[%s]: Getting variable %s", b.Name(), varName)
 
-	own, ok := b.VariableOwner[name]
+	own, ok := b.VariableOwner[varName]
 	if ok {
-		infoPrinter.DebugPrintfln("Variable %s's latest owner is %s", name, own.ownerList.lastest.Name())
+		infoPrinter.DebugPrintfln("Variable %s's latest owner is %s", varName, own.ownerList.lastest.Name())
 		return own.vi, nil
 	} else {
 		if b.Parent() == nil {
-			return nil, ErrVariableNotFound(name)
+			return nil, ErrVariableNotFound(varName)
 		}
 
 		// Get variable info form parent.
-		vi, err := b.Parent().GetVariable(name)
+		vi, err := b.Parent().GetVariable(varName)
 		if err != nil {
 			return nil, err
 		}
-
-		b.AddPredecessor(b.Parent())
-		//prevComps = append(prevComps, b.Parent())
-
-		//nextComps := b.Parent().Successors()
-		b.Parent().AddSuccessor(b)
 
 		// Track variables that are coming from outside this block's scope.
 		vi, err = b.NewScopeVariable(vi)
@@ -520,15 +521,46 @@ func (b *Block) GetVariable(name string) (*variable.VariableInfo, error) {
 
 		vi.DefinedOnly_ = false
 
-		// New owner of variable in current block is the current block.
+		if !b.KeepVariableOwnership {
+			b.AddPredecessor(b.Parent())
+			//prevComps = append(prevComps, b.Parent())
+
+			//nextComps := b.Parent().Successors()
+			b.Parent().AddSuccessor(b)
+
+			// Skip top block
+			if b.Parent().Parent() != nil {
+				// Connect with owner of variable
+				ownX, ok := b.Parent().GetVariableOwnerMap()[varName]
+				if !ok {
+					// Shouldn't happen
+					return nil, errors.New("No owner for X operator")
+				}
+
+				latestOwner := ownX.ownerList.lastest
+				ownX.ownerList.AddSuccessorToLatest(b)
+
+				b.ConnectHandshake(latestOwner)
+				b.ConnectData(latestOwner)
+			}
+
+		} else {
+			// Expect connection later
+
+			infoPrinter.DebugPrintfln("[%s]: keeping variable ownership and wait for later connections!", b.Name())
+		}
+
+		/* // New owner of variable in current block is the current block.
 		b.VariableOwner[vi.Name()] = &variableOwner{
 			ownerList: NewOwnerList(b),
 			vi:        vi,
 		}
-
+		*/
 		b.InputVariables().AddVariable(vi)
 
-		infoPrinter.DebugPrintfln("[%s] Variable %s is from outside the block's scope. Added to inputs (current size = %d).", b.Name(), name, b.InputVariables().Size)
+		//b.AddInputVariable(vi)
+
+		infoPrinter.DebugPrintfln("[%s] Variable %s is from outside the block's scope. Added to inputs and owners (current size = %d).", b.Name(), varName, b.InputVariables().Size)
 
 		return vi, nil
 	}

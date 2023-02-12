@@ -1,7 +1,6 @@
 package components
 
 import (
-	"go2async/internal/variable"
 	"strconv"
 	"strings"
 )
@@ -10,50 +9,39 @@ const forkPrefix = "F_"
 
 type Fork struct {
 	BodyComponent
-
-	In   *HandshakeChannel
-	Out1 *HandshakeChannel
-	Out2 *HandshakeChannel
 }
 
 var forkNr = 0
 
-func NewFork(inputVariables *variable.ScopedVariables) *Fork {
-	if inputVariables == nil {
-		panic("nil inputvariables")
-	}
-
+func NewFork(parent BlockType) *Fork {
 	nr := forkNr
 	forkNr++
 
-	return &Fork{
+	newFork := &Fork{
 		BodyComponent: BodyComponent{
 			number:   nr,
 			archName: defaultArch,
+			name:     strings.ToLower(forkPrefix + strconv.Itoa(nr)),
 
-			inputVariables: inputVariables,
-		},
+			parentBlock: parent,
 
-		/* In: &HandshakeChannel{
-			Out: false,
+			inputVariables: parent.InputVariables(),
 		},
-		Out1: &HandshakeChannel{
-			Req:  name + "_b_o_req",
-			Ack:  name + "_b_o_ack",
-			Data: name + "_b_data",
-			Out:  true,
-		},
-		Out2: &HandshakeChannel{
-			Req:  name + "_c_o_req",
-			Ack:  name + "_c_o_ack",
-			Data: name + "_c_data",
-			Out:  true,
-		}, */
 	}
+
+	newFork.In = append(newFork.In, NewInputHandshakeChannel(newFork, newFork.Name()+"_inA_req", newFork.Name()+"_inA_ack"))
+	newFork.Out = append(newFork.Out, NewOutputHandshakeChannel(newFork, newFork.Name()+"_outB_req", newFork.Name()+"_outB_ack"))
+	newFork.Out = append(newFork.Out, NewOutputHandshakeChannel(newFork, newFork.Name()+"_outC_req", newFork.Name()+"_outC_ack"))
+
+	newFork.InData = append(newFork.InData, NewInDataChannel(newFork, newFork.InputVariables(), newFork.Name()+"_inA_data"))
+	newFork.OutData = append(newFork.OutData, NewOutDataChannel(newFork, newFork.InputVariables(), newFork.Name()+"_outB_data"))
+	newFork.OutData = append(newFork.OutData, NewOutDataChannel(newFork, newFork.InputVariables(), newFork.Name()+"_outC_data"))
+
+	return newFork
 }
 
 func (f *Fork) Name() string {
-	return strings.ToLower(forkPrefix + strconv.Itoa(f.number))
+	return f.name
 }
 
 func (f *Fork) ComponentStr() string {
@@ -64,19 +52,19 @@ func (f *Fork) ComponentStr() string {
   )
   port map(
     -- Input Channel
-    inA_req => ` + f.Name() + `_inA_req,
-    inA_ack => ` + f.Name() + `_inA_ack,
-    inA_data => ` + f.Name() + `_inA_data,
+    inA_req => ` + f.In[0].GetReqSignalName() + `,
+    inA_ack => ` + f.In[0].GetAckSignalName() + `,
+    inA_data => ` + f.InData[0].GetDataSignalName() + `,
 
     -- Output Channel 1
-    outB_req => ` + f.Name() + `_outB_req,
-    outB_ack => ` + f.Name() + `_outB_ack,
-    outB_data => ` + f.Name() + `_out_B_data,
+    outB_req => ` + f.Out[0].GetReqSignalName() + `,
+    outB_ack => ` + f.Out[0].GetAckSignalName() + `,
+    outB_data => ` + f.OutData[0].GetDataSignalName() + `,
 
     -- Output Channel 2
-    outC_req => ` + f.Name() + `_outC_req,
-    outC_ack => ` + f.Name() + `_outC_ack,
-    outC_data => ` + f.Name() + `_outC_data,
+    outC_req => ` + f.Out[1].GetReqSignalName() + `,
+    outC_ack => ` + f.Out[1].GetAckSignalName() + `,
+    outC_data => ` + f.OutData[1].GetDataSignalName() + `,
 
     rst => rst
   );
@@ -128,13 +116,4 @@ func (f *Fork) Entity() string {
 
 func (f *Fork) EntityName() string {
 	return "demux"
-}
-
-func (f *Fork) GetSignalDefs() string {
-	panic("signaldefs not implemented")
-	return ""
-}
-
-func (f *Fork) Connect(bc BodyComponentType, x interface{}) {
-	panic("not implemented")
 }

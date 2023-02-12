@@ -18,7 +18,7 @@ type LoopBlock struct {
 	loopCond    *SelectorBlock
 	condFork    *Fork
 	condReg     *Reg
-	exitDemux   *DEMUX
+	exitDemux   *Demux
 
 	bodyReg *Reg
 	body    BodyComponentType

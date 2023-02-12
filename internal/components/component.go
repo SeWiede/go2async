@@ -183,18 +183,16 @@ func (bc *BodyComponent) AddInputVariable(vtd *variable.VariableInfo) (*variable
 		return nil, err
 	}
 
-	if !bc.isBlock {
-		// Check owner map
-		parent := bc.parentBlock
-		if _, ok := parent.GetVariableOwnerMap()[vi.Name()]; !ok {
+	// Check owner map
+	parent := bc.parentBlock
+	if _, ok := parent.GetVariableOwnerMap()[vi.Name()]; !ok {
 
-			parent.GetVariableOwnerMap()[vi.Name()] = &variableOwner{
-				ownerList: NewOwnerList(parent),
-				vi:        vtd,
-			}
-
-			infoPrinter.DebugPrintfln("[%s]: No owner for variable '%s' found. Making parent %s owner", bc.archName, vi.Name(), parent.Name())
+		parent.GetVariableOwnerMap()[vi.Name()] = &variableOwner{
+			ownerList: NewOwnerList(parent),
+			vi:        vtd,
 		}
+
+		infoPrinter.DebugPrintfln("[%s]: No owner for variable '%s' found. Making parent %s owner", bc.archName, vi.Name(), parent.Name())
 	}
 
 	/* 	if len(bc.InData) > 0 {
@@ -274,6 +272,8 @@ func (bc *BodyComponent) ConnectDataPos(bct BodyComponentType, from, to int) {
 }
 
 func (bc *BodyComponent) ConnectHandshakePosDir(bct BodyComponentType, from, to int, out bool) {
+	infoPrinter.DebugPrintfln("[%s]: connecting handshakes to '%s' (out? %t from pos %d to pos %d)", bc.Name(), bct.Name(), out, from, to)
+
 	var fromHsChannel *HandshakeChannel
 	var toHsChannel *HandshakeChannel
 
@@ -285,7 +285,11 @@ func (bc *BodyComponent) ConnectHandshakePosDir(bct BodyComponentType, from, to 
 		toHsChannel = bct.OutChannels()[to]
 	}
 
-	if bct == bc.parentBlock {
+	if bct == bc.parentBlock || bct.Name() == bc.parentBlock.Name() {
+		if bct != bc.parentBlock {
+			infoPrinter.DebugPrintfln("[%s]: bct %s is parent but not as pointer! %p != %p", bc.Name(), bct.Name(), bc.parentBlock, bct)
+		}
+
 		infoPrinter.DebugPrintfln("[%s]: to handshake connection is parent '%s' - using parent's inner connections", bc.name, bc.Parent().Name())
 
 		if out {
@@ -297,10 +301,11 @@ func (bc *BodyComponent) ConnectHandshakePosDir(bct BodyComponentType, from, to 
 
 	fromHsChannel.ConnectHandshake(toHsChannel)
 
-	infoPrinter.DebugPrintfln("[%s]: connected handshake to '%s'", bc.Name(), bct.Name())
+	infoPrinter.DebugPrintfln("[%s]: connected %d. handshake to '%s' %d.", bc.Name(), from, bct.Name(), to)
 }
 
 func (bc *BodyComponent) ConnectDataPosDir(bct BodyComponentType, from, to int, out bool) {
+	infoPrinter.DebugPrintfln("[%s]: connecting data to %s (out? %t from pos %d to pos %d)", bc.Name(), bct.Name(), out, from, to)
 	var fromDataChannel *DataChannel
 	var toDataChannel *DataChannel
 
@@ -312,7 +317,7 @@ func (bc *BodyComponent) ConnectDataPosDir(bct BodyComponentType, from, to int, 
 		toDataChannel = bct.OutDataChannels()[to]
 	}
 
-	if bct == bc.parentBlock {
+	if bct == bc.parentBlock || bct.Name() == bc.parentBlock.Name() {
 		infoPrinter.DebugPrintfln("[%s]: to data connection is parent '%s' - using parent's inner connections", bc.name, bc.Parent().Name())
 
 		if out {
@@ -324,7 +329,7 @@ func (bc *BodyComponent) ConnectDataPosDir(bct BodyComponentType, from, to int, 
 
 	fromDataChannel.ConnectData(toDataChannel)
 
-	infoPrinter.DebugPrintfln("[%s]: %s connected data to '%s' %s", bc.Name(), fromDataChannel.DataName, bct.Name(), toDataChannel.DataName)
+	infoPrinter.DebugPrintfln("[%s]: %s connected %d. data to '%s' %s %d.", bc.Name(), fromDataChannel.DataName, from, bct.Name(), toDataChannel.DataName, to)
 }
 
 func (bc *BodyComponent) GetHandshakeSignalAssigmentStr() string {

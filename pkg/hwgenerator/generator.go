@@ -643,7 +643,7 @@ func (g *Generator) GenerateIfBlock(is *ast.IfStmt, parent components.BlockType)
 		return nil, g.peb.NewParseError(is, errors.New("Only binary expression in if condition allowed found "+ref.String()))
 	}
 
-	thenBody, err := g.GenerateBlock(is.Body.List, false, newIfBlk, false)
+	thenBody, err := g.GenerateBlock(is.Body.List, false, true, newIfBlk, false)
 	if err != nil {
 		return nil, g.peb.NewParseError(is, err)
 	}
@@ -664,7 +664,7 @@ func (g *Generator) GenerateIfBlock(is *ast.IfStmt, parent components.BlockType)
 	}
 
 	if is.Else != nil {
-		elseBody, err = g.GenerateBlock(is.Else.(*ast.BlockStmt).List, false, newIfBlk, false)
+		elseBody, err = g.GenerateBlock(is.Else.(*ast.BlockStmt).List, false, true, newIfBlk, false)
 		if err != nil {
 			return nil, g.peb.NewParseError(is, err)
 		}
@@ -713,7 +713,7 @@ func (g *Generator) GenerateLoopBlock(fs *ast.ForStmt, parent components.BlockTy
 		return nil, g.peb.NewParseError(fs, errors.New("Only binary expression in for condition allowed found "+reflect.TypeOf(x).String()))
 	}
 
-	body, err := g.GenerateBlock(fs.Body.List, false, parent, false)
+	body, err := g.GenerateBlock(fs.Body.List, false, false, parent, false)
 	if err != nil {
 		return nil, g.peb.NewParseError(fs, err)
 	}
@@ -799,14 +799,14 @@ func (g *Generator) GenerateBodyBlock(s ast.Stmt, parent components.BlockType) (
 	case *ast.ReturnStmt:
 		return nil, g.peb.NewParseError(s, errors.New("Return statements only allowed at the end of function!"))
 	case *ast.BlockStmt:
-		return g.GenerateBlock(sType.List, false, parent, true)
+		return g.GenerateBlock(sType.List, false, false, parent, true)
 	default:
 		return nil, g.peb.NewParseError(s, errors.New("Invalid statement "+reflect.TypeOf(sType).String()))
 	}
 }
 
-func (g *Generator) GenerateBlock(stmts []ast.Stmt, toplevelStatement bool, parent components.BlockType, addComponentToParent bool) (b *components.Block, err error) {
-	b = components.NewBlock(toplevelStatement, parent)
+func (g *Generator) GenerateBlock(stmts []ast.Stmt, toplevelStatement bool, KeepVariableOwnership bool, parent components.BlockType, addComponentToParent bool) (b *components.Block, err error) {
+	b = components.NewBlock(toplevelStatement, KeepVariableOwnership, parent)
 
 	for _, s := range stmts {
 		newComponent, err := g.GenerateBodyBlock(s, b)
@@ -1021,7 +1021,7 @@ func (g *Generator) GenerateScope(f *ast.FuncDecl) (s *components.Scope, err err
 		return nil, g.peb.NewParseError(f, errors.New("At least one top-level statement + return expected"))
 	}
 
-	block, err := g.GenerateBlock(f.Body.List[0:fields-1], true, paramDummyBlock, true)
+	block, err := g.GenerateBlock(f.Body.List[0:fields-1], true, false, paramDummyBlock, true)
 	if err != nil {
 		return nil, g.peb.NewParseError(f, err)
 	}

@@ -9,63 +9,58 @@ const mergePrefix = "ME_"
 
 type Merge struct {
 	BodyComponent
-
-	DataWidth int
-
-	In1 *HandshakeChannel
-	In2 *HandshakeChannel
-	Out *HandshakeChannel
 }
 
 var mergeNr = 0
 
-func NewMerge(dataWitdth int) *Merge {
+func NewMerge(parent BlockType) *Merge {
 	nr := mergeNr
 	mergeNr++
 
-	return &Merge{
+	newMerge := &Merge{
 		BodyComponent: BodyComponent{
 			number:   nr,
 			archName: defaultArch,
-		},
+			name:     strings.ToLower(mergePrefix + strconv.Itoa(nr)),
 
-		DataWidth: dataWitdth,
-		/* In1: &HandshakeChannel{
-			Out: false,
+			parentBlock: parent,
+
+			inputVariables: parent.InputVariables(),
 		},
-		In2: &HandshakeChannel{
-			Out: false,
-		},
-		Out: &HandshakeChannel{
-			Req:  name + "_c_o_req",
-			Ack:  name + "_c_o_ack",
-			Data: name + "_c_data",
-			Out:  true,
-		}, */
 	}
+
+	newMerge.In = append(newMerge.In, NewInputHandshakeChannel(newMerge, newMerge.Name()+"_inA_req", newMerge.Name()+"_inA_ack"))
+	newMerge.In = append(newMerge.In, NewInputHandshakeChannel(newMerge, newMerge.Name()+"_inB_req", newMerge.Name()+"_inB_ack"))
+	newMerge.Out = append(newMerge.Out, NewOutputHandshakeChannel(newMerge, newMerge.Name()+"_outC_req", newMerge.Name()+"_outC_ack"))
+
+	newMerge.InData = append(newMerge.InData, NewInDataChannel(newMerge, newMerge.InputVariables(), newMerge.Name()+"_inA_data"))
+	newMerge.InData = append(newMerge.InData, NewInDataChannel(newMerge, newMerge.InputVariables(), newMerge.Name()+"_inB_data"))
+	newMerge.OutData = append(newMerge.OutData, NewOutDataChannel(newMerge, newMerge.InputVariables(), newMerge.Name()+"_outC_data"))
+
+	return newMerge
 }
 
 func (d *Merge) Name() string {
-	return strings.ToLower(mergePrefix + strconv.Itoa(d.number))
+	return d.name
 }
 
 func (d *Merge) ComponentStr() string {
 	return d.Name() + `: entity work.merge
   generic map (
-    DATA_WIDTH => ` + strconv.Itoa(d.DataWidth) + `
+    DATA_WIDTH => ` + strconv.Itoa(d.inputVariables.Size) + `
   )
   port map (
-    inA_req => ` + d.Name() + `_inA_req,
-    inA_ack => ` + d.Name() + `_inA_ack,
-    inA_data => ` + d.Name() + `_inA_data,
+    inA_req => ` + d.In[0].GetReqSignalName() + `,
+    inA_ack => ` + d.In[0].GetAckSignalName() + `,
+    inA_data => ` + d.InData[0].GetDataSignalName() + `,
 
-    inB_req => ` + d.Name() + `_inB_req,
-    inB_ack => ` + d.Name() + `_inB_ack,
-    inB_data => ` + d.Name() + `_inB_data,
+    inB_req => ` + d.In[1].GetReqSignalName() + `,
+    inB_ack => ` + d.In[1].GetAckSignalName() + `,
+    inB_data => ` + d.InData[1].GetDataSignalName() + `,
     
-    outC_req => ` + d.Name() + `_outC_req,
-    outC_ack => ` + d.Name() + `_outC_ack,
-    outC_data => ` + d.Name() + `_outC_data,
+    outC_req => ` + d.Out[0].GetReqSignalName() + `,
+    outC_ack => ` + d.Out[0].GetAckSignalName() + `,
+    outC_data => ` + d.OutData[0].GetDataSignalName() + `,
     
     rst => rst
    );
@@ -132,13 +127,4 @@ func (d *Merge) Entity() string {
 
 func (d *Merge) EntityName() string {
 	return "merge"
-}
-
-func (d *Merge) GetSignalDefs() string {
-	panic("signaldefs not implemented")
-	return ""
-}
-
-func (d *Merge) Connect(bc BodyComponentType, x interface{}) {
-	panic("not implemented")
 }
