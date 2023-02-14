@@ -163,11 +163,28 @@ func (ib *IfBlock) Architecture() string {
 		panic("missing merger in ifBlock")
 	}
 
-	componentStr := ib.getComponentsStr()
+	ib.createInnerLife()
 
-	signalDefs := ib.getInnerComponentsSignalDefs()
+	handshakeSignalAssignments := ib.getHandshakeSignalAssignments()
 
-	dataSignalAssignments := ib.GetInnerHandshakeSignalAssignmentstr()
+	dataSignalAssignments := ib.getDataSignalAssignments()
+
+	signalDefs := ""
+	for _, rbp := range ib.RegBlockPairs {
+		comp := rbp.Bc
+
+		signalDefs += comp.GetSignalDefs()
+
+		signalDefs += "\n"
+	}
+	signalDefs += "\n"
+
+	handshakeSignalAssignments += ib.GetInnerHandshakeSignalAssignmentstr()
+
+	componentStr := ib.componentsString()
+
+	signalDefs += ib.GetInnerSignalDefs()
+	signalDefs += "\n"
 
 	//handshakeOverwrites := ib.getHandshakeOverwrites(forks, joins)
 
@@ -181,6 +198,9 @@ func (ib *IfBlock) Architecture() string {
 	ret += "signalAssignments: process(all)"
 	ret += "\n"
 	ret += "begin"
+	ret += "\n"
+
+	ret += handshakeSignalAssignments
 	ret += "\n"
 
 	ret += dataSignalAssignments
@@ -246,7 +266,7 @@ func (b *IfBlock) getInnerComponentsSignalDefs() string {
 	return signalDefs
 }
 
-func (ib *IfBlock) getComponentsStr() string {
+func (ib *IfBlock) createInnerLife() {
 	// Make connections first
 
 	// Inputs to selector
@@ -282,37 +302,12 @@ func (ib *IfBlock) getComponentsStr() string {
 	ib.merger.ConnectDataPos(ib.thenBody, 0, 0)
 	ib.merger.ConnectDataPos(ib.elseBody, 1, 0)
 
-	// Get Signalassignments
-	signalAssignments := ""
-
 	ib.RegBlockPairs = append(ib.RegBlockPairs, &regBodyPair{Bc: ib.cond})
 	ib.RegBlockPairs = append(ib.RegBlockPairs, &regBodyPair{Bc: ib.demux})
 	ib.RegBlockPairs = append(ib.RegBlockPairs, &regBodyPair{Bc: ib.thenBody})
 	ib.RegBlockPairs = append(ib.RegBlockPairs, &regBodyPair{Bc: ib.elseBody})
 	ib.RegBlockPairs = append(ib.RegBlockPairs, &regBodyPair{Bc: ib.merger})
 
-	signalAssignments += ib.componentsString()
-
 	infoPrinter.DebugPrintfln("[%s]: got componentsStrings", ib.Name())
 
-	return signalAssignments
-}
-
-func (b *IfBlock) GetInnerHandshakeSignalAssignmentstr() string {
-	handShakeAssignments := ""
-
-	for _, in := range b.InnerInChannel {
-		handShakeAssignments += in.GetSignalAssigmentStr()
-
-		handShakeAssignments += "\n"
-	}
-
-	handShakeAssignments += "\n"
-
-	for _, out := range b.InnerOutChannel {
-		handShakeAssignments += out.GetSignalAssigmentStr()
-
-		handShakeAssignments += "\n"
-	}
-	return handShakeAssignments
 }

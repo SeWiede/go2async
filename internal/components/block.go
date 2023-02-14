@@ -361,20 +361,8 @@ func (b *Block) Entity() string {
 	return ret
 }
 
-func (b *Block) Architecture() string {
-	// Determine how many forks and joins are needed
-
-	//signalDefs := b.signalDefs()
-	/* dataSignalAssignments := b.getDefaultSignalAssignments()
-
-	signalDefs, forks, joins := b.getSignalDefsJoinsAndForks()
-
-	handshakeOverwrites := b.getHandshakeOverwrites(forks, joins) */
-
-	signalDefs := ""
-
+func (b *Block) getHandshakeSignalAssignments() string {
 	handShakeAssignments := ""
-	dataSignalAssignments := ""
 
 	for _, rbp := range b.RegBlockPairs {
 		comp := rbp.Bc
@@ -390,6 +378,12 @@ func (b *Block) Architecture() string {
 	}
 	handShakeAssignments += "\n"
 
+	return handShakeAssignments
+}
+
+func (b *Block) getDataSignalAssignments() string {
+	dataSignalAssignments := ""
+
 	for _, rbp := range b.RegBlockPairs {
 		comp := rbp.Bc
 
@@ -404,6 +398,24 @@ func (b *Block) Architecture() string {
 		dataSignalAssignments += "\n"
 	}
 	dataSignalAssignments += "\n"
+
+	return dataSignalAssignments
+}
+
+func (b *Block) Architecture() string {
+	// Determine how many forks and joins are needed
+
+	//signalDefs := b.signalDefs()
+	/* dataSignalAssignments := b.getDefaultSignalAssignments()
+
+	signalDefs, forks, joins := b.getSignalDefsJoinsAndForks()
+
+	handshakeOverwrites := b.getHandshakeOverwrites(forks, joins) */
+
+	signalDefs := ""
+
+	handShakeAssignments := b.getHandshakeSignalAssignments()
+	dataSignalAssignments := b.getDataSignalAssignments()
 
 	for _, rbp := range b.RegBlockPairs {
 		comp := rbp.Bc
@@ -522,12 +534,6 @@ func (b *Block) GetVariable(varName string) (*variable.VariableInfo, error) {
 		vi.DefinedOnly_ = false
 
 		if !b.KeepVariableOwnership {
-			b.AddPredecessor(b.Parent())
-			//prevComps = append(prevComps, b.Parent())
-
-			//nextComps := b.Parent().Successors()
-			b.Parent().AddSuccessor(b)
-
 			// Skip top block
 			if b.Parent().Parent() != nil {
 				// Connect with owner of variable
@@ -540,8 +546,21 @@ func (b *Block) GetVariable(varName string) (*variable.VariableInfo, error) {
 				latestOwner := ownX.ownerList.lastest
 				ownX.ownerList.AddSuccessorToLatest(b)
 
+				// Claim ownership of used variable in parent
+				ownX.ownerList.AddOwner(b)
+
+				b.AddPredecessor(latestOwner)
+				//prevComps = append(prevComps, b.Parent())
+
+				//nextComps := b.Parent().Successors()
+				latestOwner.AddSuccessor(b)
+
 				b.ConnectHandshake(latestOwner)
 				b.ConnectData(latestOwner)
+
+				infoPrinter.DebugPrintfln("[%s]: connected to %s and got ownerShip of var %s", b.Name(), latestOwner.Name(), varName)
+
+				// TODO: OWNERSHIP HANDLING
 			}
 
 		} else {

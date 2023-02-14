@@ -19,6 +19,8 @@ type SelectorBlock struct {
 	Operation string
 	Oi        *OperandInfo
 	Inverted  bool
+
+	addedInput int
 }
 
 var selectorNr = 0
@@ -78,12 +80,56 @@ func NewSelectorBlock(op string, oi *OperandInfo, inverted bool, parent BlockTyp
 		panic("getInputSource failed!")
 	}
 
+	_, err = sel.outputVariables.AddVariable(&variable.VariableTypeDecl{
+		Name_: "__go2async_selector__var",
+		Typ_:  "__go2async_selector",
+		Len_:  1,
+	})
+	if err != nil {
+		panic(err.Error())
+	}
+
 	infoPrinter.DebugPrintfln("[%s] finished getting inputs of [%s]", parent.Name(), sel.Name())
 
-	// Add dummy successor
-	sel.successors["asdf"] = nil
-
 	return sel
+}
+
+func (sb *SelectorBlock) AddInputVariable(vtd *variable.VariableInfo) (*variable.VariableInfo, error) {
+	// Allow both inputs to be the same
+	vi, err := sb.InputVariables().AddVariable(vtd)
+	if err != nil {
+		vi, err = sb.InputVariables().GetVariableInfo(vtd.Name())
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	// Add inputs to their respecting inputChannels
+	if sb.addedInput >= 2 {
+		panic("cannot add more than 2 inputs to binExpr")
+	} else if sb.addedInput == 1 {
+		sb.InDataChannels()[1].variables.AddVariable(vtd)
+	} else {
+		sb.InDataChannels()[0].variables.AddVariable(vtd)
+
+	}
+	sb.addedInput++
+
+	if !sb.isBlock {
+		// Check owner map
+		parent := sb.parentBlock
+		if _, ok := parent.GetVariableOwnerMap()[vi.Name()]; !ok {
+
+			parent.GetVariableOwnerMap()[vi.Name()] = &variableOwner{
+				ownerList: NewOwnerList(parent),
+				vi:        vtd,
+			}
+
+			infoPrinter.DebugPrintfln("[%s]: No owner for variable '%s' found. Making parent %s owner", sb.archName, vi.Name(), parent.Name())
+		}
+	}
+
+	return vi, err
 }
 
 func (sb *SelectorBlock) Name() string {
@@ -95,7 +141,7 @@ func (sb *SelectorBlock) ComponentStr() string { /* 	prependStr := ""
 		prependStr = `(` + strconv.Itoa(*sb.GetVariablesSize()) + ` - 1 downto ` + strconv.Itoa(*sb.predecessor.GetVariablesSize()) + ` => '0') & `
 	} */
 
-	return sb.Name() + `: entity work.Selector(` + sb.ArchName() + `)
+	return sb.Name() + `: entity work.` + sb.EntityName() + `(` + sb.ArchName() + `)
 	generic map(
 	  DATA_WIDTH =>  ` + strconv.Itoa(sb.inputVariables.Size) + `
 	)
@@ -176,7 +222,7 @@ func (sb *SelectorBlock) getCalcProcess() string {
 
 func (sb *SelectorBlock) Architecture() string {
 
-	return `architecture ` + sb.ArchName() + ` of Selector is
+	return `architecture ` + sb.ArchName() + ` of ` + sb.EntityName() + ` is
   
     --attribute dont_touch : string;
 	--attribute dont_touch of  x, y, selector: signal is "true";
@@ -261,19 +307,4 @@ func (ib *SelectorBlock) GetYTotalSize() int {
 	}
 
 	return y.TotalSize()
-}
-
-func (ib *SelectorBlock) GetSignalDefs() string {
-	signalDefs := ""
-
-	signalDefs += "signal " + ib.Name() + "_in_req : std_logic;"
-	signalDefs += "signal " + ib.Name() + "_out_req : std_logic;"
-	signalDefs += "signal " + ib.Name() + "_in_ack : std_logic;"
-	signalDefs += "signal " + ib.Name() + "_out_ack : std_logic;"
-
-	signalDefs += "signal " + ib.Name() + "_x : std_logic_vector(" + strconv.Itoa(ib.GetXTotalSize()) + "- 1 downto 0) := (others => '0');"
-	signalDefs += "signal " + ib.Name() + "_y : std_logic_vector(" + strconv.Itoa(ib.GetYTotalSize()) + "- 1 downto 0) := (others => '0');"
-	signalDefs += "signal " + ib.Name() + "_selector : std_logic_vector(0 downto 0);"
-
-	return signalDefs
 }

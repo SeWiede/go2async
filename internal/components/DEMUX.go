@@ -1,6 +1,7 @@
 package components
 
 import (
+	"go2async/internal/variable"
 	"strconv"
 	"strings"
 )
@@ -64,7 +65,14 @@ func NewDemux(parent BlockType) *Demux {
 
 	// Selector
 	newDemux.In = append(newDemux.In, NewInputHandshakeChannel(newDemux, newDemux.Name()+"_inSel_req", newDemux.Name()+"_inSel_ack"))
-	newDemux.InData = append(newDemux.InData, NewInDataChannel(newDemux, newDemux.InputVariables(), newDemux.Name()+"_selector"))
+
+	selectorVariables := NewScopedVariables()
+	selectorVariables.AddVariable(&variable.VariableTypeDecl{
+		Name_: "__go2async_selector__var",
+		Typ_:  "__go2async_selector",
+		Len_:  1,
+	})
+	newDemux.InData = append(newDemux.InData, NewInDataChannel(newDemux, selectorVariables, newDemux.Name()+"_selector"))
 
 	return newDemux
 }
