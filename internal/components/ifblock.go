@@ -23,6 +23,7 @@ type IfBlock struct {
 var ifBlockNr = 0
 
 func NewIfBlock(parent BlockType) *IfBlock {
+
 	ib := &IfBlock{
 		Block: Block{
 			BodyComponent: BodyComponent{
@@ -44,6 +45,9 @@ func NewIfBlock(parent BlockType) *IfBlock {
 			TopLevel: false,
 		},
 	}
+
+	ib.number = ifBlockNr
+	ifBlockNr++
 
 	ib.name = strings.ToLower(ifBlockPrefix + strconv.Itoa(ib.number))
 	ib.archName = archPrefix + ib.name
