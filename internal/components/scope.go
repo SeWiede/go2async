@@ -56,7 +56,7 @@ func NewScope(name string, block *Block) *Scope {
 		rs += s.Size_
 	}
 
-	s.OutReg = NewReg(s.Block.OutputVariables().Size, false, "0")
+	s.OutReg = NewReg(s.Block, false, "0")
 	/*
 		s.Block.Out.Connect(s.OutReg.In)
 
@@ -223,12 +223,12 @@ func (s *Scope) signalDefs() string {
 	// OutReg
 	ret += "signal " + s.OutReg.Name() + "_in_req : std_logic;"
 	ret += "signal " + s.OutReg.Name() + "_in_ack : std_logic;"
-	ret += "signal " + s.OutReg.Name() + "_in_data : std_logic_vector(" + strconv.Itoa(s.OutReg.DataWidth) + " - 1 downto 0);"
+	ret += "signal " + s.OutReg.Name() + "_in_data : std_logic_vector(" + strconv.Itoa(s.Block.OutputVariables().Size) + " - 1 downto 0);"
 	ret += "\n"
 
 	ret += "signal " + s.OutReg.Name() + "_out_req : std_logic;"
 	ret += "signal " + s.OutReg.Name() + "_out_ack : std_logic;"
-	ret += "signal " + s.OutReg.Name() + "_out_data : std_logic_vector(" + strconv.Itoa(s.OutReg.DataWidth) + " - 1 downto 0);"
+	ret += "signal " + s.OutReg.Name() + "_out_data : std_logic_vector(" + strconv.Itoa(s.Block.OutputVariables().Size) + " - 1 downto 0);"
 	ret += "\n"
 
 	return ret

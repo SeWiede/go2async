@@ -8,54 +8,46 @@ import (
 const regPrefix = "R_"
 
 type Reg struct {
-	Nr       int
-	archName string
+	BodyComponent
+
 	PhaseOut bool
 
 	StartValue string
-	DataWidth  int
-
-	In  *HandshakeChannel
-	Out *HandshakeChannel
 }
 
 var regNr = 0
 
-func NewReg(dataWidth int, phaseOut bool, startValue string) *Reg {
+func NewReg(parent BlockType, phaseOut bool, startValue string) *Reg {
 	nr := regNr
 	regNr++
 
 	// name := strings.ToLower(regPrefix + strconv.Itoa(nr))
 
-	return &Reg{
-		Nr:         nr,
-		archName:   defaultArch,
-		DataWidth:  dataWidth,
+	newReg := &Reg{
+		BodyComponent: BodyComponent{
+			name:     strings.ToLower(regPrefix + strconv.Itoa(nr)),
+			archName: defaultArch,
+			number:   nr,
+
+			parentBlock: parent,
+
+			inputVariables: parent.OutputVariables(),
+		},
 		PhaseOut:   phaseOut,
 		StartValue: startValue,
-		/* In: &HandshakeChannel{
-			Out: false,
-		},
-		Out: &HandshakeChannel{
-			From:      name + "_o_req",
-			FromAck:   name + "_o_ack",
-			Data:      name + "_data",
-			Out:       true,
-			DataWidth: dataWidth,
-		}, */
 	}
-}
 
-func (r *Reg) InChannel() *HandshakeChannel {
-	return r.In
-}
+	newReg.In = append(newReg.In, NewInputHandshakeChannel(newReg, newReg.Name()+"_in_req", newReg.Name()+"_in_ack"))
+	newReg.Out = append(newReg.Out, NewOutputHandshakeChannel(newReg, newReg.Name()+"_out_req", newReg.Name()+"_out_ack"))
 
-func (r *Reg) OutChannel() *HandshakeChannel {
-	return r.Out
+	newReg.InData = append(newReg.InData, NewInDataChannel(newReg, newReg.InputVariables(), newReg.Name()+"_in_data"))
+	newReg.OutData = append(newReg.OutData, NewOutDataChannel(newReg, newReg.InputVariables(), newReg.Name()+"_out_data"))
+
+	return newReg
 }
 
 func (r *Reg) Name() string {
-	return strings.ToLower(regPrefix + strconv.Itoa(r.Nr))
+	return r.name
 }
 
 func (r *Reg) ComponentStr() string {
@@ -64,28 +56,25 @@ func (r *Reg) ComponentStr() string {
 		phaseOutString = "PHASE_INIT_OUT => '1'"
 	}
 
-	dataWidthStr := "DATA_WIDTH"
-	if r.DataWidth > 0 {
-		dataWidthStr = strconv.Itoa(r.DataWidth)
-	}
-
 	return r.Name() + `: entity work.decoupled_hs_reg(` + r.archName + `)
   generic map (
-    DATA_WIDTH => ` + dataWidthStr + `,
+    DATA_WIDTH => ` + strconv.Itoa(r.InputVariables().Size) + `,
     VALUE => ` + r.StartValue + `,
     PHASE_INIT_IN => '0',
     ` + phaseOutString + `
   )
   port map (
-    rst => rst,
     -- Input channel
-    in_req => ` + r.Name() + `_in_req,
-    in_ack => ` + r.Name() + `_in_ack,
-    in_data => ` + r.Name() + `_in_data,
-    -- Output channel
-    out_req => ` + r.Name() + `_out_req,
-    out_ack => ` + r.Name() + `_out_ack,
-    out_data => ` + r.Name() + `_out_data
+    in_req => ` + r.In[0].GetReqSignalName() + `,
+    in_ack => ` + r.In[0].GetAckSignalName() + `,
+    in_data => ` + r.InData[0].GetDataSignalName() + `,
+
+    -- Output Channel 1
+    out_req => ` + r.Out[0].GetReqSignalName() + `,
+    out_ack => ` + r.Out[0].GetAckSignalName() + `,
+    out_data => ` + r.OutData[0].GetDataSignalName() + `,
+
+    rst => rst
   );
   `
 }
@@ -147,4 +136,12 @@ end ` + r.archName + `;`
 
 func (r *Reg) ArchName() string {
 	return r.archName
+}
+
+func (r *Reg) Entity() string {
+	panic("reg is predefined")
+}
+
+func (r *Reg) EntityName() string {
+	return "Reg"
 }
