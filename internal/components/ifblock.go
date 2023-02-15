@@ -109,7 +109,7 @@ func NewIfBlock(parent BlockType) *IfBlock {
 	innerOutDataChannel.Connected = true
 	ib.InnerOutDataChannel = append(ib.InnerOutDataChannel, innerOutDataChannel)
 
-	infoPrinter.DebugPrintfln("[%s]: Added ifBlock reqName", ib.Name())
+	infoPrinter.DebugPrintfln("[%s]: Added ifBlock", ib.Name())
 
 	return ib
 }
