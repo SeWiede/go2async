@@ -111,9 +111,9 @@ func (f *Fork) ArchName() string {
 }
 
 func (f *Fork) Entity() string {
-	panic("demux is predefined")
+	panic("fork is predefined")
 }
 
 func (f *Fork) EntityName() string {
-	return "demux"
+	return "fork"
 }
