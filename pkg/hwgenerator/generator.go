@@ -507,7 +507,7 @@ func (g *Generator) GenerateBinaryExpressionBlock(result *variable.VariableInfo,
 	return newFuncBlk, nil
 }
 
-func (g *Generator) GenerateSelectorBlock(be *ast.BinaryExpr, inverted bool, parent components.BlockType) (c *components.SelectorBlock, err error) {
+func (g *Generator) GenerateSelectorBlock(be *ast.BinaryExpr, inverted bool, holdOffConnections bool, parent components.BlockType) (c *components.SelectorBlock, err error) {
 	xexpr := be.X
 	yexpr := be.Y
 
@@ -608,7 +608,7 @@ func (g *Generator) GenerateSelectorBlock(be *ast.BinaryExpr, inverted bool, par
 	return components.NewSelectorBlock(comp, &components.OperandInfo{
 		X: x,
 		Y: y,
-	}, inverted, parent), nil
+	}, inverted, holdOffConnections, parent), nil
 }
 
 func (g *Generator) GenerateIfBlock(is *ast.IfStmt, parent components.BlockType) (fb *components.IfBlock, err error) {
@@ -618,7 +618,7 @@ func (g *Generator) GenerateIfBlock(is *ast.IfStmt, parent components.BlockType)
 
 	switch x := is.Cond.(type) {
 	case *ast.BinaryExpr:
-		cond, err = g.GenerateSelectorBlock(x, false, newIfBlk)
+		cond, err = g.GenerateSelectorBlock(x, false, false, newIfBlk)
 		if err != nil {
 			return nil, g.peb.NewParseError(is, err)
 		}
@@ -631,7 +631,7 @@ func (g *Generator) GenerateIfBlock(is *ast.IfStmt, parent components.BlockType)
 			}
 			return nil, g.peb.NewParseError(is, errors.New("Only binary expression in if condition allowed found "+ref.String()+" in parenthesis"))
 		}
-		cond, err = g.GenerateSelectorBlock(xBin, false, newIfBlk)
+		cond, err = g.GenerateSelectorBlock(xBin, false, false, newIfBlk)
 		if err != nil {
 			return nil, g.peb.NewParseError(is, err)
 		}
@@ -684,11 +684,13 @@ func (g *Generator) GenerateIfBlock(is *ast.IfStmt, parent components.BlockType)
 }
 
 func (g *Generator) GenerateLoopBlock(fs *ast.ForStmt, parent components.BlockType) (fb *components.LoopBlock, err error) {
+	newForBlk := components.NewLoopBlock(parent)
+
 	var cond *components.SelectorBlock
 
 	switch x := fs.Cond.(type) {
 	case *ast.BinaryExpr:
-		cond, err = g.GenerateSelectorBlock(x, true, parent)
+		cond, err = g.GenerateSelectorBlock(x, true, true, newForBlk)
 		if err != nil {
 			return nil, g.peb.NewParseError(fs, err)
 		}
@@ -701,7 +703,8 @@ func (g *Generator) GenerateLoopBlock(fs *ast.ForStmt, parent components.BlockTy
 			}
 			return nil, g.peb.NewParseError(fs, errors.New("Only binary expression in for condition allowed found "+reflect.TypeOf(x.X).String()+" in parenthesis"))
 		}
-		cond, err = g.GenerateSelectorBlock(xBin, false, parent)
+
+		cond, err = g.GenerateSelectorBlock(xBin, true, true, newForBlk)
 		if err != nil {
 			return nil, g.peb.NewParseError(fs, err)
 		}
@@ -713,7 +716,7 @@ func (g *Generator) GenerateLoopBlock(fs *ast.ForStmt, parent components.BlockTy
 		return nil, g.peb.NewParseError(fs, errors.New("Only binary expression in for condition allowed found "+reflect.TypeOf(x).String()))
 	}
 
-	body, err := g.GenerateBlock(fs.Body.List, false, false, parent, false)
+	body, err := g.GenerateBlock(fs.Body.List, false, true, newForBlk, false)
 	if err != nil {
 		return nil, g.peb.NewParseError(fs, err)
 	}
@@ -721,7 +724,8 @@ func (g *Generator) GenerateLoopBlock(fs *ast.ForStmt, parent components.BlockTy
 	g.components[cond.ArchName()] = cond
 	g.components[body.ArchName()] = body
 
-	newForBlk := components.NewLoopBlock(cond, body, parent)
+	newForBlk.AssignBodyComponents(cond, body)
+
 	g.components[newForBlk.ArchName()] = newForBlk
 	parent.AddComponent(newForBlk)
 

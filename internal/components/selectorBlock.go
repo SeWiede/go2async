@@ -21,13 +21,15 @@ type SelectorBlock struct {
 	Inverted  bool
 
 	addedInput int
+
+	holdOffConnections bool
 }
 
 var selectorNr = 0
 
 var selecTorOutDataWith = 1
 
-func NewSelectorBlock(op string, oi *OperandInfo, inverted bool, parent BlockType) *SelectorBlock {
+func NewSelectorBlock(op string, oi *OperandInfo, inverted bool, holdOffConnections bool, parent BlockType) *SelectorBlock {
 	nr := selectorNr
 	selectorNr++
 
@@ -38,17 +40,6 @@ func NewSelectorBlock(op string, oi *OperandInfo, inverted bool, parent BlockTyp
 			number:   nr,
 			archName: archPrefix + name,
 			name:     strings.ToLower(selectorprefix + strconv.Itoa(nr)),
-
-			/* In: &HandshakeChannel{
-				Out: false,
-			},
-			Out: &HandshakeChannel{
-				Req:       name + "_o_req",
-				Ack:       name + "_o_ack",
-				Data:      name + "_select",
-				Out:       true,
-				DataWidth: selecTorOutDataWith,
-			}, */
 
 			parentBlock: parent,
 
@@ -62,6 +53,8 @@ func NewSelectorBlock(op string, oi *OperandInfo, inverted bool, parent BlockTyp
 		Operation: op,
 		Oi:        oi,
 		Inverted:  inverted,
+
+		holdOffConnections: holdOffConnections,
 	}
 
 	inputChannel := NewDefaultInputHandshakeChannel(sel)
@@ -75,7 +68,7 @@ func NewSelectorBlock(op string, oi *OperandInfo, inverted bool, parent BlockTyp
 
 	sel.OutData = append(sel.OutData, NewDataChannel(sel, sel.OutputVariables(), sel.Name()+"_selector", true))
 
-	err := getInputSources(sel, parent, oi, "uint8")
+	err := getInputSources(sel, parent, oi, "uint8", holdOffConnections)
 	if err != nil {
 		panic("getInputSource failed!")
 	}

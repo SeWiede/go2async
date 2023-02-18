@@ -285,6 +285,10 @@ func (bc *BodyComponent) ConnectHandshakePosDir(bct BodyComponentType, from, to 
 		toHsChannel = bct.OutChannels()[to]
 	}
 
+	if bc.parentBlock == nil {
+		panic("parent of " + bc.Name() + " is nil")
+	}
+
 	if bct == bc.parentBlock || bct.Name() == bc.parentBlock.Name() {
 		if bct != bc.parentBlock {
 			infoPrinter.DebugPrintfln("[%s]: bct %s is parent but not as pointer! %p != %p", bc.Name(), bct.Name(), bc.parentBlock, bct)

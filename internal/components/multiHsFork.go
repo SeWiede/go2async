@@ -18,6 +18,8 @@ type MultiHsFork struct {
 	Sender       BodyComponentType
 
 	currentOut int
+
+	phaseInit bool
 }
 
 var multiHsForkNr = 0
@@ -101,10 +103,15 @@ func (m *MultiHsFork) GetNumReceivers() int {
 func (m *MultiHsFork) ComponentStr() string {
 	name := m.Name()
 
+	phase_init := "'0'"
+	if m.phaseInit {
+		phase_init = "'1'"
+	}
+
 	return name + `: entity work.multiHsFork
   generic map (
     HANDSHAKE_COMPONENTS => ` + strconv.Itoa(m.GetNumReceivers()) + `,
-    PHASE_INIT => '0'
+    PHASE_INIT => ` + phase_init + `
   )
   port map (
 	  in_req => ` + name + `_in_req,

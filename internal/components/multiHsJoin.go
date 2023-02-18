@@ -14,6 +14,8 @@ type MultiHsJoin struct {
 	Receiver   BodyComponentType
 
 	currentIn int
+
+	phaseInit bool
 }
 
 var multiHsJoinNr = 0
@@ -96,10 +98,15 @@ func (m *MultiHsJoin) GetNumSenders() int {
 func (m *MultiHsJoin) ComponentStr() string {
 	name := m.Name()
 
+	phase_init := "'0'"
+	if m.phaseInit {
+		phase_init = "'1'"
+	}
+
 	return name + `: entity work.multiHsJoin
   generic map (
     HANDSHAKE_COMPONENTS => ` + strconv.Itoa(m.GetNumSenders()) + `,
-    PHASE_INIT => '0'
+    PHASE_INIT => ` + phase_init + `
   )
   port map (
 	  in_req => ` + name + `_in_req,

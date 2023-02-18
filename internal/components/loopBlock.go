@@ -1,6 +1,8 @@
 package components
 
 import (
+	"go2async/internal/infoPrinter"
+	"go2async/internal/variable"
 	"strconv"
 	"strings"
 )
@@ -8,9 +10,7 @@ import (
 const loopBlockPrefix = "LB_"
 
 type LoopBlock struct {
-	BodyComponent
-
-	Nr int
+	Block
 
 	entryMux *MUX
 
@@ -18,7 +18,8 @@ type LoopBlock struct {
 	loopCond    *SelectorBlock
 	condFork    *Fork
 	condReg     *Reg
-	exitDemux   *Demux
+
+	exitDemux *Demux
 
 	bodyReg *Reg
 	body    BodyComponentType
@@ -26,81 +27,66 @@ type LoopBlock struct {
 
 var loopBlockNr = 0
 
-func NewLoopBlock(loopCond *SelectorBlock, body BodyComponentType, parent BlockType) *LoopBlock {
-	nr := loopBlockNr
-	loopBlockNr++
-
-	name := strings.ToLower(loopBlockPrefix + strconv.Itoa(nr))
+func NewLoopBlock(parent BlockType) *LoopBlock {
 	lb := &LoopBlock{
-		BodyComponent: BodyComponent{
-			archName: archPrefix + name,
-			/* In: &HandshakeChannel{
-				Out: false,
+		Block: Block{
+			BodyComponent: BodyComponent{
+
+				parentBlock: parent,
+
+				inputVariables: NewScopedVariables(),
+				// outputVariables: NewScopedVariables(),
+
+				predecessors: map[string]BodyComponentType{},
+				successors:   map[string]BodyComponentType{},
+
+				isBlock: true,
 			},
-			Out: &HandshakeChannel{
-				Req:       name + "_o_req",
-				Ack:       name + "_o_ack",
-				Data:      name + "_data",
-				Out:       true,
-				DataWidth: parent.GetCurrentVariableSize(),
-			}, */
 
-			parentBlock: parent,
+			ExternalInterfaces: make(map[string]*variable.VariableInfo),
+			VariableOwner:      make(map[string]*variableOwner),
+
+			TopLevel:              false,
+			KeepVariableOwnership: false,
 		},
-		Nr: nr,
 	}
 
-	/* entryIn := &HandshakeChannel{
-		Req:  "in_req",
-		Ack:  "in_ack",
-		Data: "in_data",
-		Out:  true,
-	}
+	lb.number = loopBlockNr
+	loopBlockNr++
+	lb.name = strings.ToLower(loopBlockPrefix + strconv.Itoa(lb.number))
+	lb.archName = archPrefix + lb.name
 
-	lb.loopCond = loopCond
+	inputChannel := NewDefaultInputHandshakeChannel(lb)
+	lb.In = append(lb.In, inputChannel)
 
-	lb.entryMux = NewMUX()
-	lb.entryMux.In1 = entryIn
-	lb.initRegFork = NewRegFork()
-	lb.entryMux.Out.Connect(lb.initRegFork.In)
+	outputChannel := NewDefaultOutputHandshakeChannel(lb)
+	lb.Out = append(lb.Out, outputChannel)
 
-	lb.initRegFork.Out1.Connect(lb.loopCond.In)
-	lb.condFork = NewFork(nil)
-	lb.loopCond.Out.Connect(lb.condFork.In)
-	lb.condFork.Out1.Data = "open"
-	lb.condFork.Out2.Data = "open"
+	lb.InData = append(lb.InData, NewDefaultInDataChannel(lb, lb.InputVariables()))
+	lb.OutData = append(lb.OutData, NewDefaultOutDataChannel(lb, lb.OutputVariables()))
 
-	//to mux
-	lb.condReg = NewReg(one, true, "1")
-	lb.condFork.Out1.Connect(lb.condReg.In)
-	lb.condReg.In.Data = lb.loopCond.Out.Data
+	// Inner channels -> directions from in/out are handled reversed!
+	innerInputChannel := NewOutputHandshakeChannel(lb, "in_req", "in_ack")
+	lb.InnerInChannel = append(lb.InnerInChannel, innerInputChannel)
 
-	lb.condReg.Out.Connect(lb.entryMux.Select)
-	//to demux
+	innerOutputChannel := NewInputHandshakeChannel(lb, "out_req", "out_ack")
+	lb.InnerOutChannel = append(lb.InnerOutChannel, innerOutputChannel)
 
-	lb.exitDemux = NewDEMUX(-1)
-	lb.exitDemux.Out1 = lb.OutChannel()
-	lb.condFork.Out2.Connect(lb.exitDemux.Select)
-	lb.exitDemux.Select.Data = lb.loopCond.Out.Data
+	innerInDataChannel := NewOutDataChannel(lb, lb.InputVariables(), "in_data")
+	innerInDataChannel.Connected = true
+	lb.InnerInDataChannel = append(lb.InnerInDataChannel, innerInDataChannel)
 
-	lb.initRegFork.Out2.Connect(lb.exitDemux.In)
+	innerOutDataChannel := NewInDataChannel(lb, lb.OutputVariables(), "out_data")
+	innerOutDataChannel.Connected = true
+	lb.InnerOutDataChannel = append(lb.InnerOutDataChannel, innerOutDataChannel)
 
-	lb.body = body
-
-	//lb.Out.DataWidth = &lb.variablesSize
-
-	lb.bodyReg = NewReg(lb.GetVariableSize(), false, "0")
-
-	body.OutChannel().Connect(lb.entryMux.In2)
-
-	lb.exitDemux.Out2.Connect(lb.bodyReg.In)
-	lb.bodyReg.Out.Connect(body.InChannel()) */
+	infoPrinter.DebugPrintfln("[%s]: Added loopblock", lb.Name())
 
 	return lb
 }
 
 func (lb *LoopBlock) Name() string {
-	return loopBlockPrefix + strconv.Itoa(lb.Nr)
+	return lb.name
 }
 
 func (lb *LoopBlock) ComponentStr() string {
@@ -109,14 +95,17 @@ func (lb *LoopBlock) ComponentStr() string {
     DATA_WIDTH => ` + strconv.Itoa(lb.GetVariableSize()) + `
   )
   port map (
-    rst => rst,
-    in_req => ` + lb.Name() + `_in_req,
-    in_ack => ` + lb.Name() + `_in_ack,
-    in_data => std_logic_vector(resize(unsigned(` + lb.Name() + `_in_data), ` + strconv.Itoa(lb.GetVariableSize()) + `)),
-    -- Output channel
-    out_req => ` + lb.Name() + `_out_req,
-    out_ack => ` + lb.Name() + `_out_ack,
-    out_data => ` + lb.Name() + `_out_data
+	  -- Input Channel
+	  in_req => ` + lb.In[0].GetReqSignalName() + `,
+	  in_ack => ` + lb.In[0].GetAckSignalName() + `,
+	  in_data => ` + lb.InData[0].GetDataSignalName() + `,
+
+	  -- Output Channel
+	  out_req => ` + lb.Out[0].GetReqSignalName() + `,
+	  out_ack => ` + lb.Out[0].GetAckSignalName() + `,
+	  out_data => ` + lb.OutData[0].GetDataSignalName() + `,
+
+	  rst => rst
   );
   `
 }
@@ -139,42 +128,82 @@ func (lb *LoopBlock) ComponentStr() string {
 } */
 
 func (lb *LoopBlock) Architecture() string {
-	// TODO: add inner components
-	ret := `architecture ` + lb.archName + ` of LoopBlock is
-	`
-	//ret += lb.signalDefs()
+	lb.createInnerLife()
 
+	if lb.entryMux == nil {
+		panic("missing entryMux in ifBlock")
+	}
+	if lb.initRegFork == nil {
+		panic("missing initRegFork in ifBlock")
+	}
+	/* if lb.condFork == nil {
+		panic("missing condFork in ifBlock")
+	} */
+	if lb.condReg == nil {
+		panic("missing condReg in ifBlock")
+	}
+	if lb.exitDemux == nil {
+		panic("missing exitDemux in ifBlock")
+	}
+	if lb.bodyReg == nil {
+		panic("missing bodyReg in ifBlock")
+	}
+	if lb.body == nil {
+		panic("missing body in ifBlock")
+	}
+	if lb.loopCond == nil {
+		panic("missing loopCond in ifBlock")
+	}
+
+	handshakeSignalAssignments := lb.getHandshakeSignalAssignments()
+
+	dataSignalAssignments := lb.getDataSignalAssignments()
+
+	signalDefs := ""
+	for _, rbp := range lb.RegBlockPairs {
+		comp := rbp.Bc
+
+		signalDefs += comp.GetSignalDefs()
+
+		signalDefs += "\n"
+	}
+	signalDefs += "\n"
+
+	handshakeSignalAssignments += lb.GetInnerHandshakeSignalAssignmentstr()
+
+	componentStr := lb.componentsString()
+
+	signalDefs += lb.GetInnerSignalDefs()
+	signalDefs += "\n"
+
+	ret := "architecture " + lb.archName + " of " + lb.EntityName() + " is"
 	ret += "\n"
-
+	ret += signalDefs
+	ret += "\n"
 	ret += "begin"
+	ret += "\n"
+
+	ret += "signalAssignments: process(all)"
+	ret += "\n"
+	ret += "begin"
+	ret += "\n"
+
+	ret += handshakeSignalAssignments
+	ret += "\n"
+
+	ret += dataSignalAssignments
+	ret += "\n"
 
 	ret += "\n"
 
-	/* ret += "out_req <= " + lb.OutChannel().Req + "; \n"
-	ret += lb.OutChannel().Ack + " <= out_ack; \n"
-	ret += "out_data <= " + lb.OutChannel().Data + "; \n" */
+	ret += "end process;"
 
 	ret += "\n"
 
-	ret += lb.entryMux.ComponentStr()
-	ret += "\n"
-	ret += lb.initRegFork.ComponentStr()
-	ret += "\n"
-	ret += lb.loopCond.ComponentStr()
-	ret += "\n"
-	ret += lb.condFork.ComponentStr()
-	ret += "\n"
-	ret += lb.condReg.ComponentStr()
-	ret += "\n"
-	ret += lb.exitDemux.ComponentStr()
-	ret += "\n"
-	ret += lb.bodyReg.ComponentStr()
-	ret += "\n"
-	ret += lb.body.ComponentStr()
-	ret += "\n"
+	ret += componentStr
 
-	ret += `end ` + lb.archName + `;
-	`
+	ret += "end " + lb.archName + ";"
+
 	return ret
 }
 
@@ -206,20 +235,126 @@ ENTITY ` + lb.EntityName() + ` IS
 END ` + lb.EntityName() + `;`
 }
 
-func (lb *LoopBlock) GetSignalDefs() string {
-	signalDefs := ""
+func (lb *LoopBlock) AssignBodyComponents(loopCond *SelectorBlock, body BodyComponentType) {
+	lb.loopCond = loopCond
+	lb.body = body
 
-	signalDefs += "signal " + lb.Name() + "_in_req : std_logic;"
-	signalDefs += "signal " + lb.Name() + "_out_req : std_logic;"
-	signalDefs += "signal " + lb.Name() + "_in_ack : std_logic;"
-	signalDefs += "signal " + lb.Name() + "_out_ack : std_logic;"
-
-	signalDefs += "signal " + lb.Name() + "_in_data : std_logic_vector(" + strconv.Itoa(lb.InputVariables().Size) + "- 1 downto 0);"
-	signalDefs += "signal " + lb.Name() + "_out_data : std_logic_vector(" + strconv.Itoa(lb.OutputVariables().Size) + "- 1 downto 0);"
-
-	return signalDefs
+	infoPrinter.DebugPrintfln("[%s]: added loopCond %s and body %s", lb.Name(), lb.loopCond.Name(), lb.body.Name())
 }
 
-func (lb *LoopBlock) Connect(bc BodyComponentType, x interface{}) {
-	panic("not implemented")
+func (lb *LoopBlock) createInnerLife() {
+	if lb.body == nil {
+		panic("missing body in ifBlock")
+	}
+	if lb.loopCond == nil {
+		panic("missing loopCond in ifBlock")
+	}
+
+	infoPrinter.DebugPrintfln("[%s]: creating inner life", lb.Name())
+
+	lb.entryMux = NewMUX(lb)
+	lb.initRegFork = NewRegFork(lb)
+	lb.exitDemux = NewDemux(lb)
+	//lb.condFork = NewFork(lb)
+
+	lb.condReg = NewReg(lb, lb.loopCond.OutputVariables(), true, "1")
+	lb.bodyReg = NewReg(lb, lb.exitDemux.OutputVariables(), false, "0")
+
+	// EntryMUX
+	lb.entryMux.ConnectHandshakePos(lb, 0, 0)
+	lb.entryMux.ConnectDataPos(lb, 0, 0)
+
+	// Default in2
+	lb.entryMux.ConnectDataPos(lb, 1, 0)
+
+	lb.entryMux.ConnectDataPos(lb.body, 1, 0)
+
+	// InitRegFork
+	lb.initRegFork.ConnectHandshake(lb.entryMux)
+	lb.initRegFork.ConnectData(lb.entryMux)
+
+	// Selector path
+	lb.loopCond.ConnectHandshakePos(lb.initRegFork, 0, 0)
+	lb.loopCond.ConnectDataPos(lb.initRegFork, 0, 0)
+	lb.loopCond.ConnectDataPos(lb.initRegFork, 1, 0)
+
+	// lb.condFork.ConnectHandshake(lb.loopCond)
+	// lb.condFork.ConnectData(lb.loopCond)
+
+	lb.condReg.ConnectHandshakePos(lb.loopCond, 0, 0)
+	lb.condReg.ConnectDataPos(lb.loopCond, 0, 0)
+
+	lb.entryMux.ConnectHandshakePos(lb.condReg, 2, 0)
+	lb.entryMux.ConnectDataPos(lb.condReg, 2, 0)
+
+	// Exit
+	lb.exitDemux.ConnectHandshakePos(lb.initRegFork, 0, 1)
+	lb.exitDemux.ConnectDataPos(lb.initRegFork, 0, 1)
+
+	lb.exitDemux.ConnectHandshakePos(lb.loopCond, 1, 0)
+	lb.exitDemux.ConnectDataPos(lb.loopCond, 1, 0)
+
+	// Body
+	lb.bodyReg.ConnectHandshakePos(lb.exitDemux, 0, 1)
+	lb.bodyReg.ConnectDataPos(lb.exitDemux, 0, 1)
+
+	lb.body.ConnectHandshake(lb.bodyReg)
+	lb.body.ConnectData(lb.bodyReg)
+
+	lb.entryMux.ConnectHandshakePos(lb.body, 1, 0)
+
+	lb.RegBlockPairs = append(lb.RegBlockPairs, &regBodyPair{Bc: lb.entryMux})
+	lb.RegBlockPairs = append(lb.RegBlockPairs, &regBodyPair{Bc: lb.initRegFork})
+	//lb.RegBlockPairs = append(lb.RegBlockPairs, &regBodyPair{Bc: lb.condFork})
+	lb.RegBlockPairs = append(lb.RegBlockPairs, &regBodyPair{Bc: lb.loopCond})
+	lb.RegBlockPairs = append(lb.RegBlockPairs, &regBodyPair{Bc: lb.condReg})
+	lb.RegBlockPairs = append(lb.RegBlockPairs, &regBodyPair{Bc: lb.exitDemux})
+	lb.RegBlockPairs = append(lb.RegBlockPairs, &regBodyPair{Bc: lb.bodyReg})
+	lb.RegBlockPairs = append(lb.RegBlockPairs, &regBodyPair{Bc: lb.body})
 }
+
+/* entryIn := &HandshakeChannel{
+	Req:  "in_req",
+	Ack:  "in_ack",
+	Data: "in_data",
+	Out:  true,
+}
+
+lb.loopCond = loopCond
+
+lb.entryMux = NewMUX()
+lb.entryMux.In1 = entryIn
+lb.initRegFork = NewRegFork()
+lb.entryMux.Out.Connect(lb.initRegFork.In)
+
+lb.initRegFork.Out1.Connect(lb.loopCond.In)
+lb.condFork = NewFork(nil)
+lb.loopCond.Out.Connect(lb.condFork.In)
+lb.condFork.Out1.Data = "open"
+lb.condFork.Out2.Data = "open"
+
+//to mux
+lb.condReg = NewReg(one, true, "1")
+lb.condFork.Out1.Connect(lb.condReg.In)
+lb.condReg.In.Data = lb.loopCond.Out.Data
+
+lb.condReg.Out.Connect(lb.entryMux.Select)
+//to demux
+
+lb.exitDemux = NewDEMUX(-1)
+lb.exitDemux.Out1 = lb.OutChannel()
+lb.condFork.Out2.Connect(lb.exitDemux.Select)
+lb.exitDemux.Select.Data = lb.loopCond.Out.Data
+
+lb.initRegFork.Out2.Connect(lb.exitDemux.In)
+
+lb.body = body
+
+//lb.Out.DataWidth = &lb.variablesSize
+
+lb.bodyReg = NewReg(lb.GetVariableSize(), false, "0")
+
+body.OutChannel().Connect(lb.entryMux.In2)
+
+lb.exitDemux.Out2.Connect(lb.bodyReg.In)
+lb.bodyReg.Out.Connect(body.InChannel()) */

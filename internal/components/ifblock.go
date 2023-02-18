@@ -148,6 +148,8 @@ func (ib *IfBlock) ComponentStr() string {
 }
 
 func (ib *IfBlock) Architecture() string {
+	ib.createInnerLife()
+
 	if ib.entryFork == nil {
 		panic("missing entryFork in ifBlock")
 	}
@@ -166,8 +168,6 @@ func (ib *IfBlock) Architecture() string {
 	if ib.merger == nil {
 		panic("missing merger in ifBlock")
 	}
-
-	ib.createInnerLife()
 
 	handshakeSignalAssignments := ib.getHandshakeSignalAssignments()
 
@@ -192,7 +192,7 @@ func (ib *IfBlock) Architecture() string {
 
 	//handshakeOverwrites := ib.getHandshakeOverwrites(forks, joins)
 
-	ret := "architecture " + ib.archName + " of IfBlock is"
+	ret := "architecture " + ib.archName + " of " + ib.EntityName() + " is"
 	ret += "\n"
 	ret += signalDefs
 	ret += "\n"
@@ -254,25 +254,7 @@ END ` + ib.EntityName() + `;`
 
 }
 
-func (b *IfBlock) getInnerComponentsSignalDefs() string {
-	signalDefs := ""
-
-	//signalDefs += b.entryFork.GetSignalDefs()
-	signalDefs += b.cond.GetSignalDefs()
-	signalDefs += b.demux.GetSignalDefs()
-	signalDefs += b.thenBody.GetSignalDefs()
-	signalDefs += b.elseBody.GetSignalDefs()
-	signalDefs += b.merger.GetSignalDefs()
-
-	// block signals
-	signalDefs += b.GetInnerSignalDefs()
-
-	return signalDefs
-}
-
 func (ib *IfBlock) createInnerLife() {
-	// Make connections first
-
 	// Inputs to selector
 	ib.cond.ConnectHandshake(ib)
 	ib.cond.ConnectDataPos(ib, 0, 0)
@@ -311,7 +293,4 @@ func (ib *IfBlock) createInnerLife() {
 	ib.RegBlockPairs = append(ib.RegBlockPairs, &regBodyPair{Bc: ib.thenBody})
 	ib.RegBlockPairs = append(ib.RegBlockPairs, &regBodyPair{Bc: ib.elseBody})
 	ib.RegBlockPairs = append(ib.RegBlockPairs, &regBodyPair{Bc: ib.merger})
-
-	infoPrinter.DebugPrintfln("[%s]: got componentsStrings", ib.Name())
-
 }

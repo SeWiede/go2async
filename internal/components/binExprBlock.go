@@ -103,7 +103,7 @@ func NewBinExprBlock(op string, oi *OperandInfo, parent BlockType) (*BinExprBloc
 	return bep, nil
 }
 
-func getInputSources(bt BodyComponentType, parent BlockType, oi *OperandInfo, resultType string) error {
+func getInputSources(bt BodyComponentType, parent BlockType, oi *OperandInfo, resultType string, holdOffConnections bool) error {
 	// get sources of X, Y
 	{
 		if oi.X == nil {
@@ -146,12 +146,14 @@ func getInputSources(bt BodyComponentType, parent BlockType, oi *OperandInfo, re
 
 		//bt.InChannels()[0].ConnectHandshake(latestOwner.OutChannels()[0])
 
-		bt.ConnectHandshake(latestOwner)
+		if !holdOffConnections {
+			bt.ConnectHandshake(latestOwner)
 
-		// X is first inDataChannel
-		// Assume components only have 1 outputDataChannel here
-		//bt.InDataChannels()[0].ConnectData(latestOwner.OutDataChannels()[0])
-		bt.ConnectDataPos(latestOwner, 0, 0)
+			// X is first inDataChannel
+			// Assume components only have 1 outputDataChannel here
+			//bt.InDataChannels()[0].ConnectData(latestOwner.OutDataChannels()[0])
+			bt.ConnectDataPos(latestOwner, 0, 0)
+		}
 
 		infoPrinter.DebugPrintfln("[%s]: Previous component of X input '%s' is '%s'", bt.Name(), oi.X.Name_, latestOwner.Name())
 	}
@@ -195,13 +197,15 @@ func getInputSources(bt BodyComponentType, parent BlockType, oi *OperandInfo, re
 		bt.AddPredecessor(latestOwner)
 		latestOwner.AddSuccessor(bt)
 
-		//bt.InChannels()[0].ConnectHandshake(latestOwner.OutChannels()[0])
-		bt.ConnectHandshake(latestOwner)
+		if !holdOffConnections {
+			//bt.InChannels()[0].ConnectHandshake(latestOwner.OutChannels()[0])
+			bt.ConnectHandshake(latestOwner)
 
-		// Y is second inDataChannel
-		// Assume components only have 1 outputDataChannel here
-		// bt.InDataChannels()[1].ConnectData(latestOwner.OutDataChannels()[0])
-		bt.ConnectDataPos(latestOwner, 1, 0)
+			// Y is second inDataChannel
+			// Assume components only have 1 outputDataChannel here
+			// bt.InDataChannels()[1].ConnectData(latestOwner.OutDataChannels()[0])
+			bt.ConnectDataPos(latestOwner, 1, 0)
+		}
 
 		infoPrinter.DebugPrintfln("[%s]: Previous component of Y input '%s' is '%s'", bt.Name(), oi.Y.Name_, latestOwner.Name())
 	}
@@ -227,7 +231,7 @@ func getOperandOwnersAndSetNewOwner(bt BodyComponentType, parent BlockType, oi *
 		panic("Missing result var")
 	}
 
-	err := getInputSources(bt, parent, oi, resultType)
+	err := getInputSources(bt, parent, oi, resultType, false)
 	if err != nil {
 		return nil, err
 	}

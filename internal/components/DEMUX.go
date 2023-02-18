@@ -1,6 +1,7 @@
 package components
 
 import (
+	"go2async/internal/infoPrinter"
 	"go2async/internal/variable"
 	"strconv"
 	"strings"
@@ -35,25 +36,9 @@ func NewDemux(parent BlockType) *Demux {
 
 			inputVariables: parent.InputVariables(),
 		},
-		/*In: &HandshakeChannel{
-		 	Out: false,
-		},
-		Out1: &HandshakeChannel{
-			Req:  name + "_b_o_req",
-			Ack:  name + "_b_o_ack",
-			Data: name + "_b_data",
-			Out:  true,
-		},
-		Out2: &HandshakeChannel{
-			Req:  name + "_c_o_req",
-			Ack:  name + "_c_o_ack",
-			Data: name + "_c_data",
-			Out:  true,
-		},
-		Select: &HandshakeChannel{
-			Out: false,
-		}, */
 	}
+
+	infoPrinter.DebugPrintfln("OIDA WOS " + newDemux.name + " " + parent.Name())
 
 	newDemux.In = append(newDemux.In, NewInputHandshakeChannel(newDemux, newDemux.Name()+"_inA_req", newDemux.Name()+"_inA_ack"))
 	newDemux.Out = append(newDemux.Out, NewOutputHandshakeChannel(newDemux, newDemux.Name()+"_outB_req", newDemux.Name()+"_outB_ack"))

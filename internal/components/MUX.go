@@ -1,6 +1,7 @@
 package components
 
 import (
+	"go2async/internal/variable"
 	"strconv"
 	"strings"
 )
@@ -8,68 +9,74 @@ import (
 const muxprefix = "MX_"
 
 type MUX struct {
-	Nr       int
-	archName string
-
-	In1    *HandshakeChannel
-	In2    *HandshakeChannel
-	Out    *HandshakeChannel
-	Select *HandshakeChannel
+	BodyComponent
 }
 
 var muxNr = 0
 
-func NewMUX() *MUX {
+func NewMUX(parent BlockType) *MUX {
 	nr := muxNr
 	muxNr++
 
-	//name := strings.ToLower(muxprefix + strconv.Itoa(nr))
-	return &MUX{
-		Nr:       nr,
-		archName: defaultArch,
-		/* In1: &HandshakeChannel{
-			Out: false,
-		},
-		In2: &HandshakeChannel{
-			Out: false,
-		},
-		Out: &HandshakeChannel{
-			From:    name + "_o_req",
-			FromAck: name + "_o_ack",
-			Data:    name + "_data",
-			Out:     true,
-		}, */
-		Select: &HandshakeChannel{
-			Out: false,
+	newMux := &MUX{
+		BodyComponent: BodyComponent{
+			number:   nr,
+			archName: defaultArch,
+			name:     strings.ToLower(muxprefix + strconv.Itoa(nr)),
+
+			parentBlock: parent,
+
+			inputVariables: parent.InputVariables(),
 		},
 	}
+
+	newMux.In = append(newMux.In, NewInputHandshakeChannel(newMux, newMux.Name()+"_inA_req", newMux.Name()+"_inA_ack"))
+	newMux.In = append(newMux.In, NewInputHandshakeChannel(newMux, newMux.Name()+"_inB_req", newMux.Name()+"_inB_ack"))
+	newMux.Out = append(newMux.Out, NewOutputHandshakeChannel(newMux, newMux.Name()+"_outC_req", newMux.Name()+"_outC_ack"))
+
+	newMux.InData = append(newMux.InData, NewInDataChannel(newMux, newMux.InputVariables(), newMux.Name()+"_inA_data"))
+	newMux.InData = append(newMux.InData, NewInDataChannel(newMux, newMux.InputVariables(), newMux.Name()+"_inB_data"))
+	newMux.OutData = append(newMux.OutData, NewOutDataChannel(newMux, newMux.InputVariables(), newMux.Name()+"_outC_data"))
+
+	// Selector
+	newMux.In = append(newMux.In, NewInputHandshakeChannel(newMux, newMux.Name()+"_inSel_req", newMux.Name()+"_inSel_ack"))
+
+	selectorVariables := NewScopedVariables()
+	selectorVariables.AddVariable(&variable.VariableTypeDecl{
+		Name_: "__go2async_selector__var",
+		Typ_:  "__go2async_selector",
+		Len_:  1,
+	})
+	newMux.InData = append(newMux.InData, NewInDataChannel(newMux, selectorVariables, newMux.Name()+"_selector"))
+
+	return newMux
 }
 
 func (m *MUX) Name() string {
-	return strings.ToLower(muxprefix + strconv.Itoa(m.Nr))
+	return m.name
 }
 
 func (m *MUX) ComponentStr() string {
 	return m.Name() + `: entity work.mux
   generic map (
-    DATA_WIDTH => DATA_WIDTH
+    DATA_WIDTH => ` + strconv.Itoa(m.inputVariables.Size) + `
   )
   port map (
-    inA_req => ` + m.Name() + `_inA_req,
-    inA_ack => ` + m.Name() + `_inA_ack,
-    inA_data => ` + m.Name() + `_inA_data,
+    inA_req => ` + m.In[0].GetReqSignalName() + `,
+    inA_ack => ` + m.In[0].GetAckSignalName() + `,
+    inA_data => ` + m.InData[0].GetDataSignalName() + `,
 
-    inB_req => ` + m.Name() + `_inB_req,
-    inB_ack => ` + m.Name() + `_inB_ack,
-    inB_data => ` + m.Name() + `_inB_data,
+    inB_req => ` + m.In[1].GetReqSignalName() + `,
+    inB_ack => ` + m.In[1].GetAckSignalName() + `,
+    inB_data => ` + m.InData[1].GetDataSignalName() + `,
     
-    outC_req => ` + m.Name() + `_outC_req,
-    outC_ack => ` + m.Name() + `_outC_ack,
-    outC_data => ` + m.Name() + `_outC_data,
-    
-    inSel_req => ` + m.Name() + `_inSel_req,
-    inSel_ack => ` + m.Name() + `_inSel_ack,
-    selector => ` + m.Name() + `_selector,
+    outC_req => ` + m.Out[0].GetReqSignalName() + `,
+    outC_ack => ` + m.Out[0].GetAckSignalName() + `,
+    outC_data => ` + m.OutData[0].GetDataSignalName() + `,
+
+    inSel_req => ` + m.In[2].GetReqSignalName() + `,
+    inSel_ack => ` + m.In[2].GetAckSignalName() + `,
+    selector => ` + m.InData[2].GetDataSignalName() + `,
     
     rst => rst
   );
@@ -142,4 +149,12 @@ end ` + m.archName + `;
 
 func (m *MUX) ArchName() string {
 	return m.archName
+}
+
+func (m *MUX) Entity() string {
+	panic("mux is predefined")
+}
+
+func (m *MUX) EntityName() string {
+	return "demux"
 }

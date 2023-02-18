@@ -518,6 +518,7 @@ func (b *Block) GetVariable(varName string) (*variable.VariableInfo, error) {
 		if b.Parent() == nil {
 			return nil, ErrVariableNotFound(varName)
 		}
+		infoPrinter.DebugPrintfln("[%s]: Not (yet) found - searching %s in parent %s", b.Name(), varName, b.Parent().Name())
 
 		// Get variable info form parent.
 		vi, err := b.Parent().GetVariable(varName)
@@ -564,8 +565,25 @@ func (b *Block) GetVariable(varName string) (*variable.VariableInfo, error) {
 			}
 
 		} else {
-			// Expect connection later
+			// Expect connection later but make sure parent
+			if b.Parent().Parent() != nil {
+				// Connect with owner of variable
+				ownX, ok := b.Parent().GetVariableOwnerMap()[varName]
+				if !ok {
+					// Shouldn't happen
+					return nil, errors.New("No owner for X operator")
+				}
 
+				latestOwner := ownX.ownerList.lastest
+				ownX.ownerList.AddSuccessorToLatest(b)
+
+				// Claim ownership of used variable in parent
+				ownX.ownerList.AddOwner(b)
+
+				infoPrinter.DebugPrintfln("[%s]: connected to %s and got ownerShip of var %s", b.Name(), latestOwner.Name(), varName)
+
+				// TODO: OWNERSHIP HANDLING
+			}
 			infoPrinter.DebugPrintfln("[%s]: keeping variable ownership and wait for later connections!", b.Name())
 		}
 

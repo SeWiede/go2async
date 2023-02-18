@@ -8,65 +8,66 @@ import (
 const regForkPrefix = "RF_"
 
 type RegFork struct {
-	Nr       int
-	archName string
-
-	In   *HandshakeChannel
-	Out1 *HandshakeChannel
-	Out2 *HandshakeChannel
+	BodyComponent
 }
 
 var regForkNr = 0
 
-func NewRegFork() *RegFork {
+func NewRegFork(parent BlockType) *RegFork {
 	nr := regForkNr
 	regForkNr++
 
-	//name := strings.ToLower(regForkPrefix + strconv.Itoa(nr))
-	return &RegFork{
-		Nr:       nr,
-		archName: defaultArch,
-		/* In: &HandshakeChannel{
-			Out: false,
+	newReg := &RegFork{
+		BodyComponent: BodyComponent{
+			number:   nr,
+			archName: defaultArch,
+			name:     strings.ToLower(regForkPrefix + strconv.Itoa(nr)),
+
+			parentBlock: parent,
+
+			inputVariables:  parent.InputVariables(),
+			outputVariables: parent.InputVariables(),
 		},
-		Out1: &HandshakeChannel{
-			From:    name + "_b_o_req",
-			FromAck: name + "_b_o_ack",
-			Data:    name + "_b_data",
-			Out:     true,
-		},
-		Out2: &HandshakeChannel{
-			From:    name + "_c_o_req",
-			FromAck: name + "_c_o_ack",
-			Data:    name + "_c_data",
-			Out:     true,
-		}, */
 	}
+
+	newReg.In = append(newReg.In, NewInputHandshakeChannel(newReg, newReg.Name()+"_inA_req", newReg.Name()+"_inA_ack"))
+	newReg.Out = append(newReg.Out, NewOutputHandshakeChannel(newReg, newReg.Name()+"_outB_req", newReg.Name()+"_outB_ack"))
+	newReg.Out = append(newReg.Out, NewOutputHandshakeChannel(newReg, newReg.Name()+"_outC_req", newReg.Name()+"_outC_ack"))
+
+	newReg.InData = append(newReg.InData, NewInDataChannel(newReg, newReg.InputVariables(), newReg.Name()+"_inA_data"))
+	newReg.OutData = append(newReg.OutData, NewOutDataChannel(newReg, newReg.InputVariables(), newReg.Name()+"_outB_data"))
+	newReg.OutData = append(newReg.OutData, NewOutDataChannel(newReg, newReg.InputVariables(), newReg.Name()+"_outC_data"))
+
+	//name := strings.ToLower(regForkPrefix + strconv.Itoa(nr))
+	return newReg
 }
 
 func (rf *RegFork) Name() string {
-	return strings.ToLower(regForkPrefix + strconv.Itoa(rf.Nr))
+	return rf.name
 }
 
 func (rf *RegFork) ComponentStr() string {
 	return rf.Name() + `: entity work.reg_fork
   generic map(
-    DATA_WIDTH => DATA_WIDTH,
+    DATA_WIDTH => ` + strconv.Itoa(rf.InputVariables().Size) + `,
     PHASE_INIT_A => '0',
     PHASE_INIT_B =>'0',
     PHASE_INIT_C => '0')
   port map (
-    inA_req => ` + rf.Name() + `_inA_req,
-    inA_ack => ` + rf.Name() + `_inA_ack,
-    inA_data => ` + rf.Name() + `_inA_data,
+    -- Input Channel
+    inA_req => ` + rf.In[0].GetReqSignalName() + `,
+    inA_ack => ` + rf.In[0].GetAckSignalName() + `,
+    inA_data => ` + rf.InData[0].GetDataSignalName() + `,
 
-    outB_req => ` + rf.Name() + `_outB_req,
-    outB_ack => ` + rf.Name() + `_outB_ack,
-    outB_data => ` + rf.Name() + `_outB_data,
-    
-    outC_req => ` + rf.Name() + `_outC_req,
-    outC_ack => ` + rf.Name() + `_outC_ack,
-    outC_data=> ` + rf.Name() + `_outC_data,
+    -- Output Channel 1
+    outB_req => ` + rf.Out[0].GetReqSignalName() + `,
+    outB_ack => ` + rf.Out[0].GetAckSignalName() + `,
+    outB_data => ` + rf.OutData[0].GetDataSignalName() + `,
+
+    -- Output Channel 2
+    outC_req => ` + rf.Out[1].GetReqSignalName() + `,
+    outC_ack => ` + rf.Out[1].GetAckSignalName() + `,
+    outC_data => ` + rf.OutData[1].GetDataSignalName() + `,
     
     rst => rst
   );`
@@ -121,4 +122,12 @@ func (rf *RegFork) Architecture() string {
 
 func (rf *RegFork) ArchName() string {
 	return rf.archName
+}
+
+func (rf *RegFork) Entity() string {
+	panic("regfork is predefined")
+}
+
+func (rf *RegFork) EntityName() string {
+	return "regfork"
 }

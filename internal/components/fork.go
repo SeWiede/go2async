@@ -25,7 +25,8 @@ func NewFork(parent BlockType) *Fork {
 
 			parentBlock: parent,
 
-			inputVariables: parent.InputVariables(),
+			inputVariables:  parent.OutputVariables(),
+			outputVariables: parent.OutputVariables(),
 		},
 	}
 
@@ -33,9 +34,9 @@ func NewFork(parent BlockType) *Fork {
 	newFork.Out = append(newFork.Out, NewOutputHandshakeChannel(newFork, newFork.Name()+"_outB_req", newFork.Name()+"_outB_ack"))
 	newFork.Out = append(newFork.Out, NewOutputHandshakeChannel(newFork, newFork.Name()+"_outC_req", newFork.Name()+"_outC_ack"))
 
-	newFork.InData = append(newFork.InData, NewInDataChannel(newFork, newFork.InputVariables(), newFork.Name()+"_inA_data"))
-	newFork.OutData = append(newFork.OutData, NewOutDataChannel(newFork, newFork.InputVariables(), newFork.Name()+"_outB_data"))
-	newFork.OutData = append(newFork.OutData, NewOutDataChannel(newFork, newFork.InputVariables(), newFork.Name()+"_outC_data"))
+	newFork.InData = append(newFork.InData, NewInDataChannel(newFork, newFork.OutputVariables(), newFork.Name()+"_inA_data"))
+	newFork.OutData = append(newFork.OutData, NewOutDataChannel(newFork, newFork.OutputVariables(), newFork.Name()+"_outB_data"))
+	newFork.OutData = append(newFork.OutData, NewOutDataChannel(newFork, newFork.OutputVariables(), newFork.Name()+"_outC_data"))
 
 	return newFork
 }

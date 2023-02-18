@@ -56,7 +56,7 @@ func NewScope(name string, block *Block) *Scope {
 		rs += s.Size_
 	}
 
-	s.OutReg = NewReg(s.Block, false, "0")
+	s.OutReg = NewReg(s.Block, s.Block.OutputVariables(), false, "0")
 	/*
 		s.Block.Out.Connect(s.OutReg.In)
 

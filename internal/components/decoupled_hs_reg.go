@@ -1,6 +1,7 @@
 package components
 
 import (
+	"go2async/internal/variable"
 	"strconv"
 	"strings"
 )
@@ -17,7 +18,7 @@ type Reg struct {
 
 var regNr = 0
 
-func NewReg(parent BlockType, phaseOut bool, startValue string) *Reg {
+func NewReg(parent BlockType, varToReg *variable.ScopedVariables, phaseOut bool, startValue string) *Reg {
 	nr := regNr
 	regNr++
 
@@ -31,14 +32,21 @@ func NewReg(parent BlockType, phaseOut bool, startValue string) *Reg {
 
 			parentBlock: parent,
 
-			inputVariables: parent.OutputVariables(),
+			inputVariables: varToReg,
 		},
 		PhaseOut:   phaseOut,
 		StartValue: startValue,
 	}
 
-	newReg.In = append(newReg.In, NewInputHandshakeChannel(newReg, newReg.Name()+"_in_req", newReg.Name()+"_in_ack"))
-	newReg.Out = append(newReg.Out, NewOutputHandshakeChannel(newReg, newReg.Name()+"_out_req", newReg.Name()+"_out_ack"))
+	inHs := NewInputHandshakeChannel(newReg, newReg.Name()+"_in_req", newReg.Name()+"_in_ack")
+	outHs := NewOutputHandshakeChannel(newReg, newReg.Name()+"_out_req", newReg.Name()+"_out_ack")
+
+	if phaseOut {
+		outHs.SetPhaseInit()
+	}
+
+	newReg.In = append(newReg.In, inHs)
+	newReg.Out = append(newReg.Out, outHs)
 
 	newReg.InData = append(newReg.InData, NewInDataChannel(newReg, newReg.InputVariables(), newReg.Name()+"_in_data"))
 	newReg.OutData = append(newReg.OutData, NewOutDataChannel(newReg, newReg.InputVariables(), newReg.Name()+"_out_data"))
