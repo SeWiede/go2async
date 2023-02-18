@@ -236,8 +236,8 @@ func (hw *HandshakeChannel) ConnectHandshake(to *HandshakeChannel) {
 		panic("Cannot connect two channels with the same direction.")
 	}
 
+	// partner has to have the same phase!
 	if hw.phaseInit {
-		// partner has to have the same phase!
 		to.SetPhaseInit()
 	} else if to.phaseInit {
 		hw.SetPhaseInit()

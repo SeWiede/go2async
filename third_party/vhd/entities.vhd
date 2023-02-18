@@ -394,7 +394,7 @@ ARCHITECTURE behavioural OF decoupled_hs_reg IS
   ATTRIBUTE dont_touch OF in_req_d, out_req_d : SIGNAL IS "true";
 
 BEGIN
-  out_req <= phase_out;
+  out_req <= out_req_d;
   in_ack <= phase_in;
   out_data <= data_sig;
 
@@ -420,14 +420,14 @@ BEGIN
       o => in_req_d
     );
 
-  --delay_out_req : ENTITY work.delay_element
-    --GENERIC MAP(
-    --  NUM_LCELLS => 2 * LUT_CHAIN_SIZE -- Delay  size
-    --)
-    --PORT MAP(
-    --  i => phase_out,
-    --  o => out_req_d
-   -- );
+  delay_out_req : ENTITY work.delay_element
+    GENERIC MAP(
+      NUM_LCELLS => 2 * LUT_CHAIN_SIZE -- Delay  size
+    )
+    PORT MAP(
+      i => phase_out,
+      o => out_req_d
+    );
 
   click <= (in_req_d XOR phase_in) AND (out_ack XNOR phase_out) AFTER AND2_DELAY + XOR_DELAY;
 
