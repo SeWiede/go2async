@@ -264,14 +264,11 @@ type VariableLocation struct {
 }
 
 func (vi *VariableInfo) GetVariableVectorBounds() *VariableLocation {
-	idx, _ := strconv.Atoi(vi.Index_)
+	//idx, _ := strconv.Atoi(vi.Index_)
 	totalSize := vi.TotalSize()
-	if idx > 0 {
-		totalSize = vi.Size_
-	}
 
-	ub := vi.Position_ + totalSize*(idx+1)
-	lb := vi.Position_ + totalSize*idx
+	ub := vi.Position_ + totalSize
+	lb := vi.Position_
 
 	return &VariableLocation{
 		Upperbound:    ub,

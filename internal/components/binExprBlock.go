@@ -69,10 +69,18 @@ func NewBinExprBlock(op string, oi *OperandInfo, parent BlockType) (*BinExprBloc
 	outputChannel := NewDefaultOutputHandshakeChannel(bep)
 	bep.Out = append(bep.Out, outputChannel)
 
-	bep.InData = append(bep.InData, NewDataChannel(bep, variable.NewScopedVariables(), bep.Name()+"_x", false))
-	bep.InData = append(bep.InData, NewDataChannel(bep, variable.NewScopedVariables(), bep.Name()+"_y", false))
+	bep.InData = append(bep.InData, NewDefaultInDataChannel(bep, bep.InputVariables()))
 
-	bep.OutData = append(bep.OutData, NewDataChannel(bep, bep.OutputVariables(), bep.Name()+"_result", true))
+	bep.OutData = append(bep.OutData, NewDefaultOutDataChannel(bep, bep.OutputVariables()))
+
+	if op != "NOP" {
+		// get sources of X, Y
+		if _, err := getOperandOwnersAndSetNewOwner(bep, parent, oi); err != nil {
+			return nil, err
+		}
+
+		infoPrinter.DebugPrintfln("[%s] finished owner assignments of [%s]", parent.Name(), bep.Name())
+	}
 
 	if *globalArguments.Debug {
 		opDescription := fmt.Sprintf("binExprBlock '%s': %s [size %d, len %d, index %s; const %s] = %s [size %d, len %d, index %s; const %s] ",
@@ -89,15 +97,6 @@ func NewBinExprBlock(op string, oi *OperandInfo, parent BlockType) (*BinExprBloc
 		opDescription += fmt.Sprintf("\n")
 
 		bep.opDescription = opDescription
-	}
-
-	if op != "NOP" {
-		// get sources of X, Y
-		if _, err := getOperandOwnersAndSetNewOwner(bep, parent, oi); err != nil {
-			return nil, err
-		}
-
-		infoPrinter.DebugPrintfln("[%s] finished owner assignments of [%s]", parent.Name(), bep.Name())
 	}
 
 	return bep, nil
@@ -128,6 +127,24 @@ func getInputSources(bt BodyComponentType, parent BlockType, oi *OperandInfo, re
 		if err != nil {
 			return err
 		}
+
+		indexIdent := oi.X.IndexIdent_
+		if indexIdent != nil {
+			if indexIdent.Const_ != "" {
+				panic("indexIdent is const")
+			}
+			if indexIdent.IndexIdent_ != nil {
+				panic("cascading indexIdents")
+			}
+
+			addedIndexIdent, err := bt.AddInputVariable(indexIdent)
+			if err != nil {
+				return err
+			}
+
+			addedVar.IndexIdent_ = addedIndexIdent
+		}
+
 		oi.X = addedVar
 
 		infoPrinter.DebugPrintfln("[%s]: X Input '%s' type %s", bt.Name(), oi.X.Name_, resultType)
@@ -152,7 +169,7 @@ func getInputSources(bt BodyComponentType, parent BlockType, oi *OperandInfo, re
 			// X is first inDataChannel
 			// Assume components only have 1 outputDataChannel here
 			//bt.InDataChannels()[0].ConnectData(latestOwner.OutDataChannels()[0])
-			bt.ConnectDataPos(latestOwner, 0, 0)
+			bt.ConnectData(latestOwner)
 		}
 
 		infoPrinter.DebugPrintfln("[%s]: Previous component of X input '%s' is '%s'", bt.Name(), oi.X.Name_, latestOwner.Name())
@@ -181,6 +198,24 @@ func getInputSources(bt BodyComponentType, parent BlockType, oi *OperandInfo, re
 		if err != nil {
 			return err
 		}
+
+		indexIdent := oi.Y.IndexIdent_
+		if indexIdent != nil {
+			if indexIdent.Const_ != "" {
+				panic("indexIdent is const")
+			}
+			if indexIdent.IndexIdent_ != nil {
+				panic("cascading indexIdents")
+			}
+
+			addedIndexIdent, err := bt.AddInputVariable(indexIdent)
+			if err != nil {
+				return err
+			}
+
+			addedVar.IndexIdent_ = addedIndexIdent
+		}
+
 		oi.Y = addedVar
 
 		infoPrinter.DebugPrintfln("[%s]: Y Input '%s' type %s", bt.Name(), oi.Y.Name_, resultType)
@@ -204,7 +239,7 @@ func getInputSources(bt BodyComponentType, parent BlockType, oi *OperandInfo, re
 			// Y is second inDataChannel
 			// Assume components only have 1 outputDataChannel here
 			// bt.InDataChannels()[1].ConnectData(latestOwner.OutDataChannels()[0])
-			bt.ConnectDataPos(latestOwner, 1, 0)
+			bt.ConnectData(latestOwner)
 		}
 
 		infoPrinter.DebugPrintfln("[%s]: Previous component of Y input '%s' is '%s'", bt.Name(), oi.Y.Name_, latestOwner.Name())
@@ -220,11 +255,17 @@ func getOperandOwnersAndSetNewOwner(bt BodyComponentType, parent BlockType, oi *
 	if oi.R != nil {
 		oi.R.DefinedOnly_ = false
 
-		if _, err := bt.AddOutputVariable(oi.R); err != nil {
+		outVar, err := bt.AddOutputVariable(oi.R)
+		if err != nil {
 			return nil, err
 		}
 
+		// Add result as input too
+		bt.AddInputVariable(oi.R)
+
 		resultType = oi.R.Typ_
+
+		oi.R = outVar
 
 		infoPrinter.DebugPrintfln("[%s] Result variable '%s' type '%s' added to outputs", bt.Name(), oi.R.Name(), oi.R.Typ())
 	} else {
@@ -255,25 +296,14 @@ func getOperandOwnersAndSetNewOwner(bt BodyComponentType, parent BlockType, oi *
 }
 
 func (bc *BinExprBlock) AddInputVariable(vtd *variable.VariableInfo) (*variable.VariableInfo, error) {
-	// Allow both inputs to be the same
-	vi, err := bc.InputVariables().AddVariable(vtd)
+	// Allow inputs to be the same variable
+	vi, err := bc.InputVariables().AddVariableInfo(vtd)
 	if err != nil {
 		vi, err = bc.InputVariables().GetVariableInfo(vtd.Name())
 		if err != nil {
 			return nil, err
 		}
 	}
-
-	// Add inputs to their respecting inputChannels
-	if bc.addedInput >= 2 {
-		panic("cannot add more than 2 inputs to binExpr")
-	} else if bc.addedInput == 1 {
-		bc.InDataChannels()[1].variables.AddVariable(vtd)
-	} else {
-		bc.InDataChannels()[0].variables.AddVariable(vtd)
-
-	}
-	bc.addedInput++
 
 	if !bc.isBlock {
 		// Check owner map
@@ -327,12 +357,11 @@ func (bep *BinExprBlock) ComponentStr() string {
 	  -- Input channel
 	  in_req  => ` + bep.In[0].GetReqSignalName() + `,
 	  in_ack  => ` + bep.In[0].GetAckSignalName() + `, 
-	  x => ` + bep.InData[0].GetDataSignalName() + `,
-	  y => ` + bep.InData[1].GetDataSignalName() + `,
+	  in_data => ` + bep.InData[0].GetDataSignalName() + `,
 	  -- Output channel
 	  out_req => ` + bep.Out[0].GetReqSignalName() + `,
 	  out_ack => ` + bep.Out[0].GetAckSignalName() + `,
-	  result  => ` + bep.OutData[0].GetDataSignalName() + `
+	  out_data  => ` + bep.OutData[0].GetDataSignalName() + `
 	);
 	`
 }
@@ -351,6 +380,9 @@ func (bep *BinExprBlock) getAliases() string {
 			if idx > 0 {
 				totalSize = bep.Oi.X.Size_
 			}
+
+			infoPrinter.DebugPrintfln("[%s]: oi.x index = %s, size %d, len %d", bep.Name(), bep.Oi.X.Index_, bep.Oi.X.Size_, bep.Oi.X.Len_)
+
 			ret += "alias x : std_logic_vector(" + strconv.Itoa(totalSize) + " - 1 downto 0)  is in_data( " + strconv.Itoa(bep.Oi.X.Position_+totalSize*(idx+1)) + " - 1 downto " + strconv.Itoa(bep.Oi.X.Position_+totalSize*idx) + ");\n"
 		}
 	} else {
@@ -381,6 +413,15 @@ func (bep *BinExprBlock) getAliases() string {
 			totalSize = bep.Oi.R.Size_
 		}
 		ret += "alias result : std_logic_vector(" + strconv.Itoa(totalSize) + " - 1 downto 0)  is out_data( " + strconv.Itoa(bep.Oi.R.Position_+totalSize*(idx+1)) + " - 1 downto " + strconv.Itoa(bep.Oi.R.Position_+totalSize*idx) + ");\n"
+
+		resultIn, err := bep.InputVariables().GetVariableInfo(bep.Oi.R.Name())
+		if err != nil {
+			panic("did not find result in inputs; " + err.Error())
+		}
+
+		totalSize = resultIn.TotalSize()
+
+		ret += "alias result_default : std_logic_vector(" + strconv.Itoa(totalSize) + " - 1 downto 0)  is in_data( " + strconv.Itoa(resultIn.Position_+totalSize) + " - 1 downto " + strconv.Itoa(resultIn.Position_) + ");\n"
 	} else {
 		ret += "signal result : std_logic_vector(" + strconv.Itoa(bep.Oi.R.Size_) + " - 1 downto 0);\n"
 		ret += "constant baseR      : integer := " + strconv.Itoa(bep.Oi.R.Position_) + ";\n"
@@ -419,7 +460,7 @@ func (bep *BinExprBlock) getCalcProcess() string {
 	processStart := `calc: process(all)
 	variable offset: integer range 0 to result'length;
 	begin
-	result <= std_logic_vector(to_unsigned(0, result'length)); 
+	out_data <= result_default; 
 	`
 
 	xcalc := ""
@@ -428,7 +469,7 @@ func (bep *BinExprBlock) getCalcProcess() string {
 	resultMap := ""
 
 	if bep.Operation != "NOP" {
-		/* if bep.Oi.X.IndexIdent_ != nil {
+		if bep.Oi.X.IndexIdent_ != nil {
 			x = "unsigned(x)"
 			xcalc = "x <= in_data(baseX + (to_integer(unsigned(offsetX)) + 1) * x'length - 1 downto baseX + to_integer(unsigned(offsetX)) * x'length);\n"
 		}
@@ -437,14 +478,14 @@ func (bep *BinExprBlock) getCalcProcess() string {
 			y = "unsigned(y)"
 			ycalc = "y <= in_data(baseY + (to_integer(unsigned(offsetY)) + 1) * y'length - 1 downto baseY + to_integer(unsigned(offsetY)) * y'length);\n"
 
-		} */
+		}
 
 		compute = "result <= std_logic_vector(resize(" + x + " " + SupportedOperations[bep.Operation] + " " + y + ", result'length)) " + delay + ";\n"
 
-		/* if bep.Oi.R.IndexIdent_ != nil {
+		if bep.Oi.R.IndexIdent_ != nil {
 			resultMap = "offset := baseR + to_integer(unsigned(offsetR) * result'length);\n"
 			resultMap += "out_data(offset + result'length -1 downto offset) <= result;\n"
-		} */
+		}
 	}
 
 	return processStart + xcalc + ycalc + compute + resultMap + `
@@ -454,16 +495,18 @@ func (bep *BinExprBlock) getCalcProcess() string {
 func (bep *BinExprBlock) Architecture() string {
 	// TODO: analyze delays
 
-	//` + bep.getAliases() + `
 	return `architecture ` + bep.archName + ` of ` + bep.EntityName() + ` is
-	  
+	
 	-- ` + bep.opDescription + `
-
+	
     --attribute dont_touch : string;
 	--attribute dont_touch of  x, y, result: signal is "true";
-	  
+	
     --attribute keep : boolean;
 	--attribute keep of  x, y, result: signal is true;
+
+	` + bep.getAliases() + `
+
   begin
     in_ack <= out_ack;
     
@@ -487,28 +530,6 @@ func (bep *BinExprBlock) EntityName() string {
 }
 
 func (bep *BinExprBlock) Entity() string {
-	op1Size := 0
-	op2Size := 0
-	resSize := 0
-
-	if op1, err := bep.InputVariables().GetVariableInfo(bep.Oi.X.Name()); err == nil {
-		op1Size = op1.TotalSize()
-	} else {
-		panic(bep.Name() + " invalid x")
-	}
-
-	if op2, err := bep.InputVariables().GetVariableInfo(bep.Oi.Y.Name()); err == nil {
-		op2Size = op2.TotalSize()
-	} else {
-		panic(bep.Name() + " invalid y")
-	}
-
-	if res, err := bep.OutputVariables().GetVariableInfo(bep.Oi.R.Name()); err == nil {
-		resSize = res.TotalSize()
-	} else {
-		panic(bep.Name() + " invalid result")
-	}
-
 	return `LIBRARY IEEE;
 	USE IEEE.STD_LOGIC_1164.ALL;
 	USE ieee.std_logic_unsigned.ALL;
@@ -516,15 +537,15 @@ func (bep *BinExprBlock) Entity() string {
 	USE work.click_element_library_constants.ALL;
 	
 	ENTITY ` + bep.EntityName() + ` IS
-	  PORT (-- Input channel
+	  PORT (
+		-- Input channel
 		in_req : IN STD_LOGIC;
 		in_ack : OUT STD_LOGIC;
-		x : IN STD_LOGIC_VECTOR(` + strconv.Itoa(op1Size) + ` - 1 DOWNTO 0);
-		y : IN STD_LOGIC_VECTOR(` + strconv.Itoa(op2Size) + ` - 1 DOWNTO 0);
+		in_data : IN STD_LOGIC_VECTOR(` + strconv.Itoa(bep.InputVariables().Size) + ` - 1 DOWNTO 0);
 		-- Output channel
 		out_req : OUT STD_LOGIC;
 		out_ack : IN STD_LOGIC;
-		result : OUT STD_LOGIC_VECTOR(` + strconv.Itoa(resSize) + ` - 1 DOWNTO 0));
+		out_data : OUT STD_LOGIC_VECTOR(` + strconv.Itoa(bep.OutputVariables().Size) + ` - 1 DOWNTO 0));
 	END ` + bep.EntityName() + `;
 	`
 }

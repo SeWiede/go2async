@@ -178,7 +178,7 @@ func (bc *BodyComponent) InputVariables() *variable.ScopedVariables {
 
 func (bc *BodyComponent) AddInputVariable(vtd *variable.VariableInfo) (*variable.VariableInfo, error) {
 
-	vi, err := bc.InputVariables().AddVariable(vtd)
+	vi, err := bc.InputVariables().AddVariableInfo(vtd)
 	if err != nil {
 		return nil, err
 	}
@@ -220,7 +220,7 @@ func (bc *BodyComponent) AddOutputVariable(vtd *variable.VariableInfo) (*variabl
 		infoPrinter.DebugPrintfln("[%s]: has no outData", bc.Name())
 	} */
 
-	return bc.OutputVariables().AddVariable(vtd)
+	return bc.OutputVariables().AddVariableInfo(vtd)
 }
 
 func (bc *BodyComponent) GetVariableLocation(name string) (string, error) {

@@ -62,10 +62,6 @@ func NewHandshakeChannel(owner BodyComponentType, reqSignalName, ackSignalName s
 		join = NewVariableMultiHsJoin(owner)
 	}
 
-	if reqSignalName == "dx_0_inSel_req" {
-		infoPrinter.DebugPrintfln("@@@@@@@@@@@@@@@@@@@@@@@ WTF " + owner.Name())
-	}
-
 	return &HandshakeChannel{
 		Owner: owner,
 		Req:   reqSignalName,
@@ -432,21 +428,27 @@ func (c *DataChannel) GetSignalAssigmentStr() string {
 					infoPrinter.DebugPrintfln("[%s]: not found here", t.Owner.Name())
 				}
 
-				panic(strconv.Itoa(i+1) + ". input var '" + vi.Name() + "' not found in connected dataChannels; owner: " + c.Owner.Name() + "  parent: " + c.Owner.Parent().Name())
-			}
+				//panic(strconv.Itoa(i+1) + ". input var '" + vi.Name() + "' not found in connected dataChannels; owner: " + c.Owner.Name() + "  parent: " + c.Owner.Parent().Name())
 
-			for _, dcv := range dcvs {
-				dcvvb := dcv.vi.GetVariableVectorBounds()
+				to = "std_logic_vector(to_signed(0, " + strconv.Itoa(vi.TotalSize()) + "))"
 
-				to = dcv.dc.DataName + " (" + dcvvb.UpperboundStr + " - 1 downto " + dcvvb.LowerboundStr + ")"
+				dataSignalAssigmnent += from + " <= " + to + ";\n"
 
-				if !c.Out {
-					dataSignalAssigmnent += from + " <= " + to + ";\n"
-				} else {
-					dataSignalAssigmnent += to + " <= " + from + ";\n"
+				infoPrinter.DebugPrintfln("[%s]: input var %s is assigned default", c.Owner.Name(), vi.Name())
+			} else {
+				for _, dcv := range dcvs {
+					dcvvb := dcv.vi.GetVariableVectorBounds()
+
+					to = dcv.dc.DataName + " (" + dcvvb.UpperboundStr + " - 1 downto " + dcvvb.LowerboundStr + ")"
+
+					if !c.Out {
+						dataSignalAssigmnent += from + " <= " + to + ";\n"
+					} else {
+						dataSignalAssigmnent += to + " <= " + from + ";\n"
+					}
+
+					infoPrinter.DebugPrintfln("[%s]: %d. input (out?%t)var '%s' from '%s'", c.Owner.Name(), i+1, c.Out, vi.Name(), dcv.dc.Owner.Name())
 				}
-
-				infoPrinter.DebugPrintfln("[%s]: %d. input (out?%t)var '%s' from '%s'", c.Owner.Name(), i+1, c.Out, vi.Name(), dcv.dc.Owner.Name())
 			}
 		}
 	}

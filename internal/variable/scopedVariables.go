@@ -119,6 +119,9 @@ func (sv *ScopedVariables) AddVariable(v VariableDef) (*VariableInfo, error) {
 		Typ_:      v.Typ(),
 		Len_:      v.Len(),
 		Const_:    v.Const(),
+
+		// TODO: add index!
+
 		FuncIntf_: funcIntf,
 	}
 
@@ -129,6 +132,66 @@ func (sv *ScopedVariables) AddVariable(v VariableDef) (*VariableInfo, error) {
 	sv.Variables[name] = newV
 
 	infoPrinter.VerbosePrintf("Allocated '%s' type %s at pos %d downto %d\n", newV.Name(), v.Typ(), (sv.Size)+(v.Len()*typeSize)-1, (sv.Size))
+
+	sv.Size += typeSize * v.Len()
+
+	sv.VariableList = append(sv.VariableList, newV)
+
+	return newV.Copy(), nil
+}
+
+func (sv *ScopedVariables) AddVariableInfo(v *VariableInfo) (*VariableInfo, error) {
+	if v == nil {
+		return nil, ErrNilDecl
+	}
+
+	typeSize := -1
+
+	funcIntf := v.FuncIntf()
+
+	if v.FuncIntf() == nil {
+		if v.Len() <= 0 {
+			return nil, ErrInvalidVariableLength
+		}
+
+		var ok bool
+		typeSize, ok = SupportedTypes[v.Typ()]
+		if !ok {
+			return nil, ErrUnsupportedVariableTypeFn(v.Typ())
+		}
+	} else {
+		// typeSize if result size
+		typeSize = v.FuncIntf().Results.GetSize()
+		funcIntf = funcIntf.Copy()
+	}
+
+	name := v.Name()
+
+	if name == "" {
+		name = emptyNamePrefix + strconv.Itoa(sv.ParamPos)
+		sv.ParamPos++
+	}
+
+	newV := &VariableInfo{
+		Name_:     name,
+		Position_: sv.Size,
+		Size_:     typeSize,
+		Typ_:      v.Typ(),
+		Len_:      v.Len(),
+		Const_:    v.Const(),
+		Index_:    v.Index_,
+		//IndexIdent_: v.IndexIdent_,
+
+		FuncIntf_: funcIntf,
+	}
+
+	if _, ok := sv.Variables[name]; ok {
+		return nil, ErrVariableAlreadyDeclaredFn(name)
+	}
+
+	sv.Variables[name] = newV
+
+	infoPrinter.VerbosePrintf("Allocated '%s' type %s at pos %d downto %d with index %s\n", newV.Name(), v.Typ(), (sv.Size)+(v.Len()*typeSize)-1, (sv.Size), newV.Index_)
 
 	sv.Size += typeSize * v.Len()
 
