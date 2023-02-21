@@ -83,13 +83,37 @@ func NewBinExprBlock(op string, oi *OperandInfo, parent BlockType) (*BinExprBloc
 	}
 
 	if *globalArguments.Debug {
-		opDescription := fmt.Sprintf("binExprBlock '%s': %s [size %d, len %d, index %s; const %s] = %s [size %d, len %d, index %s; const %s] ",
-			bep.Name(), oi.R.Name_, oi.R.Size_, oi.R.Len_, oi.R.Index_, oi.R.Const_, oi.X.Name_, oi.X.Size_, oi.X.Len_, oi.X.Index_, oi.X.Const_)
+		opDescription := fmt.Sprintf("binExprBlock '%s': %s [size %d, len %d, index %s; const %s",
+			bep.Name(), oi.R.Name_, oi.R.Size_, oi.R.Len_, oi.R.Index_, oi.R.Const_)
+
+		if oi.R.IndexIdent_ != nil {
+			opDescription += fmt.Sprintf("; indexIdent %s",
+				oi.R.IndexIdent_.Name())
+		}
+
+		opDescription += "] "
+
+		opDescription += fmt.Sprintf("= %s [size %d, len %d, index %s; const %s",
+			oi.X.Name_, oi.X.Size_, oi.X.Len_, oi.X.Index_, oi.X.Const_)
+
+		if oi.X.IndexIdent_ != nil {
+			opDescription += fmt.Sprintf("; indexIdent %s",
+				oi.X.IndexIdent_.Name())
+		}
+
+		opDescription += "] "
 
 		opDescription += op
 
 		if oi.Y != nil {
-			opDescription += fmt.Sprintf(" %s [size %d, len %d, index %s; const %s]", oi.Y.Name_, oi.Y.Size_, oi.Y.Len_, oi.Y.Index_, oi.Y.Const_)
+			opDescription += fmt.Sprintf(" %s [size %d, len %d, index %s; const %s", oi.Y.Name_, oi.Y.Size_, oi.Y.Len_, oi.Y.Index_, oi.Y.Const_)
+
+			if oi.Y.IndexIdent_ != nil {
+				opDescription += fmt.Sprintf("; indexIdent %s",
+					oi.Y.IndexIdent_.Name())
+			}
+
+			opDescription += "] "
 		}
 
 		infoPrinter.DebugPrintfln("[%s]: Creating %s - parent: ", parent.ArchName(), opDescription)
@@ -115,17 +139,12 @@ func getInputSources(bt BodyComponentType, parent BlockType, oi *OperandInfo, re
 		}
 
 		if oi.X.DefinedOnly_ {
-			panic("using defined only variable")
+			return errors.New("using defined only variable '" + oi.Y.Name() + "'")
 		}
 
 		if oi.X.Const_ != "" {
 			oi.X.Typ_ = resultType
 			infoPrinter.DebugPrintfln("[%s]: X Input '%s' is const '%s' with type %s inferred from result", bt.Name(), oi.X.Name_, oi.X.Const_, resultType)
-		}
-
-		addedVar, err := bt.AddInputVariable(oi.X)
-		if err != nil {
-			return err
 		}
 
 		indexIdent := oi.X.IndexIdent_
@@ -142,37 +161,25 @@ func getInputSources(bt BodyComponentType, parent BlockType, oi *OperandInfo, re
 				return err
 			}
 
-			addedVar.IndexIdent_ = addedIndexIdent
+			if err := addVariableToLatestAndConnect(bt, parent, addedIndexIdent, holdOffConnections); err != nil {
+				return err
+			}
+
+			oi.X.IndexIdent_ = addedIndexIdent
+		}
+
+		addedVar, err := bt.AddInputVariable(oi.X)
+		if err != nil {
+			return err
 		}
 
 		oi.X = addedVar
 
 		infoPrinter.DebugPrintfln("[%s]: X Input '%s' type %s", bt.Name(), oi.X.Name_, resultType)
 
-		ownX, ok := parent.GetVariableOwnerMap()[oi.X.Name_]
-		if !ok {
-			// Shouldn't happen
-			return errors.New("No owner for X operator")
+		if err := addVariableToLatestAndConnect(bt, parent, oi.X, holdOffConnections); err != nil {
+			return err
 		}
-
-		latestOwner := ownX.ownerList.lastest
-		ownX.ownerList.AddSuccessorToLatest(bt)
-
-		bt.AddPredecessor(latestOwner)
-		latestOwner.AddSuccessor(bt)
-
-		//bt.InChannels()[0].ConnectHandshake(latestOwner.OutChannels()[0])
-
-		if !holdOffConnections {
-			bt.ConnectHandshake(latestOwner)
-
-			// X is first inDataChannel
-			// Assume components only have 1 outputDataChannel here
-			//bt.InDataChannels()[0].ConnectData(latestOwner.OutDataChannels()[0])
-			bt.ConnectData(latestOwner)
-		}
-
-		infoPrinter.DebugPrintfln("[%s]: Previous component of X input '%s' is '%s'", bt.Name(), oi.X.Name_, latestOwner.Name())
 	}
 
 	{
@@ -186,17 +193,12 @@ func getInputSources(bt BodyComponentType, parent BlockType, oi *OperandInfo, re
 		}
 
 		if oi.Y.DefinedOnly_ {
-			panic("using defined only variable")
+			return errors.New("using defined only variable '" + oi.Y.Name() + "'")
 		}
 
 		if oi.Y.Const_ != "" {
 			oi.Y.Typ_ = resultType
 			infoPrinter.DebugPrintfln("[%s]: Y Input '%s' is const '%s' with type %s inferred from result", bt.Name(), oi.Y.Name_, oi.Y.Const_, resultType)
-		}
-
-		addedVar, err := bt.AddInputVariable(oi.Y)
-		if err != nil {
-			return err
 		}
 
 		indexIdent := oi.Y.IndexIdent_
@@ -213,37 +215,48 @@ func getInputSources(bt BodyComponentType, parent BlockType, oi *OperandInfo, re
 				return err
 			}
 
-			addedVar.IndexIdent_ = addedIndexIdent
+			if err := addVariableToLatestAndConnect(bt, parent, addedIndexIdent, holdOffConnections); err != nil {
+				return err
+			}
+
+			oi.Y.IndexIdent_ = addedIndexIdent
+		}
+
+		addedVar, err := bt.AddInputVariable(oi.Y)
+		if err != nil {
+			return err
 		}
 
 		oi.Y = addedVar
 
 		infoPrinter.DebugPrintfln("[%s]: Y Input '%s' type %s", bt.Name(), oi.Y.Name_, resultType)
 
-		ownY, ok := parent.GetVariableOwnerMap()[oi.Y.Name_]
-		if !ok {
-			// Shouldn't happen
-			return errors.New("No owner for Y operator")
+		if err := addVariableToLatestAndConnect(bt, parent, oi.Y, holdOffConnections); err != nil {
+			return err
 		}
-
-		latestOwner := ownY.ownerList.lastest
-		ownY.ownerList.AddSuccessorToLatest(bt)
-
-		bt.AddPredecessor(latestOwner)
-		latestOwner.AddSuccessor(bt)
-
-		if !holdOffConnections {
-			//bt.InChannels()[0].ConnectHandshake(latestOwner.OutChannels()[0])
-			bt.ConnectHandshake(latestOwner)
-
-			// Y is second inDataChannel
-			// Assume components only have 1 outputDataChannel here
-			// bt.InDataChannels()[1].ConnectData(latestOwner.OutDataChannels()[0])
-			bt.ConnectData(latestOwner)
-		}
-
-		infoPrinter.DebugPrintfln("[%s]: Previous component of Y input '%s' is '%s'", bt.Name(), oi.Y.Name_, latestOwner.Name())
 	}
+
+	return nil
+}
+
+func addVariableToLatestAndConnect(bt BodyComponentType, parent BlockType, vi *variable.VariableInfo, holfOddConn bool) error {
+	ownX, ok := parent.GetVariableOwnerMap()[vi.Name()]
+	if !ok {
+		return errors.New("No owner")
+	}
+
+	latestOwner := ownX.ownerList.lastest
+	ownX.ownerList.AddSuccessorToLatest(bt)
+
+	bt.AddPredecessor(latestOwner)
+	latestOwner.AddSuccessor(bt)
+
+	if !holfOddConn {
+		bt.ConnectHandshake(latestOwner)
+		bt.ConnectData(latestOwner)
+	}
+
+	infoPrinter.DebugPrintfln("[%s]: Previous component of input '%s' is '%s'", bt.Name(), vi.Name(), latestOwner.Name())
 
 	return nil
 }
@@ -255,19 +268,50 @@ func getOperandOwnersAndSetNewOwner(bt BodyComponentType, parent BlockType, oi *
 	if oi.R != nil {
 		oi.R.DefinedOnly_ = false
 
-		outVar, err := bt.AddOutputVariable(oi.R)
+		indexIdent := oi.R.IndexIdent_
+		if oi.R.Index_ != "" || indexIdent != nil {
+			if indexIdent != nil {
+				if indexIdent.Const_ != "" {
+					panic("indexIdent is const")
+				}
+				if indexIdent.IndexIdent_ != nil {
+					panic("cascading indexIdents")
+				}
+
+				if err := addVariableToLatestAndConnect(bt, parent, indexIdent, false); err != nil {
+					return nil, err
+				}
+
+				addedIndexIdent, err := bt.AddInputVariable(indexIdent)
+				if err != nil {
+					return nil, err
+				}
+
+				infoPrinter.DebugPrintfln("[%s]: Indexident variable '%s' added to inputs", bt.Name(), addedIndexIdent.Name())
+
+				oi.R.IndexIdent_ = addedIndexIdent
+			}
+
+			// Add result as input too
+			if err := addVariableToLatestAndConnect(bt, parent, oi.R, false); err != nil {
+				return nil, err
+			}
+
+			if _, err := bt.AddInputVariable(oi.R); err != nil {
+				return nil, err
+			}
+		}
+
+		addedVar, err := bt.AddOutputVariable(oi.R)
 		if err != nil {
 			return nil, err
 		}
 
-		// Add result as input too
-		bt.AddInputVariable(oi.R)
+		oi.R = addedVar
 
 		resultType = oi.R.Typ_
 
-		oi.R = outVar
-
-		infoPrinter.DebugPrintfln("[%s] Result variable '%s' type '%s' added to outputs", bt.Name(), oi.R.Name(), oi.R.Typ())
+		infoPrinter.DebugPrintfln("[%s]: Result variable '%s' type '%s' added to outputs with index: '%s'", bt.Name(), oi.R.Name(), oi.R.Typ(), oi.R.Index_)
 	} else {
 		panic("Missing result var")
 	}
@@ -372,79 +416,107 @@ func getIndex(idxStd string) int {
 }
 
 func (bep *BinExprBlock) getAliases() string {
+	xVar, err := bep.inputVariables.GetVariableInfo(bep.Oi.X.Name_)
+	if err != nil {
+		panic("x not found")
+	}
+
 	ret := ""
-	if bep.Oi.X.IndexIdent_ == nil {
-		if bep.Oi.X.Const_ == "" {
-			idx := getIndex(bep.Oi.X.Index_)
-			totalSize := bep.Oi.X.Size_ * bep.Oi.X.Len_
-			if idx > 0 {
-				totalSize = bep.Oi.X.Size_
+	if xVar.IndexIdent_ == nil {
+		if xVar.Const_ == "" {
+			idx := getIndex(xVar.Index_)
+			totalSize := xVar.Size_ * xVar.Len_
+			if xVar.Index_ != "" {
+				totalSize = xVar.Size_
 			}
 
-			infoPrinter.DebugPrintfln("[%s]: oi.x index = %s, size %d, len %d", bep.Name(), bep.Oi.X.Index_, bep.Oi.X.Size_, bep.Oi.X.Len_)
+			infoPrinter.DebugPrintfln("[%s]: oi.x index = %s, size %d, len %d", bep.Name(), xVar.Index_, xVar.Size_, xVar.Len_)
 
-			ret += "alias x : std_logic_vector(" + strconv.Itoa(totalSize) + " - 1 downto 0)  is in_data( " + strconv.Itoa(bep.Oi.X.Position_+totalSize*(idx+1)) + " - 1 downto " + strconv.Itoa(bep.Oi.X.Position_+totalSize*idx) + ");\n"
+			ret += "alias x : std_logic_vector(" + strconv.Itoa(totalSize) + " - 1 downto 0)  is in_data( " + strconv.Itoa(xVar.Position_+totalSize*(idx+1)) + " - 1 downto " + strconv.Itoa(xVar.Position_+totalSize*idx) + ");\n"
 		}
 	} else {
-		ret += "signal x : std_logic_vector(" + strconv.Itoa(bep.Oi.X.Size_) + "- 1 downto 0);\n"
-		ret += "constant baseX      : integer := " + strconv.Itoa(bep.Oi.X.Position_) + ";\n"
-		ret += "alias offsetX      : std_logic_vector(" + strconv.Itoa(bep.Oi.X.IndexIdent_.Size_) + " - 1 downto 0)  is in_data( " + strconv.Itoa(bep.Oi.X.IndexIdent_.Position_+bep.Oi.X.IndexIdent_.Size_) + " -1 downto " + strconv.Itoa(bep.Oi.X.IndexIdent_.Position_) + ");\n"
+		ret += "signal x : std_logic_vector(" + strconv.Itoa(xVar.Size_) + "- 1 downto 0);\n"
+		ret += "constant baseX      : integer := " + strconv.Itoa(xVar.Position_) + ";\n"
+		ret += "alias offsetX      : std_logic_vector(" + strconv.Itoa(xVar.IndexIdent_.Size_) + " - 1 downto 0)  is in_data( " + strconv.Itoa(xVar.IndexIdent_.Position_+xVar.IndexIdent_.Size_) + " -1 downto " + strconv.Itoa(xVar.IndexIdent_.Position_) + ");\n"
 	}
 
-	if bep.Oi.Y != nil && bep.Oi.Y.IndexIdent_ == nil {
-		if bep.Oi.Y.Const_ == "" {
-			idx := getIndex(bep.Oi.Y.Index_)
-			totalSize := bep.Oi.Y.Size_ * bep.Oi.Y.Len_
-			if idx > 0 {
-				totalSize = bep.Oi.Y.Size_
+	if bep.Oi.Y != nil {
+		yVar, err := bep.inputVariables.GetVariableInfo(bep.Oi.Y.Name_)
+		if err != nil {
+			panic("y not found")
+		}
+
+		if yVar != nil && yVar.IndexIdent_ == nil {
+			if yVar.Const_ == "" {
+				idx := getIndex(yVar.Index_)
+				totalSize := yVar.Size_ * yVar.Len_
+				if yVar.Index_ != "" {
+					totalSize = yVar.Size_
+				}
+				ret += "alias y      : std_logic_vector(" + strconv.Itoa(totalSize) + " - 1 downto 0)  is in_data( " + strconv.Itoa(yVar.Position_+totalSize*(idx+1)) + " - 1 downto " + strconv.Itoa(yVar.Position_+totalSize*idx) + ");\n"
 			}
-			ret += "alias y      : std_logic_vector(" + strconv.Itoa(totalSize) + " - 1 downto 0)  is in_data( " + strconv.Itoa(bep.Oi.Y.Position_+totalSize*(idx+1)) + " - 1 downto " + strconv.Itoa(bep.Oi.Y.Position_+totalSize*idx) + ");\n"
+		} else if yVar != nil && yVar.IndexIdent_ != nil {
+			ret += "signal y  : std_logic_vector(" + strconv.Itoa(yVar.Size_) + "- 1 downto 0);\n"
+			ret += "constant baseY      : integer := " + strconv.Itoa(yVar.Position_) + ";\n"
+			ret += "alias offsetY      : std_logic_vector(" + strconv.Itoa(yVar.IndexIdent_.Size_) + " - 1 downto 0)  is in_data( " + strconv.Itoa(yVar.IndexIdent_.Position_+yVar.IndexIdent_.Size_) + " -1 downto " + strconv.Itoa(yVar.IndexIdent_.Position_) + ");\n"
 		}
-	} else if bep.Oi.Y != nil && bep.Oi.Y.IndexIdent_ != nil {
-		ret += "signal y  : std_logic_vector(" + strconv.Itoa(bep.Oi.Y.Size_) + "- 1 downto 0);\n"
-		ret += "constant baseY      : integer := " + strconv.Itoa(bep.Oi.Y.Position_) + ";\n"
-		ret += "alias offsetY      : std_logic_vector(" + strconv.Itoa(bep.Oi.Y.IndexIdent_.Size_) + " - 1 downto 0)  is in_data( " + strconv.Itoa(bep.Oi.Y.IndexIdent_.Position_+bep.Oi.Y.IndexIdent_.Size_) + " -1 downto " + strconv.Itoa(bep.Oi.Y.IndexIdent_.Position_) + ");\n"
 	}
 
-	if bep.Oi.R.IndexIdent_ == nil {
-		idx := getIndex(bep.Oi.R.Index_)
-		totalSize := bep.Oi.R.Size_ * bep.Oi.R.Len_
-		if idx > 0 {
-			totalSize = bep.Oi.R.Size_
-		}
-		ret += "alias result : std_logic_vector(" + strconv.Itoa(totalSize) + " - 1 downto 0)  is out_data( " + strconv.Itoa(bep.Oi.R.Position_+totalSize*(idx+1)) + " - 1 downto " + strconv.Itoa(bep.Oi.R.Position_+totalSize*idx) + ");\n"
+	rVar, err := bep.outputVariables.GetVariableInfo(bep.Oi.R.Name_)
+	if err != nil {
+		panic("r not found")
+	}
 
-		resultIn, err := bep.InputVariables().GetVariableInfo(bep.Oi.R.Name())
+	if rVar.IndexIdent_ == nil {
+		idx := getIndex(rVar.Index_)
+		totalSize := rVar.Size_ * rVar.Len_
+		if rVar.Index_ != "" {
+			totalSize = rVar.Size_
+		}
+
+		ret += "alias result : std_logic_vector(" + strconv.Itoa(totalSize) + " - 1 downto 0)  is out_data( " + strconv.Itoa(rVar.Position_+totalSize*(idx+1)) + " - 1 downto " + strconv.Itoa(rVar.Position_+totalSize*idx) + ");\n"
+	} else {
+		ret += "signal result : std_logic_vector(" + strconv.Itoa(rVar.Size_) + " - 1 downto 0);\n"
+		ret += "constant baseR      : integer := " + strconv.Itoa(rVar.Position_) + ";\n"
+		ret += "alias offsetR      : std_logic_vector(" + strconv.Itoa(rVar.IndexIdent_.Size_) + " - 1 downto 0)  is in_data( " + strconv.Itoa(rVar.IndexIdent_.Position_+rVar.IndexIdent_.Size_) + " -1 downto " + strconv.Itoa(rVar.IndexIdent_.Position_) + ");\n"
+	}
+
+	if rVar.Index_ != "" || rVar.IndexIdent_ != nil {
+		resultIn, err := bep.InputVariables().GetVariableInfo(rVar.Name())
 		if err != nil {
 			panic("did not find result in inputs; " + err.Error())
 		}
 
-		totalSize = resultIn.TotalSize()
+		totalSize := resultIn.TotalSize()
 
 		ret += "alias result_default : std_logic_vector(" + strconv.Itoa(totalSize) + " - 1 downto 0)  is in_data( " + strconv.Itoa(resultIn.Position_+totalSize) + " - 1 downto " + strconv.Itoa(resultIn.Position_) + ");\n"
-	} else {
-		ret += "signal result : std_logic_vector(" + strconv.Itoa(bep.Oi.R.Size_) + " - 1 downto 0);\n"
-		ret += "constant baseR      : integer := " + strconv.Itoa(bep.Oi.R.Position_) + ";\n"
-		ret += "alias offsetR      : std_logic_vector(" + strconv.Itoa(bep.Oi.R.IndexIdent_.Size_) + " - 1 downto 0)  is in_data( " + strconv.Itoa(bep.Oi.R.IndexIdent_.Position_+bep.Oi.R.IndexIdent_.Size_) + " -1 downto " + strconv.Itoa(bep.Oi.R.IndexIdent_.Position_) + ");\n"
 	}
 
 	return ret
 }
 
 func (bep *BinExprBlock) getCalcProcess() string {
+	xVar, errx := bep.inputVariables.GetVariableInfo(bep.Oi.X.Name())
+	yVar, erry := bep.inputVariables.GetVariableInfo(bep.Oi.Y.Name())
+	rVar, errr := bep.outputVariables.GetVariableInfo(bep.Oi.R.Name())
+
+	if errx != nil || erry != nil || errr != nil {
+		panic("invalid I/O")
+	}
+
 	x := ""
 	y := ""
 	delay := " after ADDER_DELAY"
 
 	x = "unsigned(x)"
-	if bep.Oi.X.Const_ != "" {
-		x = "to_unsigned(" + bep.Oi.X.Const_ + ", result'length)"
+	if xVar.Const_ != "" {
+		x = "to_unsigned(" + xVar.Const_ + ", result'length)"
 	}
 
-	if bep.Oi.Y != nil {
+	if yVar != nil {
 		y = "unsigned(y)"
-		if bep.Oi.Y.Const_ != "" {
-			y = "to_unsigned(" + bep.Oi.Y.Const_ + ", result'length)"
+		if yVar.Const_ != "" {
+			y = "to_unsigned(" + yVar.Const_ + ", result'length)"
 		}
 
 		if bep.Operation == "<<" || bep.Operation == ">>" {
@@ -452,15 +524,20 @@ func (bep *BinExprBlock) getCalcProcess() string {
 		}
 	}
 
-	if bep.Operation == "NOP" || bep.Operation == "=" || bep.Oi.Y == nil {
+	if bep.Operation == "NOP" || bep.Operation == "=" || yVar == nil {
 		y = ""
 		delay = ""
 	}
 
+	defaultOut := ""
+	if rVar.Index_ != "" || rVar.IndexIdent_ != nil {
+		defaultOut += "out_data <= result_default;"
+	}
+
 	processStart := `calc: process(all)
-	variable offset: integer range 0 to result'length;
+	variable offset: integer range 0 to out_data'length;
 	begin
-	out_data <= result_default; 
+	` + defaultOut + `
 	`
 
 	xcalc := ""
@@ -469,12 +546,12 @@ func (bep *BinExprBlock) getCalcProcess() string {
 	resultMap := ""
 
 	if bep.Operation != "NOP" {
-		if bep.Oi.X.IndexIdent_ != nil {
+		if xVar.IndexIdent_ != nil {
 			x = "unsigned(x)"
 			xcalc = "x <= in_data(baseX + (to_integer(unsigned(offsetX)) + 1) * x'length - 1 downto baseX + to_integer(unsigned(offsetX)) * x'length);\n"
 		}
 
-		if bep.Oi.Y != nil && bep.Oi.Y.IndexIdent_ != nil {
+		if yVar != nil && yVar.IndexIdent_ != nil {
 			y = "unsigned(y)"
 			ycalc = "y <= in_data(baseY + (to_integer(unsigned(offsetY)) + 1) * y'length - 1 downto baseY + to_integer(unsigned(offsetY)) * y'length);\n"
 
@@ -482,7 +559,7 @@ func (bep *BinExprBlock) getCalcProcess() string {
 
 		compute = "result <= std_logic_vector(resize(" + x + " " + SupportedOperations[bep.Operation] + " " + y + ", result'length)) " + delay + ";\n"
 
-		if bep.Oi.R.IndexIdent_ != nil {
+		if rVar.IndexIdent_ != nil {
 			resultMap = "offset := baseR + to_integer(unsigned(offsetR) * result'length);\n"
 			resultMap += "out_data(offset + result'length -1 downto offset) <= result;\n"
 		}
