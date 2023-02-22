@@ -275,8 +275,7 @@ func (lb *LoopBlock) createInnerLife() {
 
 	// Selector path
 	lb.loopCond.ConnectHandshakePos(lb.initRegFork, 0, 0)
-	lb.loopCond.ConnectDataPos(lb.initRegFork, 0, 0)
-	lb.loopCond.ConnectDataPos(lb.initRegFork, 1, 0)
+	lb.loopCond.ConnectData(lb.initRegFork)
 
 	// lb.condFork.ConnectHandshake(lb.loopCond)
 	// lb.condFork.ConnectData(lb.loopCond)

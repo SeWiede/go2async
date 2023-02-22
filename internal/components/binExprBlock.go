@@ -421,81 +421,71 @@ func getIndex(idxStd string) int {
 	return idx
 }
 
-func (bep *BinExprBlock) getAliases() string {
-	xVar, err := bep.inputVariables.GetVariableInfo(bep.Oi.X.Name_)
+func getAliasOf(varname string, aliasName string, dc *DataChannel) string {
+	alias := ""
+
+	dcVar, err := dc.variables.GetVariableInfo(varname)
 	if err != nil {
-		panic("x not found")
+		panic(aliasName + " '" + varname + "' not found")
 	}
 
-	ret := ""
-	if xVar.IndexIdent_ == nil {
-		if xVar.Const_ == "" {
-			idx := getIndex(xVar.Index_)
-			totalSize := xVar.Size_ * xVar.Len_
-			if xVar.Index_ != "" {
-				totalSize = xVar.Size_
+	if dcVar.IndexIdent_ == nil {
+		if dcVar.Const_ == "" {
+			idx := getIndex(dcVar.Index_)
+			totalSize := dcVar.Size_ * dcVar.Len_
+			if dcVar.Index_ != "" {
+				totalSize = dcVar.Size_
 			}
 
-			infoPrinter.DebugPrintfln("[%s]: oi.x index = %s, size %d, len %d", bep.Name(), xVar.Index_, xVar.Size_, xVar.Len_)
-
-			ret += "alias x : std_logic_vector(" + strconv.Itoa(totalSize) + " - 1 downto 0)  is in_data( " + strconv.Itoa(xVar.Position_+totalSize*(idx+1)) + " - 1 downto " + strconv.Itoa(xVar.Position_+totalSize*idx) + ");\n"
+			alias += "alias " + aliasName + " : std_logic_vector(" + strconv.Itoa(totalSize) + " - 1 downto 0)  is in_data( " + strconv.Itoa(dcVar.Position_+totalSize*(idx+1)) + " - 1 downto " + strconv.Itoa(dcVar.Position_+totalSize*idx) + ");\n"
 		}
 	} else {
-		ret += "signal x : std_logic_vector(" + strconv.Itoa(xVar.Size_) + "- 1 downto 0);\n"
-		ret += "constant baseX      : integer := " + strconv.Itoa(xVar.Position_) + ";\n"
-		ret += "alias offsetX      : std_logic_vector(" + strconv.Itoa(xVar.IndexIdent_.Size_) + " - 1 downto 0)  is in_data( " + strconv.Itoa(xVar.IndexIdent_.Position_+xVar.IndexIdent_.Size_) + " -1 downto " + strconv.Itoa(xVar.IndexIdent_.Position_) + ");\n"
+		alias += "signal " + aliasName + " : std_logic_vector(" + strconv.Itoa(dcVar.Size_) + "- 1 downto 0);\n"
+		alias += "constant base" + aliasName + "      : integer := " + strconv.Itoa(dcVar.Position_) + ";\n"
+		alias += "alias offset" + aliasName + "      : std_logic_vector(" + strconv.Itoa(dcVar.IndexIdent_.Size_) + " - 1 downto 0)  is in_data( " + strconv.Itoa(dcVar.IndexIdent_.Position_+dcVar.IndexIdent_.Size_) + " -1 downto " + strconv.Itoa(dcVar.IndexIdent_.Position_) + ");\n"
 	}
+
+	return alias
+}
+
+func (bep *BinExprBlock) getAliases() string {
+	ret := ""
+	ret += getAliasOf(bep.Oi.X.Name(), "x", bep.InDataChannels()[0])
 
 	if bep.Oi.Y != nil {
-		yVar, err := bep.inputVariables.GetVariableInfo(bep.Oi.Y.Name_)
+		ret += getAliasOf(bep.Oi.Y.Name(), "y", bep.InDataChannels()[0])
+	}
+
+	if bep.Oi.R != nil {
+		rVar, err := bep.outputVariables.GetVariableInfo(bep.Oi.R.Name_)
 		if err != nil {
-			panic("y not found")
+			panic("r not found")
 		}
 
-		if yVar != nil && yVar.IndexIdent_ == nil {
-			if yVar.Const_ == "" {
-				idx := getIndex(yVar.Index_)
-				totalSize := yVar.Size_ * yVar.Len_
-				if yVar.Index_ != "" {
-					totalSize = yVar.Size_
-				}
-				ret += "alias y      : std_logic_vector(" + strconv.Itoa(totalSize) + " - 1 downto 0)  is in_data( " + strconv.Itoa(yVar.Position_+totalSize*(idx+1)) + " - 1 downto " + strconv.Itoa(yVar.Position_+totalSize*idx) + ");\n"
+		if rVar.IndexIdent_ == nil {
+			idx := getIndex(rVar.Index_)
+			totalSize := rVar.Size_ * rVar.Len_
+			if rVar.Index_ != "" {
+				totalSize = rVar.Size_
 			}
-		} else if yVar != nil && yVar.IndexIdent_ != nil {
-			ret += "signal y  : std_logic_vector(" + strconv.Itoa(yVar.Size_) + "- 1 downto 0);\n"
-			ret += "constant baseY      : integer := " + strconv.Itoa(yVar.Position_) + ";\n"
-			ret += "alias offsetY      : std_logic_vector(" + strconv.Itoa(yVar.IndexIdent_.Size_) + " - 1 downto 0)  is in_data( " + strconv.Itoa(yVar.IndexIdent_.Position_+yVar.IndexIdent_.Size_) + " -1 downto " + strconv.Itoa(yVar.IndexIdent_.Position_) + ");\n"
-		}
-	}
 
-	rVar, err := bep.outputVariables.GetVariableInfo(bep.Oi.R.Name_)
-	if err != nil {
-		panic("r not found")
-	}
-
-	if rVar.IndexIdent_ == nil {
-		idx := getIndex(rVar.Index_)
-		totalSize := rVar.Size_ * rVar.Len_
-		if rVar.Index_ != "" {
-			totalSize = rVar.Size_
+			ret += "alias result : std_logic_vector(" + strconv.Itoa(totalSize) + " - 1 downto 0)  is out_data( " + strconv.Itoa(rVar.Position_+totalSize*(idx+1)) + " - 1 downto " + strconv.Itoa(rVar.Position_+totalSize*idx) + ");\n"
+		} else {
+			ret += "signal result : std_logic_vector(" + strconv.Itoa(rVar.Size_) + " - 1 downto 0);\n"
+			ret += "constant baseR      : integer := " + strconv.Itoa(rVar.Position_) + ";\n"
+			ret += "alias offsetR      : std_logic_vector(" + strconv.Itoa(rVar.IndexIdent_.Size_) + " - 1 downto 0)  is in_data( " + strconv.Itoa(rVar.IndexIdent_.Position_+rVar.IndexIdent_.Size_) + " -1 downto " + strconv.Itoa(rVar.IndexIdent_.Position_) + ");\n"
 		}
 
-		ret += "alias result : std_logic_vector(" + strconv.Itoa(totalSize) + " - 1 downto 0)  is out_data( " + strconv.Itoa(rVar.Position_+totalSize*(idx+1)) + " - 1 downto " + strconv.Itoa(rVar.Position_+totalSize*idx) + ");\n"
-	} else {
-		ret += "signal result : std_logic_vector(" + strconv.Itoa(rVar.Size_) + " - 1 downto 0);\n"
-		ret += "constant baseR      : integer := " + strconv.Itoa(rVar.Position_) + ";\n"
-		ret += "alias offsetR      : std_logic_vector(" + strconv.Itoa(rVar.IndexIdent_.Size_) + " - 1 downto 0)  is in_data( " + strconv.Itoa(rVar.IndexIdent_.Position_+rVar.IndexIdent_.Size_) + " -1 downto " + strconv.Itoa(rVar.IndexIdent_.Position_) + ");\n"
-	}
+		if rVar.Index_ != "" || rVar.IndexIdent_ != nil {
+			resultIn, err := bep.InputVariables().GetVariableInfo(rVar.Name())
+			if err != nil {
+				panic("did not find result in inputs; " + err.Error())
+			}
 
-	if rVar.Index_ != "" || rVar.IndexIdent_ != nil {
-		resultIn, err := bep.InputVariables().GetVariableInfo(rVar.Name())
-		if err != nil {
-			panic("did not find result in inputs; " + err.Error())
+			totalSize := resultIn.TotalSize()
+
+			ret += "alias result_default : std_logic_vector(" + strconv.Itoa(totalSize) + " - 1 downto 0)  is in_data( " + strconv.Itoa(resultIn.Position_+totalSize) + " - 1 downto " + strconv.Itoa(resultIn.Position_) + ");\n"
 		}
-
-		totalSize := resultIn.TotalSize()
-
-		ret += "alias result_default : std_logic_vector(" + strconv.Itoa(totalSize) + " - 1 downto 0)  is in_data( " + strconv.Itoa(resultIn.Position_+totalSize) + " - 1 downto " + strconv.Itoa(resultIn.Position_) + ");\n"
 	}
 
 	return ret

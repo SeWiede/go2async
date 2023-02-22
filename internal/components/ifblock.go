@@ -257,8 +257,7 @@ END ` + ib.EntityName() + `;`
 func (ib *IfBlock) createInnerLife() {
 	// Inputs to selector
 	ib.cond.ConnectHandshake(ib)
-	ib.cond.ConnectDataPos(ib, 0, 0)
-	ib.cond.ConnectDataPos(ib, 1, 0)
+	ib.cond.ConnectData(ib)
 
 	// Demux
 	// Data Path
