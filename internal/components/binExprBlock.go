@@ -161,9 +161,12 @@ func getInputSources(bt BodyComponentType, parent BlockType, oi *OperandInfo, re
 				return err
 			}
 
-			if err := addVariableToLatestAndConnect(bt, parent, addedIndexIdent, holdOffConnections); err != nil {
-				return err
-			}
+			// needs to happen later
+			defer func() {
+				if err := addVariableToLatestAndConnect(bt, parent, addedIndexIdent, holdOffConnections); err != nil {
+					panic("could not add X to latest and connect")
+				}
+			}()
 
 			oi.X.IndexIdent_ = addedIndexIdent
 		}
@@ -215,9 +218,12 @@ func getInputSources(bt BodyComponentType, parent BlockType, oi *OperandInfo, re
 				return err
 			}
 
-			if err := addVariableToLatestAndConnect(bt, parent, addedIndexIdent, holdOffConnections); err != nil {
-				return err
-			}
+			// needs to happen later
+			defer func() {
+				if err := addVariableToLatestAndConnect(bt, parent, addedIndexIdent, holdOffConnections); err != nil {
+					panic("could not add Y to latest and connect")
+				}
+			}()
 
 			oi.Y.IndexIdent_ = addedIndexIdent
 		}
