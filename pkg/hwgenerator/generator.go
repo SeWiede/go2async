@@ -138,41 +138,6 @@ func (g *Generator) HandleAssignmentStmt(s *ast.AssignStmt, parent components.Bl
 		parent.AddComponent(newFuncBlk)
 
 		return newFuncBlk, nil
-	case *ast.Ident:
-		v, err := parent.GetVariable(rhsExpr.Name)
-		if err != nil {
-			return nil, g.peb.NewParseError(s, err)
-		}
-
-		if newVar {
-			varDecl := &variable.VariableTypeDecl{
-				Name_: lhsExpr.(*ast.Ident).Name,
-				Typ_:  v.Typ_,
-				Len_:  1,
-			}
-
-			// TODO: REMOVE
-			/* if lhsVar, err = parent.NewVariable(varDecl); err != nil {
-				return nil, g.peb.NewParseError(s, err)
-			} */
-
-			if lhsVar, err = variable.NewLocalVariable(varDecl); err != nil {
-				return nil, g.peb.NewParseError(s, err)
-			}
-		}
-
-		newFuncBlk, err := components.NewBinExprBlock("=", &components.OperandInfo{
-			R: lhsVar,
-			X: v,
-		}, parent)
-		if err != nil {
-			return nil, err
-		}
-
-		g.components[newFuncBlk.ArchName()] = newFuncBlk
-		parent.AddComponent(newFuncBlk)
-
-		return newFuncBlk, nil
 	case *ast.IndexExpr:
 		v, err := parent.GetVariable(rhsExpr.X.(*ast.Ident).Name)
 		if err != nil {
@@ -221,11 +186,52 @@ func (g *Generator) HandleAssignmentStmt(s *ast.AssignStmt, parent components.Bl
 			return nil, err
 		}
 
+		infoPrinter.DebugPrintfln("generating IndexExpr poiners: r %p", lhsVar)
+		infoPrinter.DebugPrintfln("generating IndexExpr poiners: x %p", v)
+
 		g.components[newFuncBlk.ArchName()] = newFuncBlk
 		parent.AddComponent(newFuncBlk)
 
 		return newFuncBlk, nil
 
+	case *ast.Ident:
+		v, err := parent.GetVariable(rhsExpr.Name)
+		if err != nil {
+			return nil, g.peb.NewParseError(s, err)
+		}
+
+		if newVar {
+			varDecl := &variable.VariableTypeDecl{
+				Name_: lhsExpr.(*ast.Ident).Name,
+				Typ_:  v.Typ_,
+				Len_:  1,
+			}
+
+			// TODO: REMOVE
+			/* if lhsVar, err = parent.NewVariable(varDecl); err != nil {
+				return nil, g.peb.NewParseError(s, err)
+			} */
+
+			if lhsVar, err = variable.NewLocalVariable(varDecl); err != nil {
+				return nil, g.peb.NewParseError(s, err)
+			}
+		}
+
+		newFuncBlk, err := components.NewBinExprBlock("=", &components.OperandInfo{
+			R: lhsVar,
+			X: v,
+		}, parent)
+		if err != nil {
+			return nil, err
+		}
+
+		infoPrinter.DebugPrintfln("generating asdf poiners: r %p", lhsVar)
+		infoPrinter.DebugPrintfln("generating asdf poiners: x %p", v)
+
+		g.components[newFuncBlk.ArchName()] = newFuncBlk
+		parent.AddComponent(newFuncBlk)
+
+		return newFuncBlk, nil
 	case *ast.BinaryExpr:
 		if newVar {
 			// TODO: infer size first

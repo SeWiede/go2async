@@ -173,14 +173,12 @@ func (sv *ScopedVariables) AddVariableInfo(v *VariableInfo) (*VariableInfo, erro
 	}
 
 	newV := &VariableInfo{
-		Name_:       name,
-		Position_:   sv.Size,
-		Size_:       typeSize,
-		Typ_:        v.Typ(),
-		Len_:        v.Len(),
-		Const_:      v.Const(),
-		Index_:      v.Index_,
-		IndexIdent_: v.IndexIdent_,
+		Name_:     name,
+		Position_: sv.Size,
+		Size_:     typeSize,
+		Typ_:      v.Typ(),
+		Len_:      v.Len(),
+		Const_:    v.Const(),
 
 		FuncIntf_: funcIntf,
 	}

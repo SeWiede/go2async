@@ -119,7 +119,7 @@ func (ib *IfBlock) AssignBodyComponents(cond *SelectorBlock, thenBody BodyCompon
 	ib.thenBody = thenBody
 	ib.elseBody = elseBody
 
-	infoPrinter.DebugPrintfln("[%s]: added bodyComponents: %s, %s and %s", ib.cond.Name(), ib.thenBody.Name(), ib.elseBody.Name())
+	infoPrinter.DebugPrintfln("[%s]: added bodyComponents: then %s and else %s", ib.cond.Name(), ib.thenBody.Name(), ib.elseBody.Name())
 }
 
 func (ib *IfBlock) Name() string {

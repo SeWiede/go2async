@@ -270,7 +270,8 @@ func (c *HandshakeChannel) AssignDefaultOut() {
 
 func (c *DataChannel) AssignDefaultOut() {
 	if !c.Out {
-		panic(c.Owner.Name() + " input data " + c.DataName + " is not connected!")
+		//panic(c.Owner.Name() + " input data " + c.DataName + " is not connected!")
+		return
 	}
 
 	infoPrinter.DebugPrintfln("[%s]: assigning default OUT data: connect with parent", c.Owner.Name())

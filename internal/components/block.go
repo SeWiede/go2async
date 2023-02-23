@@ -513,7 +513,7 @@ func (b *Block) GetVariable(varName string) (*variable.VariableInfo, error) {
 	own, ok := b.VariableOwner[varName]
 	if ok {
 		infoPrinter.DebugPrintfln("Variable %s's latest owner is %s", varName, own.ownerList.lastest.Name())
-		return own.vi, nil
+		return own.vi.Copy(), nil
 	} else {
 		if b.Parent() == nil {
 			return nil, ErrVariableNotFound(varName)
@@ -599,7 +599,7 @@ func (b *Block) GetVariable(varName string) (*variable.VariableInfo, error) {
 
 		infoPrinter.DebugPrintfln("[%s] Variable %s is from outside the block's scope. Added to inputs and owners (current size = %d).", b.Name(), varName, b.InputVariables().Size)
 
-		return vi, nil
+		return vi.Copy(), nil
 	}
 
 	/* v, err := b.GetScopedVariables().GetVariableInfo(name)

@@ -147,6 +147,7 @@ func getInputSources(bt BodyComponentType, parent BlockType, oi *OperandInfo, re
 			infoPrinter.DebugPrintfln("[%s]: X Input '%s' is const '%s' with type %s inferred from result", bt.Name(), oi.X.Name_, oi.X.Const_, resultType)
 		}
 
+		index := oi.X.Index_
 		indexIdent := oi.X.IndexIdent_
 		if indexIdent != nil {
 			if indexIdent.Const_ != "" {
@@ -168,7 +169,9 @@ func getInputSources(bt BodyComponentType, parent BlockType, oi *OperandInfo, re
 				}
 			}()
 
-			oi.X.IndexIdent_ = addedIndexIdent
+			infoPrinter.DebugPrintfln("[%s]: X Indexident variable '%s' added to inputs", bt.Name(), addedIndexIdent.Name())
+
+			indexIdent = addedIndexIdent
 		}
 
 		addedVar, err := bt.AddInputVariable(oi.X)
@@ -177,6 +180,8 @@ func getInputSources(bt BodyComponentType, parent BlockType, oi *OperandInfo, re
 		}
 
 		oi.X = addedVar
+		oi.X.Index_ = index
+		oi.X.IndexIdent_ = indexIdent
 
 		infoPrinter.DebugPrintfln("[%s]: X Input '%s' type %s", bt.Name(), oi.X.Name_, resultType)
 
@@ -204,6 +209,7 @@ func getInputSources(bt BodyComponentType, parent BlockType, oi *OperandInfo, re
 			infoPrinter.DebugPrintfln("[%s]: Y Input '%s' is const '%s' with type %s inferred from result", bt.Name(), oi.Y.Name_, oi.Y.Const_, resultType)
 		}
 
+		index := oi.Y.Index_
 		indexIdent := oi.Y.IndexIdent_
 		if indexIdent != nil {
 			if indexIdent.Const_ != "" {
@@ -225,6 +231,8 @@ func getInputSources(bt BodyComponentType, parent BlockType, oi *OperandInfo, re
 				}
 			}()
 
+			infoPrinter.DebugPrintfln("[%s]: Y Indexident variable '%s' added to inputs", bt.Name(), addedIndexIdent.Name())
+
 			oi.Y.IndexIdent_ = addedIndexIdent
 		}
 
@@ -234,6 +242,8 @@ func getInputSources(bt BodyComponentType, parent BlockType, oi *OperandInfo, re
 		}
 
 		oi.Y = addedVar
+		oi.Y.Index_ = index
+		oi.Y.IndexIdent_ = indexIdent
 
 		infoPrinter.DebugPrintfln("[%s]: Y Input '%s' type %s", bt.Name(), oi.Y.Name_, resultType)
 
@@ -252,17 +262,23 @@ func addVariableToLatestAndConnect(bt BodyComponentType, parent BlockType, vi *v
 	}
 
 	latestOwner := ownX.ownerList.lastest
-	ownX.ownerList.AddSuccessorToLatest(bt)
 
-	bt.AddPredecessor(latestOwner)
-	latestOwner.AddSuccessor(bt)
+	if latestOwner.Name() != bt.Name() {
+		ownX.ownerList.AddSuccessorToLatest(bt)
 
-	if !holfOddConn {
-		bt.ConnectHandshake(latestOwner)
-		bt.ConnectData(latestOwner)
+		bt.AddPredecessor(latestOwner)
+		latestOwner.AddSuccessor(bt)
+
+		if !holfOddConn {
+			bt.ConnectHandshake(latestOwner)
+
+			if vi.Const() == "" {
+				bt.ConnectData(latestOwner)
+			}
+		}
 	}
 
-	infoPrinter.DebugPrintfln("[%s]: Previous component of input '%s' is '%s'", bt.Name(), vi.Name(), latestOwner.Name())
+	infoPrinter.DebugPrintfln("[%s]: @@ Previous component of input '%s' is '%s' or const '%s'", bt.Name(), vi.Name(), latestOwner.Name(), vi.Const_)
 
 	return nil
 }
@@ -274,8 +290,10 @@ func getOperandOwnersAndSetNewOwner(bt BodyComponentType, parent BlockType, oi *
 	if oi.R != nil {
 		oi.R.DefinedOnly_ = false
 
+		index := oi.R.Index_ // preserve index
 		indexIdent := oi.R.IndexIdent_
-		if oi.R.Index_ != "" || indexIdent != nil {
+
+		if index != "" || indexIdent != nil {
 			if indexIdent != nil {
 				if indexIdent.Const_ != "" {
 					panic("indexIdent is const")
@@ -295,7 +313,7 @@ func getOperandOwnersAndSetNewOwner(bt BodyComponentType, parent BlockType, oi *
 
 				infoPrinter.DebugPrintfln("[%s]: Indexident variable '%s' added to inputs", bt.Name(), addedIndexIdent.Name())
 
-				oi.R.IndexIdent_ = addedIndexIdent
+				indexIdent = addedIndexIdent
 			}
 
 			// Add result as input too
@@ -313,7 +331,10 @@ func getOperandOwnersAndSetNewOwner(bt BodyComponentType, parent BlockType, oi *
 			return nil, err
 		}
 
+		// reassign operation info
 		oi.R = addedVar
+		oi.R.Index_ = index
+		oi.R.IndexIdent_ = indexIdent
 
 		resultType = oi.R.Typ_
 
@@ -421,28 +442,27 @@ func getIndex(idxStd string) int {
 	return idx
 }
 
-func getAliasOf(varname string, aliasName string, dc *DataChannel) string {
+func getAliasOf(vi *variable.VariableInfo, aliasName string, dc *DataChannel) string {
 	alias := ""
 
-	dcVar, err := dc.variables.GetVariableInfo(varname)
-	if err != nil {
-		panic(aliasName + " '" + varname + "' not found")
-	}
-
-	if dcVar.IndexIdent_ == nil {
-		if dcVar.Const_ == "" {
-			idx := getIndex(dcVar.Index_)
-			totalSize := dcVar.Size_ * dcVar.Len_
-			if dcVar.Index_ != "" {
-				totalSize = dcVar.Size_
-			}
-
-			alias += "alias " + aliasName + " : std_logic_vector(" + strconv.Itoa(totalSize) + " - 1 downto 0)  is in_data( " + strconv.Itoa(dcVar.Position_+totalSize*(idx+1)) + " - 1 downto " + strconv.Itoa(dcVar.Position_+totalSize*idx) + ");\n"
-		}
+	if vi.Const_ != "" {
+		alias += "constant " + aliasName + " : std_logic_vector(" + strconv.Itoa(vi.TotalSize()) + " - 1 downto 0)  := std_logic_vector(to_unsigned(" + vi.Const_ + ", " + strconv.Itoa(vi.TotalSize()) + "));\n"
 	} else {
-		alias += "signal " + aliasName + " : std_logic_vector(" + strconv.Itoa(dcVar.Size_) + "- 1 downto 0);\n"
-		alias += "constant base" + aliasName + "      : integer := " + strconv.Itoa(dcVar.Position_) + ";\n"
-		alias += "alias offset" + aliasName + "      : std_logic_vector(" + strconv.Itoa(dcVar.IndexIdent_.Size_) + " - 1 downto 0)  is in_data( " + strconv.Itoa(dcVar.IndexIdent_.Position_+dcVar.IndexIdent_.Size_) + " -1 downto " + strconv.Itoa(dcVar.IndexIdent_.Position_) + ");\n"
+		if vi.IndexIdent_ == nil {
+			if vi.Const_ == "" {
+				idx := getIndex(vi.Index_)
+				totalSize := vi.Size_ * vi.Len_
+				if vi.Index_ != "" {
+					totalSize = vi.Size_
+				}
+
+				alias += "alias " + aliasName + " : std_logic_vector(" + strconv.Itoa(totalSize) + " - 1 downto 0)  is in_data( " + strconv.Itoa(vi.Position_+totalSize*(idx+1)) + " - 1 downto " + strconv.Itoa(vi.Position_+totalSize*idx) + ");\n"
+			}
+		} else {
+			alias += "signal " + aliasName + " : std_logic_vector(" + strconv.Itoa(vi.Size_) + "- 1 downto 0);\n"
+			alias += "constant base" + aliasName + "      : integer := " + strconv.Itoa(vi.Position_) + ";\n"
+			alias += "alias offset" + aliasName + "      : std_logic_vector(" + strconv.Itoa(vi.IndexIdent_.Size_) + " - 1 downto 0)  is in_data( " + strconv.Itoa(vi.IndexIdent_.Position_+vi.IndexIdent_.Size_) + " -1 downto " + strconv.Itoa(vi.IndexIdent_.Position_) + ");\n"
+		}
 	}
 
 	return alias
@@ -450,17 +470,14 @@ func getAliasOf(varname string, aliasName string, dc *DataChannel) string {
 
 func (bep *BinExprBlock) getAliases() string {
 	ret := ""
-	ret += getAliasOf(bep.Oi.X.Name(), "x", bep.InDataChannels()[0])
+	ret += getAliasOf(bep.Oi.X, "x", bep.InDataChannels()[0])
 
 	if bep.Oi.Y != nil {
-		ret += getAliasOf(bep.Oi.Y.Name(), "y", bep.InDataChannels()[0])
+		ret += getAliasOf(bep.Oi.Y, "y", bep.InDataChannels()[0])
 	}
 
 	if bep.Oi.R != nil {
-		rVar, err := bep.outputVariables.GetVariableInfo(bep.Oi.R.Name_)
-		if err != nil {
-			panic("r not found")
-		}
+		rVar := bep.Oi.R
 
 		if rVar.IndexIdent_ == nil {
 			idx := getIndex(rVar.Index_)
@@ -492,42 +509,40 @@ func (bep *BinExprBlock) getAliases() string {
 }
 
 func (bep *BinExprBlock) getCalcProcess() string {
-	xVar, errx := bep.inputVariables.GetVariableInfo(bep.Oi.X.Name())
-	yVar, erry := bep.inputVariables.GetVariableInfo(bep.Oi.Y.Name())
-	rVar, errr := bep.outputVariables.GetVariableInfo(bep.Oi.R.Name())
-
-	if errx != nil || erry != nil || errr != nil {
-		panic("invalid I/O")
-	}
+	xVar := bep.Oi.X
+	yVar := bep.Oi.Y
+	rVar := bep.Oi.R
 
 	x := ""
 	y := ""
 	delay := " after ADDER_DELAY"
-
-	x = "unsigned(x)"
-	if xVar.Const_ != "" {
-		x = "to_unsigned(" + xVar.Const_ + ", result'length)"
-	}
-
-	if yVar != nil {
-		y = "unsigned(y)"
-		if yVar.Const_ != "" {
-			y = "to_unsigned(" + yVar.Const_ + ", result'length)"
-		}
-
-		if bep.Operation == "<<" || bep.Operation == ">>" {
-			y = "to_integer(" + y + ")"
-		}
-	}
-
-	if bep.Operation == "NOP" || bep.Operation == "=" || yVar == nil {
-		y = ""
-		delay = ""
-	}
-
 	defaultOut := ""
-	if rVar.Index_ != "" || rVar.IndexIdent_ != nil {
-		defaultOut += "out_data <= result_default;"
+
+	if bep.Operation != "NOP" {
+		x = "unsigned(x)"
+		if xVar.Const_ != "" {
+			x = "to_unsigned(" + xVar.Const_ + ", result'length)"
+		}
+
+		if yVar != nil {
+			y = "unsigned(y)"
+			if yVar.Const_ != "" {
+				y = "to_unsigned(" + yVar.Const_ + ", result'length)"
+			}
+
+			if bep.Operation == "<<" || bep.Operation == ">>" {
+				y = "to_integer(" + y + ")"
+			}
+		}
+
+		if bep.Operation == "NOP" || bep.Operation == "=" || yVar == nil {
+			y = ""
+			delay = ""
+		}
+
+		if rVar.Index_ != "" || rVar.IndexIdent_ != nil {
+			defaultOut += "out_data <= result_default;"
+		}
 	}
 
 	processStart := `calc: process(all)
