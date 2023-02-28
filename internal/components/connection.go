@@ -1,6 +1,7 @@
 package components
 
 import (
+	"errors"
 	"go2async/internal/infoPrinter"
 	"go2async/internal/variable"
 	"strconv"
@@ -13,11 +14,10 @@ type DataChannel struct {
 
 	variables *variable.ScopedVariables
 
-	To []*DataChannel
+	To map[string]*DataChannelVariable
 
 	Connected bool
-
-	Out bool
+	Out       bool
 }
 
 type HandshakeChannel struct {
@@ -97,8 +97,9 @@ func NewDataChannel(owner BodyComponentType, inputScope *variable.ScopedVariable
 		Owner:     owner,
 		DataName:  dataSignalName,
 		variables: inputScope,
-		Connected: false,
 		Out:       out,
+
+		To: map[string]*DataChannelVariable{},
 	}
 }
 
@@ -268,17 +269,6 @@ func (c *HandshakeChannel) AssignDefaultOut() {
 	c.Owner.ConnectHandshakeDir(c.Owner.Parent(), true)
 }
 
-func (c *DataChannel) AssignDefaultOut() {
-	if !c.Out {
-		//panic(c.Owner.Name() + " input data " + c.DataName + " is not connected!")
-		return
-	}
-
-	infoPrinter.DebugPrintfln("[%s]: assigning default OUT data: connect with parent", c.Owner.Name())
-
-	c.Owner.ConnectDataDir(c.Owner.Parent(), true)
-}
-
 func (c *HandshakeChannel) SignalDefs() string {
 	if !c.Connected {
 		c.AssignDefaultOut()
@@ -346,7 +336,7 @@ func getOutDirStr(out bool) string {
 	}
 }
 
-func (c *DataChannel) ConnectData(to *DataChannel) {
+func (c *DataChannel) ConnectVariable(to *DataChannel, fromVar *variable.VariableInfo) error {
 	if to == nil {
 		panic("To channel was nil")
 	}
@@ -354,14 +344,78 @@ func (c *DataChannel) ConnectData(to *DataChannel) {
 		panic("Cannot connect two channels with the same direction. Signalnames: " + c.DataName + " <=> " + to.DataName)
 	}
 
-	// bidirectional
-	c.To = append(c.To, to)
-	to.To = append(to.To, c)
+	if !c.variables.HasVariable(fromVar) {
+		infoPrinter.DebugPrintf("vars in datachannel %s: ", c.DataName)
+		for _, vi := range c.variables.VariableList {
+			infoPrinter.DebugPrintfln("var '%s'", vi.Name())
+		}
 
-	c.Connected = true
-	to.Connected = true
+		return errors.New("variable '" + fromVar.Name() + "' not in datachannel")
+	}
+	if !to.variables.HasVariable(fromVar) {
+		infoPrinter.DebugPrintf("vars in datachannel %s: ", to.DataName)
+		for _, vi := range to.variables.VariableList {
+			infoPrinter.DebugPrintfln("var '%s'", vi.Name())
+		}
+
+		if fromVar.IndexIdent_ != nil || fromVar.Index_ != "" {
+
+			c.To[fromVar.Name()] = &DataChannelVariable{
+				dc: nil,
+				vi: fromVar,
+			}
+
+			return nil
+		}
+
+		return errors.New("variable '" + fromVar.Name() + "' not in to datachannel")
+	}
+
+	viFrom, _ := c.variables.GetActualVariableInfo(fromVar.Name())
+	viTo, _ := to.variables.GetActualVariableInfo(fromVar.Name())
+
+	// bidirectional
+	c.To[fromVar.Name()] = &DataChannelVariable{
+		dc: to,
+		vi: viTo,
+	}
+	to.To[fromVar.Name()] = &DataChannelVariable{
+		dc: c,
+		vi: viFrom,
+	}
+
+	viFrom.Connected_ = true
+	viTo.Connected_ = true
 
 	infoPrinter.DebugPrintfln("[DataChannel]: Connected %s [%s : %s] to %s [%s : %s]", c.DataName, c.Owner.Name(), getOutDirStr(c.Out), to.DataName, to.Owner.Name(), getOutDirStr(to.Out))
+
+	return nil
+}
+
+func (c *DataChannel) ConnectData(to *DataChannel) error {
+	if to == nil {
+		panic("To channel was nil")
+	}
+	if c.Out == to.Out {
+		panic("Cannot connect two channels with the same direction. Signalnames: " + c.DataName + " <=> " + to.DataName)
+	}
+
+	foundAtLeastOne := false
+	for _, vi := range to.variables.VariableList {
+		// is allowed to fail
+		if err := c.ConnectVariable(to, vi); err != nil {
+			infoPrinter.DebugPrintfln("[DataChannel]: Could not connect variable %s from %s to %s", vi.Name(), c.DataName, to.DataName)
+		} else {
+			foundAtLeastOne = true
+		}
+	}
+
+	if !foundAtLeastOne {
+		panic("did not find matching data I/O")
+		return errors.New("did not find at least one matching data I/O")
+	}
+
+	return nil
 }
 
 type DataChannelVariable struct {
@@ -387,10 +441,6 @@ func getDataChannelsThatHaveVar(searchSpace []*DataChannel, varName string) []*D
 }
 
 func (c *DataChannel) GetSignalAssigmentStr() string {
-	if !c.Connected {
-		c.AssignDefaultOut()
-	}
-
 	infoPrinter.DebugPrintfln("GETTING ASSIGNMENTS FOR %s", getOutDirStr(c.Out))
 
 	dataSignalAssigmnent := ""
@@ -411,25 +461,14 @@ func (c *DataChannel) GetSignalAssigmentStr() string {
 
 			dataSignalAssigmnent += from + " <= " + to + ";\n"
 		} else {
-			dcvs := getDataChannelsThatHaveVar(c.To, vi.Name())
-			if len(dcvs) == 0 {
-				infoPrinter.DebugPrintfln("[%s]: did not find var '%s' in %d connected dataChannels: ", c.Owner.Name(), vi.Name(), len(c.To))
+
+			if !vi.Connected_ {
+				infoPrinter.DebugPrintfln("[%s]: var '%s' not connected in %d connected dataChannels: ", c.Owner.Name(), vi.Name(), len(c.To))
 
 				if c.Out {
 					// Unconnected out connections are allowed
 					continue
 				}
-
-				for _, t := range c.To {
-					for _, v := range t.Owner.OutputVariables().VariableList {
-
-						infoPrinter.DebugPrintfln("[%s]: var %s is output", t.Owner.Name(), v.Name())
-					}
-
-					infoPrinter.DebugPrintfln("[%s]: not found here", t.Owner.Name())
-				}
-
-				//panic(strconv.Itoa(i+1) + ". input var '" + vi.Name() + "' not found in connected dataChannels; owner: " + c.Owner.Name() + "  parent: " + c.Owner.Parent().Name())
 
 				to = "std_logic_vector(to_signed(0, " + strconv.Itoa(vi.TotalSize()) + "))"
 
@@ -437,20 +476,32 @@ func (c *DataChannel) GetSignalAssigmentStr() string {
 
 				infoPrinter.DebugPrintfln("[%s]: input var %s is assigned default", c.Owner.Name(), vi.Name())
 			} else {
-				for _, dcv := range dcvs {
-					dcvvb := dcv.vi.GetVariableVectorBounds()
 
-					to = dcv.dc.DataName + " (" + dcvvb.UpperboundStr + " - 1 downto " + dcvvb.LowerboundStr + ")"
-
-					if !c.Out {
-						dataSignalAssigmnent += from + " <= " + to + ";\n"
-					} else {
-						dataSignalAssigmnent += to + " <= " + from + ";\n"
+				dcv, ok := c.To[vi.Name()]
+				if !ok {
+					if c.Out {
+						// Unconnected out connections are allowed
+						continue
 					}
-
-					infoPrinter.DebugPrintfln("[%s]: %d. input (out?%t)var '%s' from '%s'", c.Owner.Name(), i+1, c.Out, vi.Name(), dcv.dc.Owner.Name())
+					panic("did not find '" + vi.Name() + "' in connected dataChannels")
 				}
+
+				dcvvi := dcv.vi
+				dc := dcv.dc
+
+				dcvvb := dcvvi.GetVariableVectorBounds()
+
+				to = dcv.dc.DataName + " (" + dcvvb.UpperboundStr + " - 1 downto " + dcvvb.LowerboundStr + ")"
+
+				if !c.Out {
+					dataSignalAssigmnent += from + " <= " + to + ";\n"
+				} else {
+					dataSignalAssigmnent += to + " <= " + from + ";\n"
+				}
+
+				infoPrinter.DebugPrintfln("[%s]: %d. input (out?%t)var '%s' from '%s'", c.Owner.Name(), i+1, c.Out, dcvvi.Name(), dc.Owner.Name())
 			}
+
 		}
 	}
 

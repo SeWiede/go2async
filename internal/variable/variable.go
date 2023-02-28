@@ -96,6 +96,7 @@ type VariableInfo struct {
 	FuncIntf_ *FuncInterface
 
 	DefinedOnly_ bool
+	Connected_   bool
 }
 
 func MakeConst(constval string, typ string) (*VariableInfo, error) {

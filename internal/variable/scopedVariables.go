@@ -72,6 +72,15 @@ func (sv *ScopedVariables) GetVariableInfo(name string) (*VariableInfo, error) {
 	return vi.Copy(), nil
 }
 
+func (sv *ScopedVariables) GetActualVariableInfo(name string) (*VariableInfo, error) {
+	vi, ok := sv.Variables[name]
+	if !ok {
+		return nil, ErrVariableNotFoundFn(name)
+	}
+
+	return vi, nil
+}
+
 func (sv *ScopedVariables) GetVariableInfoAt(pos int) (*VariableInfo, error) {
 	if len(sv.VariableList) <= pos || pos < 0 {
 		return nil, ErrInvalidVariablePosFn(pos)
@@ -200,4 +209,13 @@ func (sv *ScopedVariables) AddVariableInfo(v *VariableInfo) (*VariableInfo, erro
 
 func (sv *ScopedVariables) GetSize() int {
 	return sv.Size
+}
+
+func (sv *ScopedVariables) HasVariableName(v string) bool {
+	_, ok := sv.Variables[v]
+	return ok
+}
+
+func (sv *ScopedVariables) HasVariable(vi *VariableInfo) bool {
+	return sv.HasVariableName(vi.Name())
 }

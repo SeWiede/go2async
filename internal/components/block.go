@@ -384,6 +384,28 @@ func (b *Block) getHandshakeSignalAssignments() string {
 func (b *Block) getDataSignalAssignments() string {
 	dataSignalAssignments := ""
 
+	// Default data_out assignment is data_in
+
+	dataSignalAssignments += "-- Default block out_data is in_data"
+	dataSignalAssignments += "\n"
+	dataSignalAssignments += "out_data <= in_data(out_data'length - 1 downto 0);"
+	dataSignalAssignments += "\n"
+	dataSignalAssignments += "\n"
+
+	// Get out_data assignments
+	for _, outp := range b.OutputVariables().VariableList {
+		owner, ok := b.VariableOwner[outp.Name()]
+		if !ok {
+			panic("output var '" + outp.Name() + "' not in ownerMap")
+		}
+
+		latestOwner := owner.ownerList.latest
+
+		if latestOwner.Name() != b.Name() {
+			latestOwner.ConnectOutVariable(b, outp)
+		}
+	}
+
 	for _, rbp := range b.RegBlockPairs {
 		comp := rbp.Bc
 
@@ -512,7 +534,7 @@ func (b *Block) GetVariable(varName string) (*variable.VariableInfo, error) {
 
 	own, ok := b.VariableOwner[varName]
 	if ok {
-		infoPrinter.DebugPrintfln("Variable %s's latest owner is %s", varName, own.ownerList.lastest.Name())
+		infoPrinter.DebugPrintfln("Variable %s's latest owner is %s", varName, own.ownerList.latest.Name())
 		return own.vi.Copy(), nil
 	} else {
 		if b.Parent() == nil {
@@ -534,6 +556,8 @@ func (b *Block) GetVariable(varName string) (*variable.VariableInfo, error) {
 
 		vi.DefinedOnly_ = false
 
+		b.InputVariables().AddVariable(vi)
+
 		if !b.KeepVariableOwnership {
 			// Skip top block
 			if b.Parent().Parent() != nil {
@@ -544,7 +568,7 @@ func (b *Block) GetVariable(varName string) (*variable.VariableInfo, error) {
 					return nil, errors.New("No owner for X operator")
 				}
 
-				latestOwner := ownX.ownerList.lastest
+				latestOwner := ownX.ownerList.latest
 				ownX.ownerList.AddSuccessorToLatest(b)
 
 				// Claim ownership of used variable in parent
@@ -574,7 +598,7 @@ func (b *Block) GetVariable(varName string) (*variable.VariableInfo, error) {
 					return nil, errors.New("No owner for X operator")
 				}
 
-				latestOwner := ownX.ownerList.lastest
+				latestOwner := ownX.ownerList.latest
 				ownX.ownerList.AddSuccessorToLatest(b)
 
 				// Claim ownership of used variable in parent
@@ -587,28 +611,10 @@ func (b *Block) GetVariable(varName string) (*variable.VariableInfo, error) {
 			infoPrinter.DebugPrintfln("[%s]: keeping variable ownership and wait for later connections!", b.Name())
 		}
 
-		/* // New owner of variable in current block is the current block.
-		b.VariableOwner[vi.Name()] = &variableOwner{
-			ownerList: NewOwnerList(b),
-			vi:        vi,
-		}
-		*/
-		b.InputVariables().AddVariable(vi)
-
-		//b.AddInputVariable(vi)
-
 		infoPrinter.DebugPrintfln("[%s] Variable %s is from outside the block's scope. Added to inputs and owners (current size = %d).", b.Name(), varName, b.InputVariables().Size)
 
 		return vi.Copy(), nil
 	}
-
-	/* v, err := b.GetScopedVariables().GetVariableInfo(name)
-	if err != nil {
-
-	} else {
-		infoPrinter.DebugPrintfln("Variable %s's owner is %s", name, own.bc.Name())
-		return v, nil
-	} */
 }
 
 func (b *Block) AddFunctionInterface(f *variable.VariableInfo) error {

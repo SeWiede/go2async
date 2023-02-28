@@ -266,7 +266,6 @@ func (lb *LoopBlock) createInnerLife() {
 
 	// Default in2
 	lb.entryMux.ConnectDataPos(lb, 1, 0)
-
 	lb.entryMux.ConnectDataPos(lb.body, 1, 0)
 
 	// InitRegFork

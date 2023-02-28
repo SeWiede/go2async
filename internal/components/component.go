@@ -98,6 +98,9 @@ type BodyComponentType interface {
 
 	GetHandshakeSignalAssigmentStr() string
 	GetDataSignalAssigmentStr() string
+
+	ConnectVariable(bct BodyComponentType, vi *variable.VariableInfo)
+	ConnectOutVariable(bct BodyComponentType, vi *variable.VariableInfo)
 }
 
 type BodyComponent struct {
@@ -331,9 +334,52 @@ func (bc *BodyComponent) ConnectDataPosDir(bct BodyComponentType, from, to int, 
 		}
 	}
 
-	fromDataChannel.ConnectData(toDataChannel)
+	if err := fromDataChannel.ConnectData(toDataChannel); err != nil {
+		panic("could not connect data: " + err.Error())
+	}
 
 	infoPrinter.DebugPrintfln("[%s]: %s connected %d. data to '%s' %s %d.", bc.Name(), fromDataChannel.DataName, from, bct.Name(), toDataChannel.DataName, to)
+}
+
+func (bc *BodyComponent) ConnectVariable(bct BodyComponentType, vi *variable.VariableInfo) {
+	infoPrinter.DebugPrintfln("[%s]: connecting variable to %s (out? %t from pos %d to pos %d)", bc.Name(), bct.Name(), false, 0, 0)
+	var fromDataChannel *DataChannel
+	var toDataChannel *DataChannel
+
+	fromDataChannel = bc.InDataChannels()[0]
+	toDataChannel = bct.OutDataChannels()[0]
+
+	if bct == bc.parentBlock || bct.Name() == bc.parentBlock.Name() {
+		infoPrinter.DebugPrintfln("[%s]: to data connection is parent '%s' - using parent's inner connections", bc.name, bc.Parent().Name())
+
+		toDataChannel = bc.parentBlock.GetInnerInData()
+	}
+
+	if err := fromDataChannel.ConnectVariable(toDataChannel, vi); err != nil {
+		panic("could not connect data: " + err.Error())
+	}
+
+	infoPrinter.DebugPrintfln("[%s]: %s connected %d. variable to '%s' %s %d.", bc.Name(), fromDataChannel.DataName, 0, bct.Name(), toDataChannel.DataName, 0)
+}
+func (bc *BodyComponent) ConnectOutVariable(bct BodyComponentType, vi *variable.VariableInfo) {
+	infoPrinter.DebugPrintfln("[%s]: connecting variable to %s (out? %t from pos %d to pos %d)", bc.Name(), bct.Name(), true, 0, 0)
+	var fromDataChannel *DataChannel
+	var toDataChannel *DataChannel
+
+	fromDataChannel = bc.OutDataChannels()[0]
+	toDataChannel = bct.InDataChannels()[0]
+
+	if bct == bc.parentBlock || bct.Name() == bc.parentBlock.Name() {
+		infoPrinter.DebugPrintfln("[%s]: to data connection is parent '%s' - using parent's inner connections", bc.name, bc.Parent().Name())
+
+		toDataChannel = bc.parentBlock.GetInnerOutData()
+	}
+
+	if err := fromDataChannel.ConnectVariable(toDataChannel, vi); err != nil {
+		panic("could not connect data: " + err.Error())
+	}
+
+	infoPrinter.DebugPrintfln("[%s]: %s connected %d. variable to '%s' %s %d.", bc.Name(), fromDataChannel.DataName, 0, bct.Name(), toDataChannel.DataName, 0)
 }
 
 func (bc *BodyComponent) GetHandshakeSignalAssigmentStr() string {

@@ -261,7 +261,7 @@ func addVariableToLatestAndConnect(bt BodyComponentType, parent BlockType, vi *v
 		return errors.New("No owner")
 	}
 
-	latestOwner := ownX.ownerList.lastest
+	latestOwner := ownX.ownerList.latest
 
 	if latestOwner.Name() != bt.Name() {
 		ownX.ownerList.AddSuccessorToLatest(bt)
@@ -273,7 +273,7 @@ func addVariableToLatestAndConnect(bt BodyComponentType, parent BlockType, vi *v
 			bt.ConnectHandshake(latestOwner)
 
 			if vi.Const() == "" {
-				bt.ConnectData(latestOwner)
+				bt.ConnectVariable(latestOwner, vi)
 			}
 		}
 	}
@@ -302,12 +302,12 @@ func getOperandOwnersAndSetNewOwner(bt BodyComponentType, parent BlockType, oi *
 					panic("cascading indexIdents")
 				}
 
-				if err := addVariableToLatestAndConnect(bt, parent, indexIdent, false); err != nil {
+				addedIndexIdent, err := bt.AddInputVariable(indexIdent)
+				if err != nil {
 					return nil, err
 				}
 
-				addedIndexIdent, err := bt.AddInputVariable(indexIdent)
-				if err != nil {
+				if err := addVariableToLatestAndConnect(bt, parent, indexIdent, false); err != nil {
 					return nil, err
 				}
 
@@ -316,12 +316,12 @@ func getOperandOwnersAndSetNewOwner(bt BodyComponentType, parent BlockType, oi *
 				indexIdent = addedIndexIdent
 			}
 
-			// Add result as input too
-			if err := addVariableToLatestAndConnect(bt, parent, oi.R, false); err != nil {
+			// Add input array as default input
+			if _, err := bt.AddInputVariable(oi.R); err != nil {
 				return nil, err
 			}
 
-			if _, err := bt.AddInputVariable(oi.R); err != nil {
+			if err := addVariableToLatestAndConnect(bt, parent, oi.R, false); err != nil {
 				return nil, err
 			}
 		}
@@ -555,6 +555,8 @@ func (bep *BinExprBlock) getCalcProcess() string {
 	ycalc := ""
 	compute := ""
 	resultMap := ""
+
+	delay = ""
 
 	if bep.Operation != "NOP" {
 		if xVar.IndexIdent_ != nil {

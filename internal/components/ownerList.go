@@ -6,7 +6,7 @@ type ownerList struct {
 	// Acts as linked list of predecessors
 	predecessorMap map[string]BodyComponentType
 
-	lastest BodyComponentType
+	latest BodyComponentType
 }
 
 func NewOwnerList(top BodyComponentType) *ownerList {
@@ -16,17 +16,17 @@ func NewOwnerList(top BodyComponentType) *ownerList {
 
 	return &ownerList{
 		predecessorMap: predecessorMap,
-		lastest:        top,
+		latest:         top,
 	}
 }
 
 func (ol *ownerList) GetLatest() BodyComponentType {
-	return ol.lastest
+	return ol.latest
 }
 
 func (ol *ownerList) AddOwner(n BodyComponentType) {
 	ol.predecessorMap[n.Name()] = ol.GetLatest()
-	ol.lastest = n
+	ol.latest = n
 }
 
 func (ol *ownerList) AddSuccessorToLatest(n BodyComponentType) {
