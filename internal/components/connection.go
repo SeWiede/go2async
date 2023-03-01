@@ -404,14 +404,13 @@ func (c *DataChannel) ConnectData(to *DataChannel) error {
 	for _, vi := range to.variables.VariableList {
 		// is allowed to fail
 		if err := c.ConnectVariable(to, vi); err != nil {
-			infoPrinter.DebugPrintfln("[DataChannel]: Could not connect variable %s from %s to %s", vi.Name(), c.DataName, to.DataName)
+			infoPrinter.DebugPrintfln("[DataChannel]: Could not connect var %s from %s to %s", vi.Name(), c.DataName, to.DataName)
 		} else {
 			foundAtLeastOne = true
 		}
 	}
 
 	if !foundAtLeastOne {
-		panic("did not find matching data I/O")
 		return errors.New("did not find at least one matching data I/O")
 	}
 

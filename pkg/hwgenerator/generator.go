@@ -186,9 +186,6 @@ func (g *Generator) HandleAssignmentStmt(s *ast.AssignStmt, parent components.Bl
 			return nil, err
 		}
 
-		infoPrinter.DebugPrintfln("generating IndexExpr poiners: r %p", lhsVar)
-		infoPrinter.DebugPrintfln("generating IndexExpr poiners: x %p", v)
-
 		g.components[newFuncBlk.ArchName()] = newFuncBlk
 		parent.AddComponent(newFuncBlk)
 
@@ -224,9 +221,6 @@ func (g *Generator) HandleAssignmentStmt(s *ast.AssignStmt, parent components.Bl
 		if err != nil {
 			return nil, err
 		}
-
-		infoPrinter.DebugPrintfln("generating asdf poiners: r %p", lhsVar)
-		infoPrinter.DebugPrintfln("generating asdf poiners: x %p", v)
 
 		g.components[newFuncBlk.ArchName()] = newFuncBlk
 		parent.AddComponent(newFuncBlk)

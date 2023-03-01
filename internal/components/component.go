@@ -335,7 +335,8 @@ func (bc *BodyComponent) ConnectDataPosDir(bct BodyComponentType, from, to int, 
 	}
 
 	if err := fromDataChannel.ConnectData(toDataChannel); err != nil {
-		panic("could not connect data: " + err.Error())
+		// panic("could not connect data: " + err.Error())
+		infoPrinter.DebugPrintfln("[%s]: error connecting data to %s: %s", bc.Name(), bct.Name(), err.Error())
 	}
 
 	infoPrinter.DebugPrintfln("[%s]: %s connected %d. data to '%s' %s %d.", bc.Name(), fromDataChannel.DataName, from, bct.Name(), toDataChannel.DataName, to)

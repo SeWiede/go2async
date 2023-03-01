@@ -461,7 +461,7 @@ func getAliasOf(vi *variable.VariableInfo, aliasName string, dc *DataChannel) st
 		} else {
 			alias += "signal " + aliasName + " : std_logic_vector(" + strconv.Itoa(vi.Size_) + "- 1 downto 0);\n"
 			alias += "constant base" + aliasName + "      : integer := " + strconv.Itoa(vi.Position_) + ";\n"
-			alias += "alias offset" + aliasName + "      : std_logic_vector(" + strconv.Itoa(vi.IndexIdent_.Size_) + " - 1 downto 0)  is in_data( " + strconv.Itoa(vi.IndexIdent_.Position_+vi.IndexIdent_.Size_) + " -1 downto " + strconv.Itoa(vi.IndexIdent_.Position_) + ");\n"
+			alias += "alias offset" + aliasName + "      : std_logic_vector(" + strconv.Itoa(vi.IndexIdent_.Size_) + " - 1 downto 0)  is in_data( " + strconv.Itoa(vi.IndexIdent_.Position_+vi.IndexIdent_.Size_) + " - 1 downto " + strconv.Itoa(vi.IndexIdent_.Position_) + ");\n"
 		}
 	}
 
@@ -490,7 +490,7 @@ func (bep *BinExprBlock) getAliases() string {
 		} else {
 			ret += "signal result : std_logic_vector(" + strconv.Itoa(rVar.Size_) + " - 1 downto 0);\n"
 			ret += "constant baseR      : integer := " + strconv.Itoa(rVar.Position_) + ";\n"
-			ret += "alias offsetR      : std_logic_vector(" + strconv.Itoa(rVar.IndexIdent_.Size_) + " - 1 downto 0)  is in_data( " + strconv.Itoa(rVar.IndexIdent_.Position_+rVar.IndexIdent_.Size_) + " -1 downto " + strconv.Itoa(rVar.IndexIdent_.Position_) + ");\n"
+			ret += "alias offsetR      : std_logic_vector(" + strconv.Itoa(rVar.IndexIdent_.Size_) + " - 1 downto 0)  is in_data( " + strconv.Itoa(rVar.IndexIdent_.Position_+rVar.IndexIdent_.Size_) + " - 1 downto " + strconv.Itoa(rVar.IndexIdent_.Position_) + ");\n"
 		}
 
 		if rVar.Index_ != "" || rVar.IndexIdent_ != nil {

@@ -581,7 +581,7 @@ func (b *Block) GetVariable(varName string) (*variable.VariableInfo, error) {
 				latestOwner.AddSuccessor(b)
 
 				b.ConnectHandshake(latestOwner)
-				b.ConnectData(latestOwner)
+				b.ConnectVariable(latestOwner, vi)
 
 				infoPrinter.DebugPrintfln("[%s]: connected to %s and got ownerShip of var %s", b.Name(), latestOwner.Name(), varName)
 
