@@ -157,6 +157,11 @@ func (lb *LoopBlock) Architecture() string {
 
 	handshakeSignalAssignments := lb.getHandshakeSignalAssignments()
 
+	// Get out_data assignments
+	for _, outp := range lb.OutputVariables().VariableList {
+		lb.exitDemux.ConnectOutVariable(lb, outp)
+	}
+
 	dataSignalAssignments := lb.getDataSignalAssignments()
 
 	signalDefs := ""

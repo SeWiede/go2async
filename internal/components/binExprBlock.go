@@ -348,9 +348,14 @@ func getOperandOwnersAndSetNewOwner(bt BodyComponentType, parent BlockType, oi *
 		return nil, err
 	}
 
+	// Make sure no index info is stored in woner ref
+	rCopy := oi.R.Copy()
+	rCopy.IndexIdent_ = nil
+	rCopy.Index_ = ""
+
 	// Set new owner of result variable after getting previous owners! - R is not nil here!
 	if own, ok := parent.GetVariableOwnerMap()[oi.R.Name()]; ok {
-		own.vi = oi.R
+		own.vi = rCopy
 		own.ownerList.AddOwner(bt)
 	} else {
 		infoPrinter.DebugPrintfln("Adding variable '%s' to ownermap of '%s'", oi.R.Name_, parent.Name())
@@ -555,8 +560,6 @@ func (bep *BinExprBlock) getCalcProcess() string {
 	ycalc := ""
 	compute := ""
 	resultMap := ""
-
-	delay = ""
 
 	if bep.Operation != "NOP" {
 		if xVar.IndexIdent_ != nil {

@@ -171,6 +171,11 @@ func (ib *IfBlock) Architecture() string {
 
 	handshakeSignalAssignments := ib.getHandshakeSignalAssignments()
 
+	// Get out_data assignments
+	for _, outp := range ib.OutputVariables().VariableList {
+		ib.merger.ConnectOutVariable(ib, outp)
+	}
+
 	dataSignalAssignments := ib.getDataSignalAssignments()
 
 	signalDefs := ""

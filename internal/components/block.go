@@ -392,27 +392,13 @@ func (b *Block) getDataSignalAssignments() string {
 	dataSignalAssignments += "\n"
 	dataSignalAssignments += "\n"
 
-	// Get out_data assignments
-	for _, outp := range b.OutputVariables().VariableList {
-		owner, ok := b.VariableOwner[outp.Name()]
-		if !ok {
-			panic("output var '" + outp.Name() + "' not in ownerMap")
-		}
-
-		latestOwner := owner.ownerList.latest
-
-		if latestOwner.Name() != b.Name() {
-			latestOwner.ConnectOutVariable(b, outp)
-		}
-	}
-
 	for _, rbp := range b.RegBlockPairs {
 		comp := rbp.Bc
 
 		dataSignalAssignments += "-- Data signal assignments for " + comp.Name()
 		dataSignalAssignments += "\n"
 
-		infoPrinter.DebugPrintfln("[%s]: data signal assignments for "+comp.Name(), comp.Name())
+		infoPrinter.DebugPrintfln("[%s]: data signal assignment ", comp.Name())
 		dataSignalAssignments += comp.GetDataSignalAssigmentStr()
 
 		dataSignalAssignments += "-------------------------------"
@@ -437,6 +423,23 @@ func (b *Block) Architecture() string {
 	signalDefs := ""
 
 	handShakeAssignments := b.getHandshakeSignalAssignments()
+
+	// Get out_data assignments
+	for _, outp := range b.OutputVariables().VariableList {
+		owner, ok := b.VariableOwner[outp.Name()]
+		if !ok {
+			panic("output var '" + outp.Name() + "' not in ownerMap")
+		}
+
+		latestOwner := owner.ownerList.latest
+
+		if latestOwner.Name() != b.Name() {
+			latestOwner.ConnectOutVariable(b, outp)
+
+			infoPrinter.DebugPrintfln("[%s]: assigning output %s from %s", b.Name(), outp.Name(), latestOwner.Name())
+		}
+	}
+
 	dataSignalAssignments := b.getDataSignalAssignments()
 
 	for _, rbp := range b.RegBlockPairs {
@@ -535,6 +538,7 @@ func (b *Block) GetVariable(varName string) (*variable.VariableInfo, error) {
 	own, ok := b.VariableOwner[varName]
 	if ok {
 		infoPrinter.DebugPrintfln("Variable %s's latest owner is %s", varName, own.ownerList.latest.Name())
+
 		return own.vi.Copy(), nil
 	} else {
 		if b.Parent() == nil {
