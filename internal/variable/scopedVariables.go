@@ -95,6 +95,7 @@ func (sv *ScopedVariables) AddVariable(v VariableDef) (*VariableInfo, error) {
 	}
 
 	typeSize := -1
+	signed := false
 
 	funcIntf := v.FuncIntf()
 
@@ -104,10 +105,13 @@ func (sv *ScopedVariables) AddVariable(v VariableDef) (*VariableInfo, error) {
 		}
 
 		var ok bool
-		typeSize, ok = SupportedTypes[v.Typ()]
+		typeInfo, ok := SupportedTypes[v.Typ()]
 		if !ok {
 			return nil, ErrUnsupportedVariableTypeFn(v.Typ())
 		}
+
+		typeSize = typeInfo.Size
+		signed = typeInfo.Signed
 	} else {
 		// typeSize if result size
 		typeSize = v.FuncIntf().Results.GetSize()
@@ -125,6 +129,7 @@ func (sv *ScopedVariables) AddVariable(v VariableDef) (*VariableInfo, error) {
 		Name_:     name,
 		Position_: sv.Size,
 		Size_:     typeSize,
+		Signed_:   signed,
 		Typ_:      v.Typ(),
 		Len_:      v.Len(),
 		Const_:    v.Const(),
@@ -155,6 +160,7 @@ func (sv *ScopedVariables) AddVariableInfo(v *VariableInfo) (*VariableInfo, erro
 	}
 
 	typeSize := -1
+	signed := false
 
 	funcIntf := v.FuncIntf()
 
@@ -164,10 +170,13 @@ func (sv *ScopedVariables) AddVariableInfo(v *VariableInfo) (*VariableInfo, erro
 		}
 
 		var ok bool
-		typeSize, ok = SupportedTypes[v.Typ()]
+		typeInfo, ok := SupportedTypes[v.Typ()]
 		if !ok {
 			return nil, ErrUnsupportedVariableTypeFn(v.Typ())
 		}
+
+		typeSize = typeInfo.Size
+		signed = typeInfo.Signed
 	} else {
 		// typeSize if result size
 		typeSize = v.FuncIntf().Results.GetSize()
@@ -185,6 +194,7 @@ func (sv *ScopedVariables) AddVariableInfo(v *VariableInfo) (*VariableInfo, erro
 		Name_:     name,
 		Position_: sv.Size,
 		Size_:     typeSize,
+		Signed_:   signed,
 		Typ_:      v.Typ(),
 		Len_:      v.Len(),
 		Const_:    v.Const(),

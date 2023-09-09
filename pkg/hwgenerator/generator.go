@@ -30,8 +30,8 @@ type Generator struct {
 var cvp = 0
 
 func NewGenerator(intSize int) *Generator {
-	variable.SupportedTypes["int"] = intSize
-	variable.SupportedTypes["uint"] = intSize
+	variable.SupportedTypes["int"].Size = intSize
+	variable.SupportedTypes["uint"].Size = intSize
 
 	return &Generator{
 		components: make(map[string]components.Component),

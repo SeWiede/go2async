@@ -523,16 +523,30 @@ func (bep *BinExprBlock) getCalcProcess() string {
 	delay := " after ADDER_DELAY"
 	defaultOut := ""
 
+	xSignStr := "unsigned"
+	ySignStr := "unsigned"
+	rSignStr := "unsigned"
+
+	if xVar != nil && xVar.Signed_ {
+		xSignStr = "signed"
+	}
+	if yVar != nil && yVar.Signed_ {
+		ySignStr = "signed"
+	}
+	if rVar != nil && rVar.Signed_ {
+		rSignStr = "signed"
+	}
+
 	if bep.Operation != "NOP" {
-		x = "unsigned(x)"
+		x = xSignStr + "(x)"
 		if xVar.Const_ != "" {
-			x = "to_unsigned(" + xVar.Const_ + ", result'length)"
+			x = "to_" + xSignStr + "(" + xVar.Const_ + ", result'length)"
 		}
 
 		if yVar != nil {
-			y = "unsigned(y)"
+			y = ySignStr + "(y)"
 			if yVar.Const_ != "" {
-				y = "to_unsigned(" + yVar.Const_ + ", result'length)"
+				y = "to_" + xSignStr + "(" + yVar.Const_ + ", result'length)"
 			}
 
 			if bep.Operation == "<<" || bep.Operation == ">>" {
@@ -563,12 +577,12 @@ func (bep *BinExprBlock) getCalcProcess() string {
 
 	if bep.Operation != "NOP" {
 		if xVar.IndexIdent_ != nil {
-			x = "unsigned(x)"
+			x = xSignStr + "(x)"
 			xcalc = "x <= in_data(baseX + (to_integer(unsigned(offsetX)) + 1) * x'length - 1 downto baseX + to_integer(unsigned(offsetX)) * x'length);\n"
 		}
 
 		if yVar != nil && yVar.IndexIdent_ != nil {
-			y = "unsigned(y)"
+			y = ySignStr + "(y)"
 			ycalc = "y <= in_data(baseY + (to_integer(unsigned(offsetY)) + 1) * y'length - 1 downto baseY + to_integer(unsigned(offsetY)) * y'length);\n"
 
 		}
@@ -576,7 +590,7 @@ func (bep *BinExprBlock) getCalcProcess() string {
 		compute = "result <= std_logic_vector(resize(" + x + " " + SupportedOperations[bep.Operation] + " " + y + ", result'length)) " + delay + ";\n"
 
 		if rVar.IndexIdent_ != nil {
-			resultMap = "offset := baseR + to_integer(unsigned(offsetR) * result'length);\n"
+			resultMap = "offset := baseR + to_integer(" + rSignStr + "(offsetR) * result'length);\n"
 			resultMap += "out_data(offset + result'length -1 downto offset) <= result;\n"
 		}
 	}

@@ -8,7 +8,25 @@ import (
 
 var ErrEmptyName = errors.New("Variable name is empty")
 
-var SupportedTypes map[string]int = map[string]int{"int": strconv.IntSize, "int8": 8, "int16": 16, "int32": 32, "int64": 64, "uint": strconv.IntSize, "uint8": 8, "uint16": 16, "uint32": 32, "uint64": 64, "byte": 8, "__go2async_selector": 1}
+type typeInfo struct {
+	Size   int
+	Signed bool
+}
+
+var SupportedTypes map[string]*typeInfo = map[string]*typeInfo{
+	"int":                 {strconv.IntSize, true},
+	"int8":                {8, true},
+	"int16":               {16, true},
+	"int32":               {32, true},
+	"int64":               {64, true},
+	"uint":                {strconv.IntSize, true},
+	"uint8":               {8, false},
+	"uint16":              {16, false},
+	"uint32":              {32, false},
+	"uint64":              {64, false},
+	"byte":                {8, false},
+	"__go2async_selector": {1, false},
+}
 
 type FuncInterface struct {
 	Parameters *ScopedVariables
@@ -83,11 +101,12 @@ func (vTd *VariableTypeDecl) Copy() *VariableTypeDecl {
 }
 
 type VariableInfo struct {
-	Name_  string
-	Size_  int
-	Typ_   string
-	Const_ string
-	Len_   int
+	Name_   string
+	Size_   int
+	Typ_    string
+	Const_  string
+	Len_    int
+	Signed_ bool
 
 	Position_   int
 	Index_      string
@@ -100,14 +119,14 @@ type VariableInfo struct {
 }
 
 func MakeConst(constval string, typ string) (*VariableInfo, error) {
-	size, ok := SupportedTypes[typ]
+	typeInfo, ok := SupportedTypes[typ]
 	if !ok {
 		return nil, ErrUnsupportedVariableTypeFn(typ)
 	}
 
 	return &VariableInfo{
 		Const_: constval,
-		Size_:  size,
+		Size_:  typeInfo.Size,
 		Typ_:   typ,
 		Len_:   1,
 	}, nil
@@ -153,6 +172,7 @@ func (vi *VariableInfo) Copy() *VariableInfo {
 		Len_:        vi.Len_,
 		Index_:      vi.Index_,
 		IndexIdent_: copiedIndexIdent,
+		Signed_:     vi.Signed_,
 
 		FuncIntf_: copiedFuncIntf,
 	}
@@ -179,16 +199,17 @@ func FromDef(vdef VariableDef) (*VariableInfo, error) {
 		copiedFuncIntf = vdef.FuncIntf().Copy()
 	}
 
-	typeSize, ok := SupportedTypes[vdef.Typ()]
+	typeInfo, ok := SupportedTypes[vdef.Typ()]
 	if !ok {
 		return nil, ErrUnsupportedVariableTypeFn(vdef.Typ())
 	}
 
 	return &VariableInfo{
-		Name_: vdef.Name(),
-		Typ_:  vdef.Typ(),
-		Len_:  vdef.Len(),
-		Size_: typeSize,
+		Name_:   vdef.Name(),
+		Typ_:    vdef.Typ(),
+		Len_:    vdef.Len(),
+		Size_:   typeInfo.Size,
+		Signed_: typeInfo.Signed,
 
 		FuncIntf_: copiedFuncIntf,
 
@@ -220,6 +241,7 @@ func NewLocalVariable(v VariableDef) (*VariableInfo, error) {
 	}
 
 	typeSize := -1
+	signed := false
 	funcIntf := v.FuncIntf()
 
 	if v.FuncIntf() == nil {
@@ -228,10 +250,12 @@ func NewLocalVariable(v VariableDef) (*VariableInfo, error) {
 		}
 
 		var ok bool
-		typeSize, ok = SupportedTypes[v.Typ()]
+		typeInfo, ok := SupportedTypes[v.Typ()]
 		if !ok {
 			return nil, ErrUnsupportedVariableTypeFn(v.Typ())
 		}
+		typeSize = typeInfo.Size
+		signed = typeInfo.Signed
 	} else {
 		// typeSize if result size
 		typeSize = v.FuncIntf().Results.GetSize()
@@ -250,6 +274,8 @@ func NewLocalVariable(v VariableDef) (*VariableInfo, error) {
 		Name_:     v.Name(),
 		Position_: 0, // Position can only be 0 for new local variables since they are not part of scopedVariables
 		Size_:     typeSize,
+		Signed_:   signed,
+
 		Typ_:      v.Typ(),
 		Len_:      v.Len(),
 		FuncIntf_: funcIntf,

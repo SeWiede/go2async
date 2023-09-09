@@ -1,14 +1,14 @@
 package goexamples
 
 func Quicksort(x [6]int) [6]int {
-	var l, r [15]int // Queues to safe the recursive states (left bound, right bound)
+	var l, r [15]int // Queues to safe recursive bound states (left bound, right bound)
 	var n, d int     // Queue states
-	l[0] = 0         // first left bound: leftmost element
-	r[0] = 6 - 1     // first right bound: rightmost element
+	l[0] = 0         // First left bound: leftmost element
+	r[0] = 6 - 1     // First right bound: rightmost element
 
-	d = 0        // current queue position
-	n = 1        // occupied queue elements
-	for d != n { // loop until all queue elements are processes
+	d = 0        // Current queue position
+	n = 1        // Occupied queue elements
+	for d != n { // loop until all queue elements are processed
 		li := l[d]
 		re := r[d]
 		i := li
