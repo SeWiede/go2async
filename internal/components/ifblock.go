@@ -1,6 +1,7 @@
 package components
 
 import (
+	"go2async/internal/globalArguments"
 	"go2async/internal/infoPrinter"
 	"go2async/internal/variable"
 	"strconv"
@@ -188,7 +189,9 @@ func (ib *IfBlock) Architecture() string {
 	}
 	signalDefs += "\n"
 
-	handshakeSignalAssignments += ib.GetInnerHandshakeSignalAssignmentstr()
+	if !*globalArguments.Sequential {
+		handshakeSignalAssignments += ib.GetInnerHandshakeSignalAssignmentstr()
+	}
 
 	componentStr := ib.componentsString()
 

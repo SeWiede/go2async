@@ -1,6 +1,7 @@
 package components
 
 import (
+	"go2async/internal/globalArguments"
 	"go2async/internal/infoPrinter"
 	"go2async/internal/variable"
 	"strconv"
@@ -174,7 +175,9 @@ func (lb *LoopBlock) Architecture() string {
 	}
 	signalDefs += "\n"
 
-	handshakeSignalAssignments += lb.GetInnerHandshakeSignalAssignmentstr()
+	if !*globalArguments.Sequential {
+		handshakeSignalAssignments += lb.GetInnerHandshakeSignalAssignmentstr()
+	}
 
 	componentStr := lb.componentsString()
 

@@ -19,9 +19,9 @@ func newGo2AsyncCommand() (*cobra.Command, error) {
 		DisableFlagsInUseLine: true,
 	}
 
-	// does nothing for now
 	globalArguments.Debug = cmd.PersistentFlags().Bool("debug", false, "Enables debug mode")
 	globalArguments.Verbose = cmd.PersistentFlags().Bool("verbose", false, "Print additional information")
+	globalArguments.Sequential = cmd.PersistentFlags().Bool("sequential", false, "Enable sequential mode")
 
 	return cmd, nil
 }

@@ -270,7 +270,9 @@ func addVariableToLatestAndConnect(bt BodyComponentType, parent BlockType, vi *v
 		latestOwner.AddSuccessor(bt)
 
 		if !holfOddConn {
-			bt.ConnectHandshake(latestOwner)
+			if !*globalArguments.Sequential {
+				bt.ConnectHandshake(latestOwner)
+			}
 
 			if vi.Const() == "" {
 				bt.ConnectVariable(latestOwner, vi)

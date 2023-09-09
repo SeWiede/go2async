@@ -2,6 +2,7 @@ package components
 
 import (
 	"errors"
+	"go2async/internal/globalArguments"
 	"go2async/internal/infoPrinter"
 	"go2async/internal/variable"
 	"strconv"
@@ -119,48 +120,61 @@ func (hw *HandshakeChannel) GetSignalAssigmentStr() string {
 
 	signalAssignments := ""
 
-	// default
-	/* ret += hw.Req + " <= " + hw.To[0].Req + ";\n"
-	ret += hw.To[0].Ack + " <= " + hw.Ack + ";\n" */
+	if *globalArguments.Sequential {
 
-	if hw.Out {
-		hwFork := hw.fork
-
-		signalAssignments += hwFork.Name() + "_in_req <= " + hw.Req + ";"
-		signalAssignments += "\n"
-		signalAssignments += hw.Ack + " <= " + hwFork.Name() + "_in_ack;"
-		signalAssignments += "\n"
-
-		infoPrinter.DebugPrintfln("[%s]: connecting outputs to %d forks", hw.Owner.Name(), len(hwFork.ReceiverList))
-
-		for i, j := range hwFork.ReceiverList {
-			infoPrinter.DebugPrintfln("[%s]: connecting output to %s", hw.Owner.Name(), j.Receiver.Name())
-			istr := strconv.Itoa(i)
-			posInJoin := hwFork.getJoinHsPos(j)
-			posInJoinStr := strconv.Itoa(posInJoin)
-
-			signalAssignments += j.Name() + "_in_req(" + posInJoinStr + ") <= " + hwFork.Name() + "_out_req(" + istr + ");"
+		// default
+		if hw.Out {
+			signalAssignments += hw.To[0].Req + " <= " + hw.Req + ";"
 			signalAssignments += "\n"
-			signalAssignments += hwFork.Name() + "_out_ack(" + istr + ") <= " + j.Name() + "_in_ack(" + posInJoinStr + ");"
+			signalAssignments += hw.Ack + " <= " + hw.To[0].Ack + ";"
+			signalAssignments += "\n"
+		} else {
+			signalAssignments += hw.Req + " <= " + hw.To[0].Req + ";"
+			signalAssignments += "\n"
+			signalAssignments += hw.To[0].Ack + " <= " + hw.Ack + ";"
 			signalAssignments += "\n"
 		}
+
 	} else {
-		hwJoin := hw.join
+		if hw.Out {
+			hwFork := hw.fork
 
-		signalAssignments += hw.Req + " <= " + hwJoin.Name() + "_out_req;"
-		signalAssignments += "\n"
-		signalAssignments += hwJoin.Name() + "_out_ack <= " + hw.Ack + ";"
-		signalAssignments += "\n"
-
-		for i, f := range hwJoin.SenderList {
-			istr := strconv.Itoa(i)
-			posInFork := hwJoin.getForkHsPos(f)
-			posInForkStr := strconv.Itoa(posInFork)
-
-			signalAssignments += hwJoin.Name() + "_in_req(" + istr + ") <= " + f.Name() + "_out_req(" + posInForkStr + ");"
+			signalAssignments += hwFork.Name() + "_in_req <= " + hw.Req + ";"
 			signalAssignments += "\n"
-			signalAssignments += f.Name() + "_out_ack(" + posInForkStr + ") <= " + hwJoin.Name() + "_in_ack(" + istr + ");"
+			signalAssignments += hw.Ack + " <= " + hwFork.Name() + "_in_ack;"
 			signalAssignments += "\n"
+
+			infoPrinter.DebugPrintfln("[%s]: connecting outputs to %d forks", hw.Owner.Name(), len(hwFork.ReceiverList))
+
+			for i, j := range hwFork.ReceiverList {
+				infoPrinter.DebugPrintfln("[%s]: connecting output to %s", hw.Owner.Name(), j.Receiver.Name())
+				istr := strconv.Itoa(i)
+				posInJoin := hwFork.getJoinHsPos(j)
+				posInJoinStr := strconv.Itoa(posInJoin)
+
+				signalAssignments += j.Name() + "_in_req(" + posInJoinStr + ") <= " + hwFork.Name() + "_out_req(" + istr + ");"
+				signalAssignments += "\n"
+				signalAssignments += hwFork.Name() + "_out_ack(" + istr + ") <= " + j.Name() + "_in_ack(" + posInJoinStr + ");"
+				signalAssignments += "\n"
+			}
+		} else {
+			hwJoin := hw.join
+
+			signalAssignments += hw.Req + " <= " + hwJoin.Name() + "_out_req;"
+			signalAssignments += "\n"
+			signalAssignments += hwJoin.Name() + "_out_ack <= " + hw.Ack + ";"
+			signalAssignments += "\n"
+
+			for i, f := range hwJoin.SenderList {
+				istr := strconv.Itoa(i)
+				posInFork := hwJoin.getForkHsPos(f)
+				posInForkStr := strconv.Itoa(posInFork)
+
+				signalAssignments += hwJoin.Name() + "_in_req(" + istr + ") <= " + f.Name() + "_out_req(" + posInForkStr + ");"
+				signalAssignments += "\n"
+				signalAssignments += f.Name() + "_out_ack(" + posInForkStr + ") <= " + hwJoin.Name() + "_in_ack(" + istr + ");"
+				signalAssignments += "\n"
+			}
 		}
 	}
 

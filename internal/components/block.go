@@ -2,6 +2,7 @@ package components
 
 import (
 	"errors"
+	"go2async/internal/globalArguments"
 	infoPrinter "go2async/internal/infoPrinter"
 	"go2async/internal/variable"
 	"strconv"
@@ -152,7 +153,19 @@ func (b *Block) Name() string {
 }
 
 func (b *Block) AddComponent(bodyComponent BodyComponentType) {
+	var prev BodyComponentType
+	prev = b
+	if len(b.RegBlockPairs) != 0 {
+		prev = b.RegBlockPairs[len(b.RegBlockPairs)-1].Bc
+	}
+
 	b.RegBlockPairs = append(b.RegBlockPairs, &regBodyPair{Bc: bodyComponent})
+
+	if *globalArguments.Sequential && b.Name() != "ParamDummyBlock" {
+		infoPrinter.DebugPrintfln("[%s]: connected %s to %s", b.Name(), prev.Name(), bodyComponent.Name())
+		bodyComponent.ConnectHandshake(prev)
+	}
+
 	/* b.Out = bodyComponent.OutChannel()
 
 	// TODO: explore top-level behaviour!
@@ -276,21 +289,26 @@ func (b *Block) componentsString() string {
 		}
 		ret += c.Bc.ComponentStr() + "\n"
 
-		for _, in := range c.Bc.InChannels() {
-			ret += in.join.ComponentStr()
+		if !*globalArguments.Sequential {
+			for _, in := range c.Bc.InChannels() {
+				ret += in.join.ComponentStr()
+			}
+
+			for _, out := range c.Bc.OutChannels() {
+				ret += out.fork.ComponentStr()
+			}
 		}
 
-		for _, out := range c.Bc.OutChannels() {
-			ret += out.fork.ComponentStr()
+	}
+
+	if !*globalArguments.Sequential {
+		for _, in := range b.InnerInChannel {
+			ret += in.fork.ComponentStr()
 		}
-	}
 
-	for _, in := range b.InnerInChannel {
-		ret += in.fork.ComponentStr()
-	}
-
-	for _, out := range b.InnerOutChannel {
-		ret += out.join.ComponentStr()
+		for _, out := range b.InnerOutChannel {
+			ret += out.join.ComponentStr()
+		}
 	}
 
 	return ret
@@ -364,19 +382,69 @@ func (b *Block) Entity() string {
 func (b *Block) getHandshakeSignalAssignments() string {
 	handShakeAssignments := ""
 
-	for _, rbp := range b.RegBlockPairs {
-		comp := rbp.Bc
-
-		handShakeAssignments += "-- Handshake signals assignments for " + comp.Name()
+	if *globalArguments.Sequential {
+		// Default assignment: Block in <-> Block out
+		handShakeAssignments += "-- Default block handshake signals assignments"
+		handShakeAssignments += "\n"
+		handShakeAssignments += "out_req <= in_req;"
+		handShakeAssignments += "\n"
+		handShakeAssignments += "in_ack <= out_ack;"
+		handShakeAssignments += "\n"
 		handShakeAssignments += "\n"
 
-		handShakeAssignments += comp.GetHandshakeSignalAssigmentStr()
+		for _, rbp := range b.RegBlockPairs {
+			comp := rbp.Bc
 
-		handShakeAssignments += "-------------------------------"
+			for _, ch := range comp.InChannels() {
+				handShakeAssignments += ch.GetSignalAssigmentStr()
+				handShakeAssignments += "\n"
+			}
+			for _, ch := range comp.OutChannels() {
+				handShakeAssignments += ch.GetSignalAssigmentStr()
+				handShakeAssignments += "\n"
+			}
+
+			/* if i == 0 {
+				handShakeAssignments += comp.InChannels()[0].Req + "<=" + b.InnerInChannel[0].Req + ";"
+				handShakeAssignments += "\n"
+				handShakeAssignments += b.InnerInChannel[0].Ack + "<=" + comp.InChannels()[0].Ack + ";"
+				handShakeAssignments += "\n"
+				handShakeAssignments += "\n"
+			} else {
+				curComp := b.RegBlockPairs[i].Bc
+				prevComp := b.RegBlockPairs[i-1].Bc
+
+				handShakeAssignments += curComp.InChannels()[0].Req + "<=" + prevComp.OutChannels()[0].Req + ";"
+				handShakeAssignments += "\n"
+				handShakeAssignments += prevComp.OutChannels()[0].Ack + "<=" + curComp.InChannels()[0].Ack + ";"
+				handShakeAssignments += "\n"
+				handShakeAssignments += "\n"
+			}
+
+			if i == len(b.RegBlockPairs)-1 {
+				handShakeAssignments += comp.OutChannels()[0].Ack + "<=" + b.InnerOutChannel[0].Ack + ";"
+				handShakeAssignments += "\n"
+				handShakeAssignments += b.InnerOutChannel[0].Req + "<=" + comp.OutChannels()[0].Req + ";"
+				handShakeAssignments += "\n"
+				handShakeAssignments += "\n"
+			} */
+		}
 		handShakeAssignments += "\n"
+	} else {
+		for _, rbp := range b.RegBlockPairs {
+			comp := rbp.Bc
+
+			handShakeAssignments += "-- Handshake signals assignments for " + comp.Name()
+			handShakeAssignments += "\n"
+
+			handShakeAssignments += comp.GetHandshakeSignalAssigmentStr()
+
+			handShakeAssignments += "-------------------------------"
+			handShakeAssignments += "\n"
+			handShakeAssignments += "\n"
+		}
 		handShakeAssignments += "\n"
 	}
-	handShakeAssignments += "\n"
 
 	return handShakeAssignments
 }
@@ -451,14 +519,15 @@ func (b *Block) Architecture() string {
 	}
 	signalDefs += "\n"
 
+	if !*globalArguments.Sequential {
+		handShakeAssignments += "------ Block assignments"
+		handShakeAssignments += "\n"
+		handShakeAssignments += b.GetInnerHandshakeSignalAssignmentstr()
+		handShakeAssignments += "------------------------"
+		handShakeAssignments += "\n"
+		handShakeAssignments += "\n"
+	}
 	// Handle block at the end since there might be some new default connections to the parent
-
-	handShakeAssignments += "------ Block assignments"
-	handShakeAssignments += "\n"
-	handShakeAssignments += b.GetInnerHandshakeSignalAssignmentstr()
-	handShakeAssignments += "------------------------"
-	handShakeAssignments += "\n"
-	handShakeAssignments += "\n"
 
 	signalDefs += b.GetInnerSignalDefs()
 	signalDefs += "\n"
@@ -584,7 +653,9 @@ func (b *Block) GetVariable(varName string) (*variable.VariableInfo, error) {
 				//nextComps := b.Parent().Successors()
 				latestOwner.AddSuccessor(b)
 
-				b.ConnectHandshake(latestOwner)
+				if !*globalArguments.Sequential {
+					b.ConnectHandshake(latestOwner)
+				}
 				b.ConnectVariable(latestOwner, vi)
 
 				infoPrinter.DebugPrintfln("[%s]: connected to %s and got ownerShip of var %s", b.Name(), latestOwner.Name(), varName)
