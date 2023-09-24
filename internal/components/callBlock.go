@@ -22,6 +22,54 @@ type CallBlock struct {
 
 var cbNr = 0
 
+func getParams(cb *CallBlock, parent BlockType, pr *variable.FuncInterface, fi variable.VariableDef) (BodyComponentType, error) {
+
+	// Get inputs
+	for i, P := range pr.Parameters.VariableList {
+		addedVar, err := cb.AddInputVariable(P)
+		if err != nil {
+			return nil, err
+		}
+
+		P = addedVar
+
+		infoPrinter.DebugPrintfln("[%s]: %d Input '%s' type %s", cb.Name(), i, P.Name_, P.Typ_)
+
+		if err := addVariableToLatestAndConnect(cb, parent, P, false); err != nil {
+			return nil, err
+		}
+	}
+
+	for i, R := range pr.Results.VariableList {
+		addedVar, err := cb.AddOutputVariable(R)
+		if err != nil {
+			return nil, err
+		}
+
+		R = addedVar
+
+		rCopy := R.Copy()
+		rCopy.IndexIdent_ = nil
+		rCopy.Index_ = ""
+		// Set new owner of result variable after getting previous owners
+		if own, ok := parent.GetVariableOwnerMap()[R.Name()]; ok {
+			own.vi = rCopy
+			own.ownerList.AddOwner(cb)
+		} else {
+			infoPrinter.DebugPrintfln("Adding variable '%s' to ownermap of '%s'", R.Name_, parent.Name())
+
+			parent.GetVariableOwnerMap()[R.Name()] = &variableOwner{
+				ownerList: NewOwnerList(cb),
+				vi:        R,
+			}
+		}
+
+		infoPrinter.DebugPrintfln("[%s]: %d output '%s' type %s", cb.Name(), i, R.Name_, R.Typ_)
+	}
+
+	return cb, nil
+}
+
 func NewCallBlock(paramsResults *variable.FuncInterface, fi variable.VariableDef, parent BlockType) (*CallBlock, error) {
 	if fi.FuncIntf() == nil {
 		return nil, errors.New("invalid function variable '" + fi.Name() + "'")
@@ -32,33 +80,42 @@ func NewCallBlock(paramsResults *variable.FuncInterface, fi variable.VariableDef
 
 	name := callBlockPrefix + strconv.Itoa(nr)
 
-	ret := &CallBlock{
+	cb := &CallBlock{
 		BodyComponent: BodyComponent{
+			name: name,
+
+			number:   nr,
 			archName: archPrefix + name,
 
-			/* In: &HandshakeChannel{
-				Out: false,
-			},
-
-			Out: &HandshakeChannel{
-				Req:       name + "_o_req",
-				Ack:       name + "_o_ack",
-				Data:      name + "_data",
-				Out:       true,
-				DataWidth: parent.GetCurrentVariableSize(),
-			}, */
-
 			parentBlock: parent,
-		},
 
-		Nr: nr,
+			inputVariables:  variable.NewScopedVariables(),
+			outputVariables: variable.NewScopedVariables(),
+
+			predecessors: map[string]BodyComponentType{},
+			successors:   map[string]BodyComponentType{},
+		},
 
 		paramsResults: paramsResults,
 
 		funcIntf: fi,
 	}
 
-	return ret, nil
+	inputChannel := NewDefaultInputHandshakeChannel(cb)
+	cb.In = append(cb.In, inputChannel)
+
+	outputChannel := NewDefaultOutputHandshakeChannel(cb)
+	cb.Out = append(cb.Out, outputChannel)
+
+	cb.InData = append(cb.InData, NewDefaultInDataChannel(cb, cb.InputVariables()))
+
+	cb.OutData = append(cb.OutData, NewDefaultOutDataChannel(cb, cb.OutputVariables()))
+
+	if _, err := getParams(cb, parent, paramsResults, fi); err != nil {
+		return nil, err
+	}
+
+	return cb, nil
 }
 
 func (cb *CallBlock) EntityName() string {
@@ -83,11 +140,11 @@ func (cb *CallBlock) Entity() string {
 	  PORT (
 		rst : IN STD_LOGIC;
 		-- Input channel
-		in_data : IN STD_LOGIC_VECTOR(DATA_WIDTH - 1 DOWNTO 0);
+		in_data : IN STD_LOGIC_VECTOR(` + strconv.Itoa(cb.InputVariables().Size) + ` - 1 DOWNTO 0);
 		in_req : IN STD_LOGIC;
 		in_ack : OUT STD_LOGIC;
 		-- Output channel
-		out_data : OUT STD_LOGIC_VECTOR(DATA_WIDTH - 1 DOWNTO 0);
+		out_data : OUT STD_LOGIC_VECTOR(` + strconv.Itoa(cb.OutputVariables().Size) + ` - 1 DOWNTO 0);
 		out_req : OUT STD_LOGIC;
 		out_ack : IN STD_LOGIC
 	  );
@@ -100,19 +157,16 @@ func (cb *CallBlock) Name() string {
 
 func (cb *CallBlock) ComponentStr() string {
 	return cb.Name() + `: entity work.` + cb.EntityName() + `(` + cb.archName + `)
-	generic map(
-	  DATA_WIDTH => ` + strconv.Itoa(cb.GetVariableSize()) + `
-	)
 	port map (
 		rst => rst,
 		-- Input channel
-		in_req  => ` + cb.Name() + `_in_req,
-		in_ack  => ` + cb.Name() + `_in_ack, 
-		in_data => std_logic_vector(resize(unsigned(` + cb.Name() + `_in_data), ` + strconv.Itoa(cb.GetVariableSize()) + `)),
+		in_req  => ` + cb.In[0].GetReqSignalName() + `,
+		in_ack  => ` + cb.In[0].GetAckSignalName() + `, 
+		in_data => ` + cb.InData[0].GetDataSignalName() + `,
 		-- Output channel
-		out_req => ` + cb.Name() + `_out_req,
-		out_ack => ` + cb.Name() + `_out_ack,
-		out_data  => ` + cb.Name() + `_out_data
+		out_req => ` + cb.Out[0].GetReqSignalName() + `,
+		out_ack => ` + cb.Out[0].GetReqSignalName() + `,
+		out_data  => ` + cb.OutData[0].GetDataSignalName() + `
 	);
 	`
 }
@@ -260,20 +314,6 @@ func (cb *CallBlock) Architecture() string {
 
   end ` + cb.archName + `;
   `
-}
-
-func (cb *CallBlock) GetSignalDefs() string {
-	signalDefs := ""
-
-	signalDefs += "signal " + cb.Name() + "_in_req : std_logic;"
-	signalDefs += "signal " + cb.Name() + "_out_req : std_logic;"
-	signalDefs += "signal " + cb.Name() + "_in_ack : std_logic;"
-	signalDefs += "signal " + cb.Name() + "_out_ack : std_logic;"
-
-	signalDefs += "signal " + cb.Name() + "_in_data : std_logic_vector(" + strconv.Itoa(cb.InputVariables().Size) + "- 1 downto 0);"
-	signalDefs += "signal " + cb.Name() + "_out_data : std_logic_vector(" + strconv.Itoa(cb.OutputVariables().Size) + "- 1 downto 0);"
-
-	return signalDefs
 }
 
 func (cb *CallBlock) Connect(bc BodyComponentType, x interface{}) {
