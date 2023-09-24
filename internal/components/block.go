@@ -489,6 +489,30 @@ func (b *Block) getDataSignalAssignments() string {
 	}
 	dataSignalAssignments += "\n"
 
+	for name, extInf := range b.ExternalInterfaces {
+		var connectedTo *DataChannel
+
+		for _, c := range extInf.InnerInData.To {
+			connectedTo = c.dc
+		}
+
+		dataSignalAssignments += "-- Data signal assignments for external Interface " + name
+		dataSignalAssignments += "\n"
+		dataSignalAssignments += extInf.InnerInData.DataName + " <= " + connectedTo.DataName + ";"
+		dataSignalAssignments += "\n"
+
+		for _, c := range extInf.InnerOutData.To {
+			connectedTo = c.dc
+		}
+
+		dataSignalAssignments += connectedTo.DataName + " <= " + extInf.InnerOutData.DataName + ";"
+		dataSignalAssignments += "\n"
+
+		dataSignalAssignments += "-------------------------------"
+		dataSignalAssignments += "\n"
+		dataSignalAssignments += "\n"
+	}
+
 	return dataSignalAssignments
 }
 
@@ -713,7 +737,7 @@ func (b *Block) AddFunctionInterface(f *variable.VariableInfo) error {
 
 	// Reversed
 	extPrefix := f.Name_
-	blkExtPrefix := b.Name() + extPrefix
+	blkExtPrefix := b.Name() + "_" + extPrefix
 
 	externalIn := NewOutputHandshakeChannel(b, blkExtPrefix+"_in_req", blkExtPrefix+"_in_ack")
 	b.In = append(b.In, externalIn)
@@ -728,12 +752,14 @@ func (b *Block) AddFunctionInterface(f *variable.VariableInfo) error {
 	b.InnerOutChannel = append(b.InnerOutChannel, externalInnerIn)
 	externalInnerOut := NewOutputHandshakeChannel(b, extPrefix+"_out_req", extPrefix+"_out_ack")
 	b.InnerInChannel = append(b.InnerInChannel, externalInnerOut)
-	externalInnerInData := NewInDataChannel(b, f.FuncIntf_.Parameters, extPrefix+"_in_data")
-	externalInnerInData.Connected = true
-	b.InnerOutDataChannel = append(b.InnerOutDataChannel, externalInnerInData)
-	externalInnerOutData := NewOutDataChannel(b, f.FuncIntf_.Results, extPrefix+"_out_data")
+
+	externalInnerOutData := NewOutDataChannel(b, f.FuncIntf_.Parameters, extPrefix+"_out_data")
 	externalInnerOutData.Connected = true
-	b.InnerInDataChannel = append(b.InnerInDataChannel, externalInnerOutData)
+	b.InnerOutDataChannel = append(b.InnerOutDataChannel, externalInnerOutData)
+
+	externalInnerInData := NewInDataChannel(b, f.FuncIntf_.Results, extPrefix+"_in_data")
+	externalInnerInData.Connected = true
+	b.InnerInDataChannel = append(b.InnerInDataChannel, externalInnerInData)
 
 	b.ExternalInterfaces[f.Name_] = &ExternalInterface{
 		Vi:           f.Copy(),
@@ -775,7 +801,7 @@ func (b *Block) GetAndAssignFunctionInterface(fname string) (*ExternalInterface,
 
 			// Reversed
 			extPrefix := extIntfParent.Vi.Name_
-			blkExtPrefix := b.Name() + extPrefix
+			blkExtPrefix := b.Name() + "_" + extPrefix
 			externalIn := NewOutputHandshakeChannel(b, blkExtPrefix+"_in_req", blkExtPrefix+"_in_ack")
 			b.In = append(b.In, externalIn)
 			externalOut := NewInputHandshakeChannel(b, blkExtPrefix+"_out_req", blkExtPrefix+"_out_ack")
@@ -789,12 +815,14 @@ func (b *Block) GetAndAssignFunctionInterface(fname string) (*ExternalInterface,
 			b.InnerOutChannel = append(b.InnerOutChannel, externalInnerIn)
 			externalInnerOut := NewOutputHandshakeChannel(b, extPrefix+"_out_req", extPrefix+"_out_ack")
 			b.InnerInChannel = append(b.InnerInChannel, externalInnerOut)
-			externalInnerInData := NewInDataChannel(b, extIntfParent.Vi.FuncIntf_.Parameters, extPrefix+"_in_data")
-			externalInnerInData.Connected = true
-			b.InnerOutDataChannel = append(b.InnerOutDataChannel, externalInnerInData)
-			externalInnerOutData := NewOutDataChannel(b, extIntfParent.Vi.FuncIntf_.Results, extPrefix+"_out_data")
+
+			externalInnerOutData := NewOutDataChannel(b, extIntfParent.Vi.FuncIntf_.Parameters, extPrefix+"_out_data")
 			externalInnerOutData.Connected = true
-			b.InnerInDataChannel = append(b.InnerInDataChannel, externalInnerOutData)
+			b.InnerOutDataChannel = append(b.InnerOutDataChannel, externalInnerOutData)
+
+			externalInnerInData := NewInDataChannel(b, extIntfParent.Vi.FuncIntf_.Results, extPrefix+"_in_data")
+			externalInnerInData.Connected = true
+			b.InnerInDataChannel = append(b.InnerInDataChannel, externalInnerInData)
 
 			newExtIntf.In = externalIn
 			newExtIntf.InnerIn = externalInnerIn

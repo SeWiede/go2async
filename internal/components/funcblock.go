@@ -155,13 +155,13 @@ func (fb *FuncBlock) ComponentStr() string {
 
 		--External Interface
 		-- Input channel
-		` + fb.externalInterface.Name() + `_in_req => ` + fb.In[1].GetReqSignalName() + `,
-		` + fb.externalInterface.Name() + `_in_ack => ` + fb.In[1].GetAckSignalName() + `,
-		` + fb.externalInterface.Name() + `_in_data  => ` + fb.InData[1].GetDataSignalName() + `,
+		` + fb.externalInterface.Name() + `_in_req => ` + fb.Out[1].GetReqSignalName() + `,
+		` + fb.externalInterface.Name() + `_in_ack => ` + fb.Out[1].GetAckSignalName() + `,
+		` + fb.externalInterface.Name() + `_in_data  => ` + fb.OutData[1].GetDataSignalName() + `,
 		-- Output channel
-		` + fb.externalInterface.Name() + `_out_req =>  ` + fb.Out[1].GetReqSignalName() + `,
-		` + fb.externalInterface.Name() + `_out_ack =>  ` + fb.Out[1].GetAckSignalName() + `,
-		` + fb.externalInterface.Name() + `_out_data =>  ` + fb.OutData[1].GetDataSignalName() + `
+		` + fb.externalInterface.Name() + `_out_req =>  ` + fb.In[1].GetReqSignalName() + `,
+		` + fb.externalInterface.Name() + `_out_ack =>  ` + fb.In[1].GetAckSignalName() + `,
+		` + fb.externalInterface.Name() + `_out_data =>  ` + fb.InData[1].GetDataSignalName() + `
 	);
 	`
 }
