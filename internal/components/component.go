@@ -32,9 +32,9 @@ type BlockType interface {
 	BodyComponentType
 
 	GetVariable(name string) (*variable.VariableInfo, error)
-	GetAndAssignFunctionInterface(fname string) (*variable.VariableInfo, error)
+	GetAndAssignFunctionInterface(fname string) (*ExternalInterface, error)
 	GetVariableOwnerMap() map[string]*variableOwner
-	GetExternalInterfaces() map[string]*variable.VariableInfo
+	GetExternalInterfaces() map[string]*ExternalInterface
 	AddComponent(bodyComponent BodyComponentType)
 	NewScopeVariable(vdef variable.VariableDef) (*variable.VariableInfo, error)
 
@@ -44,7 +44,7 @@ type BlockType interface {
 	GetInnerOut() *HandshakeChannel
 }
 
-func (b *Block) GetExternalInterfaces() map[string]*variable.VariableInfo {
+func (b *Block) GetExternalInterfaces() map[string]*ExternalInterface {
 	return b.ExternalInterfaces
 }
 
@@ -52,7 +52,7 @@ func (b *Block) GetVariableOwnerMap() map[string]*variableOwner {
 	return b.VariableOwner
 }
 
-func (b *IfBlock) GetExternalInterfaces() map[string]*variable.VariableInfo {
+func (b *IfBlock) GetExternalInterfaces() map[string]*ExternalInterface {
 	return b.ExternalInterfaces
 }
 

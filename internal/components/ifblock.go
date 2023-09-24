@@ -3,7 +3,6 @@ package components
 import (
 	"go2async/internal/globalArguments"
 	"go2async/internal/infoPrinter"
-	"go2async/internal/variable"
 	"strconv"
 	"strings"
 )
@@ -40,7 +39,7 @@ func NewIfBlock(parent BlockType) *IfBlock {
 				isBlock: true,
 			},
 
-			ExternalInterfaces: make(map[string]*variable.VariableInfo),
+			ExternalInterfaces: make(map[string]*ExternalInterface),
 			VariableOwner:      make(map[string]*variableOwner),
 
 			TopLevel: false,

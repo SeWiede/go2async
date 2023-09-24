@@ -290,8 +290,8 @@ func (g *Generator) HandleAssignmentStmt(s *ast.AssignStmt, parent components.Bl
 
 		var funcIntf variable.VariableDef
 
-		// Prioritize functionPointer params - of course
-		funcIntf, err = parent.GetAndAssignFunctionInterface(funcName)
+		// Prioritize functionPointer params
+		extFuncIntf, err := parent.GetAndAssignFunctionInterface(funcName)
 		if err != nil {
 			funcIntf, ok = g.functions[funcName]
 			if ok {
@@ -300,6 +300,8 @@ func (g *Generator) HandleAssignmentStmt(s *ast.AssignStmt, parent components.Bl
 			} else {
 				return nil, g.peb.NewParseError(s, err)
 			}
+		} else {
+			funcIntf = extFuncIntf.Vi
 		}
 
 		paramsResults := variable.NewFuncIntf()

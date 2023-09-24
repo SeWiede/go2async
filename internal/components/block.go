@@ -21,6 +21,20 @@ type regBodyPair struct {
 	Bc  BodyComponentType
 }
 
+type ExternalInterface struct {
+	In          *HandshakeChannel
+	InnerIn     *HandshakeChannel
+	InData      *DataChannel
+	InnerInData *DataChannel
+
+	Out          *HandshakeChannel
+	InnerOut     *HandshakeChannel
+	OutData      *DataChannel
+	InnerOutData *DataChannel
+
+	Vi *variable.VariableInfo
+}
+
 type Block struct {
 	BodyComponent
 	Nr int
@@ -29,7 +43,7 @@ type Block struct {
 	BodyComponents []BodyComponentType
 
 	VariableOwner      map[string]*variableOwner
-	ExternalInterfaces map[string]*variable.VariableInfo
+	ExternalInterfaces map[string]*ExternalInterface
 
 	RegBlockPairs []*regBodyPair
 
@@ -89,7 +103,7 @@ func NewBlock(toplevel bool, keepVariableOwnership bool, parent BlockType) *Bloc
 			isBlock: true,
 		},
 
-		ExternalInterfaces: make(map[string]*variable.VariableInfo),
+		ExternalInterfaces: make(map[string]*ExternalInterface),
 		VariableOwner:      make(map[string]*variableOwner),
 
 		TopLevel:              toplevel,
@@ -125,7 +139,7 @@ func NewBlock(toplevel bool, keepVariableOwnership bool, parent BlockType) *Bloc
 
 func NewParamDummyBlock(params map[string]*variable.VariableInfo) *Block {
 	ret := &Block{
-		ExternalInterfaces: make(map[string]*variable.VariableInfo),
+		ExternalInterfaces: make(map[string]*ExternalInterface),
 		VariableOwner:      make(map[string]*variableOwner),
 	}
 
@@ -697,30 +711,106 @@ func (b *Block) AddFunctionInterface(f *variable.VariableInfo) error {
 		return errors.New("Functionpointer already decalred")
 	}
 
-	b.ExternalInterfaces[f.Name_] = f.Copy()
+	// Reversed
+	extPrefix := f.Name_
+	blkExtPrefix := b.Name() + extPrefix
 
-	infoPrinter.DebugPrintf("Added func %s to block %s\n", f.Name_, b.archName)
+	externalIn := NewOutputHandshakeChannel(b, blkExtPrefix+"_in_req", blkExtPrefix+"_in_ack")
+	b.In = append(b.In, externalIn)
+	externalOut := NewInputHandshakeChannel(b, blkExtPrefix+"_out_req", blkExtPrefix+"_out_ack")
+	b.Out = append(b.Out, externalOut)
+	externalInData := NewOutDataChannel(b, f.FuncIntf_.Parameters, blkExtPrefix+"_in_data")
+	b.InData = append(b.InData, externalInData)
+	externalOutData := NewInDataChannel(b, f.FuncIntf_.Results, blkExtPrefix+"_out_data")
+	b.OutData = append(b.OutData, externalOutData)
+
+	externalInnerIn := NewInputHandshakeChannel(b, extPrefix+"_in_req", extPrefix+"_in_ack")
+	b.InnerOutChannel = append(b.InnerOutChannel, externalInnerIn)
+	externalInnerOut := NewOutputHandshakeChannel(b, extPrefix+"_out_req", extPrefix+"_out_ack")
+	b.InnerInChannel = append(b.InnerInChannel, externalInnerOut)
+	externalInnerInData := NewInDataChannel(b, f.FuncIntf_.Parameters, extPrefix+"_in_data")
+	externalInnerInData.Connected = true
+	b.InnerOutDataChannel = append(b.InnerOutDataChannel, externalInnerInData)
+	externalInnerOutData := NewOutDataChannel(b, f.FuncIntf_.Results, extPrefix+"_out_data")
+	externalInnerOutData.Connected = true
+	b.InnerInDataChannel = append(b.InnerInDataChannel, externalInnerOutData)
+
+	b.ExternalInterfaces[f.Name_] = &ExternalInterface{
+		Vi:           f.Copy(),
+		In:           externalIn,
+		InnerIn:      externalInnerIn,
+		InData:       externalInData,
+		InnerInData:  externalInnerInData,
+		Out:          externalOut,
+		InnerOut:     externalInnerOut,
+		OutData:      externalOutData,
+		InnerOutData: externalInnerOutData,
+	}
+
+	infoPrinter.DebugPrintfln("[%s]: Added func %s to block %s", b.Name(), f.Name_, b.archName)
 
 	return nil
 }
 
-func (b *Block) GetAndAssignFunctionInterface(fname string) (*variable.VariableInfo, error) {
+func (b *Block) GetAndAssignFunctionInterface(fname string) (*ExternalInterface, error) {
 	if f, ok := b.ExternalInterfaces[fname]; ok {
 		return f, nil
 	}
 
-	infoPrinter.DebugPrintf("Function '%s' not found at block %s - searching parent\n", fname, b.archName)
+	infoPrinter.DebugPrintfln("[%s]: Function '%s' not found - searching parent", b.Name(), fname)
 
 	if b.parentBlock != nil {
-		f, err := b.parentBlock.GetAndAssignFunctionInterface(fname)
+		extIntfParent, err := b.parentBlock.GetAndAssignFunctionInterface(fname)
 		if err == nil {
 			// parent-stack had the function defined: add the interface to block
-			fiCopy := f.Copy()
-			b.ExternalInterfaces[f.Name_] = fiCopy
+			fiCopy := extIntfParent.Vi.Copy()
 
-			infoPrinter.DebugPrintf("Found function '%s' on parent stack and registerd function '%s' at block %s\n", f.Name_, f.Name_, b.archName)
+			newExtIntf := &ExternalInterface{
+				Vi: fiCopy,
+			}
 
-			return fiCopy, nil
+			b.ExternalInterfaces[extIntfParent.Vi.Name_] = newExtIntf
+
+			infoPrinter.DebugPrintfln("[%s]: Found function '%s' on parent '%s' - registered", b.Name(), extIntfParent.Vi.Name_, b.Parent().Name())
+
+			// Reversed
+			extPrefix := extIntfParent.Vi.Name_
+			blkExtPrefix := b.Name() + extPrefix
+			externalIn := NewOutputHandshakeChannel(b, blkExtPrefix+"_in_req", blkExtPrefix+"_in_ack")
+			b.In = append(b.In, externalIn)
+			externalOut := NewInputHandshakeChannel(b, blkExtPrefix+"_out_req", blkExtPrefix+"_out_ack")
+			b.Out = append(b.Out, externalOut)
+			externalInData := NewOutDataChannel(b, extIntfParent.Vi.FuncIntf_.Parameters, blkExtPrefix+"_in_data")
+			b.InData = append(b.InData, externalInData)
+			externalOutData := NewInDataChannel(b, extIntfParent.Vi.FuncIntf_.Results, blkExtPrefix+"_out_data")
+			b.OutData = append(b.OutData, externalOutData)
+
+			externalInnerIn := NewInputHandshakeChannel(b, extPrefix+"_in_req", extPrefix+"_in_ack")
+			b.InnerOutChannel = append(b.InnerOutChannel, externalInnerIn)
+			externalInnerOut := NewOutputHandshakeChannel(b, extPrefix+"_out_req", extPrefix+"_out_ack")
+			b.InnerInChannel = append(b.InnerInChannel, externalInnerOut)
+			externalInnerInData := NewInDataChannel(b, extIntfParent.Vi.FuncIntf_.Parameters, extPrefix+"_in_data")
+			externalInnerInData.Connected = true
+			b.InnerOutDataChannel = append(b.InnerOutDataChannel, externalInnerInData)
+			externalInnerOutData := NewOutDataChannel(b, extIntfParent.Vi.FuncIntf_.Results, extPrefix+"_out_data")
+			externalInnerOutData.Connected = true
+			b.InnerInDataChannel = append(b.InnerInDataChannel, externalInnerOutData)
+
+			newExtIntf.In = externalIn
+			newExtIntf.InnerIn = externalInnerIn
+			newExtIntf.Out = externalOut
+			newExtIntf.InnerOut = externalInnerOut
+			newExtIntf.InData = externalInData
+			newExtIntf.InnerInData = externalInnerInData
+			newExtIntf.OutData = externalOutData
+			newExtIntf.InnerOutData = externalInnerOutData
+
+			extIntfParent.InnerIn.ConnectHandshake(externalIn)
+			extIntfParent.InnerOut.ConnectHandshake(externalOut)
+			extIntfParent.InnerInData.ConnectData(externalInData)
+			extIntfParent.InnerOutData.ConnectData(externalOutData)
+
+			return newExtIntf, nil
 		}
 	}
 

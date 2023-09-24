@@ -22,7 +22,7 @@ type CallBlock struct {
 
 var cbNr = 0
 
-func getParams(cb *CallBlock, parent BlockType, pr *variable.FuncInterface, fi variable.VariableDef) (BodyComponentType, error) {
+func getParams(cb BodyComponentType, parent BlockType, pr *variable.FuncInterface, fi variable.VariableDef) (BodyComponentType, error) {
 
 	// Get inputs
 	for i, P := range pr.Parameters.VariableList {

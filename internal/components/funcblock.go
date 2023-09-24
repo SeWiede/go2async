@@ -31,38 +31,66 @@ func NewFuncBlock(paramsResults *variable.FuncInterface, fi variable.VariableDef
 
 	name := funcBlockPrefix + strconv.Itoa(nr)
 
-	f, err := parent.GetAndAssignFunctionInterface(fi.Name())
+	extIntf, err := parent.GetAndAssignFunctionInterface(fi.Name())
 	if err != nil {
 		return nil, err
 	}
 
-	ret := &FuncBlock{
+	fb := &FuncBlock{
 		BodyComponent: BodyComponent{
+			name: name,
+
+			number:   nr,
 			archName: archPrefix + name,
 
-			/* In: &HandshakeChannel{
-				Out: false,
-			},
-
-			Out: &HandshakeChannel{
-				Req:       name + "_o_req",
-				Ack:       name + "_o_ack",
-				Data:      name + "_data",
-				Out:       true,
-				DataWidth: parent.GetCurrentVariableSize(),
-			}, */
-
 			parentBlock: parent,
-		},
 
-		Nr: nr,
+			inputVariables:  variable.NewScopedVariables(),
+			outputVariables: variable.NewScopedVariables(),
+
+			predecessors: map[string]BodyComponentType{},
+			successors:   map[string]BodyComponentType{},
+		},
 
 		paramsResults: paramsResults,
 
-		externalInterface: f.Copy(),
+		externalInterface: extIntf.Vi.Copy(),
 	}
 
-	return ret, nil
+	inputChannel := NewDefaultInputHandshakeChannel(fb)
+	fb.In = append(fb.In, inputChannel)
+
+	outputChannel := NewDefaultOutputHandshakeChannel(fb)
+	fb.Out = append(fb.Out, outputChannel)
+
+	fb.InData = append(fb.InData, NewDefaultInDataChannel(fb, fb.InputVariables()))
+
+	fb.OutData = append(fb.OutData, NewDefaultOutDataChannel(fb, fb.OutputVariables()))
+
+	extPrefix := "func_" + extIntf.Vi.Name_
+	// External interface
+	externalIn := NewOutputHandshakeChannel(fb, extPrefix+"_in_req", extPrefix+"_in_ack")
+	fb.Out = append(fb.Out, externalIn)
+
+	externalOut := NewInputHandshakeChannel(fb, extPrefix+"_out_req", extPrefix+"_out_ack")
+	fb.In = append(fb.In, externalOut)
+
+	externalInData := NewOutDataChannel(fb, extIntf.Vi.FuncIntf_.Parameters, extPrefix+"_in_data")
+	fb.OutData = append(fb.OutData, externalInData)
+
+	externalOutData := NewInDataChannel(fb, extIntf.Vi.FuncIntf_.Results, extPrefix+"_out_data")
+	fb.InData = append(fb.InData, externalOutData)
+
+	if _, err := getParams(fb, parent, paramsResults, fi); err != nil {
+		return nil, err
+	}
+
+	extIntf.InnerIn.ConnectHandshake(externalIn)
+	extIntf.InnerOut.ConnectHandshake(externalOut)
+	extIntf.InnerInData.ConnectData(externalInData)
+	extIntf.InnerOutData.ConnectData(externalOutData)
+
+	return fb, nil
 }
 
 func (fb *FuncBlock) EntityName() string {
@@ -84,20 +112,20 @@ func (fb *FuncBlock) Entity() string {
 	  );
 	  PORT (
 		-- Input channel
-		in_data : IN STD_LOGIC_VECTOR(DATA_WIDTH - 1 DOWNTO 0);
+		in_data : IN STD_LOGIC_VECTOR(` + strconv.Itoa(fb.InputVariables().Size) + ` - 1 DOWNTO 0);
 		in_req : IN STD_LOGIC;
 		in_ack : OUT STD_LOGIC;
 		-- Output channel
-		out_data : OUT STD_LOGIC_VECTOR(DATA_WIDTH - 1 DOWNTO 0);
+		out_data : OUT STD_LOGIC_VECTOR(` + strconv.Itoa(fb.InputVariables().Size) + ` - 1 DOWNTO 0);
 		out_req : OUT STD_LOGIC;
 		out_ack : IN STD_LOGIC;
 
 		-- External interfaces
-		` + fb.externalInterface.Name() + `_in_data : OUT STD_LOGIC_VECTOR(` + fb.externalInterface.Name() + `_IN_DATA_WIDTH - 1 DOWNTO 0);
+		` + fb.externalInterface.Name() + `_in_data : OUT STD_LOGIC_VECTOR(` + strconv.Itoa(fb.externalInterface.FuncIntf_.Parameters.Size) + ` - 1 DOWNTO 0);
 		` + fb.externalInterface.Name() + `_in_req : OUT STD_LOGIC;
 		` + fb.externalInterface.Name() + `_in_ack : IN STD_LOGIC;
 		-- Output channel
-		` + fb.externalInterface.Name() + `_out_data : IN STD_LOGIC_VECTOR(` + fb.externalInterface.Name() + `_OUT_DATA_WIDTH - 1 DOWNTO 0);
+		` + fb.externalInterface.Name() + `_out_data : IN STD_LOGIC_VECTOR(` + strconv.Itoa(fb.externalInterface.FuncIntf_.Results.Size) + ` - 1 DOWNTO 0);
 		` + fb.externalInterface.Name() + `_out_req : IN STD_LOGIC;
 		` + fb.externalInterface.Name() + `_out_ack : OUT STD_LOGIC
 	  );
@@ -117,23 +145,23 @@ func (fb *FuncBlock) ComponentStr() string {
 	)
 	port map (
 		-- Input channel
-		in_req  => ` + fb.Name() + `_in_req,
-		in_ack  => ` + fb.Name() + `_in_ack, 
-		in_data => std_logic_vector(resize(unsigned(` + fb.Name() + `_in_data), ` + strconv.Itoa(fb.GetVariableSize()) + `)),
+		in_req  => ` + fb.In[0].GetReqSignalName() + `,
+		in_ack  => ` + fb.In[0].GetAckSignalName() + `, 
+		in_data => ` + fb.InData[0].GetDataSignalName() + `,
 		-- Output channel
-		out_req => ` + fb.Name() + `_out_req,
-		out_ack => ` + fb.Name() + `_out_ack,
-		out_data  => ` + fb.Name() + `_out_data,
+		out_req => ` + fb.Out[0].GetReqSignalName() + `,
+		out_ack => ` + fb.Out[0].GetReqSignalName() + `,
+		out_data  => ` + fb.OutData[0].GetDataSignalName() + `,
 
 		--External Interface
 		-- Input channel
-		` + fb.externalInterface.Name() + `_in_data  => ` + fb.externalInterface.Name() + `_in_data,
-		` + fb.externalInterface.Name() + `_in_req => ` + fb.externalInterface.Name() + `_in_req,
-		` + fb.externalInterface.Name() + `_in_ack => ` + fb.externalInterface.Name() + `_in_ack,
+		` + fb.externalInterface.Name() + `_in_req => ` + fb.In[1].GetReqSignalName() + `,
+		` + fb.externalInterface.Name() + `_in_ack => ` + fb.In[1].GetAckSignalName() + `,
+		` + fb.externalInterface.Name() + `_in_data  => ` + fb.InData[1].GetDataSignalName() + `,
 		-- Output channel
-		` + fb.externalInterface.Name() + `_out_data => ` + fb.externalInterface.Name() + `_out_data,
-		` + fb.externalInterface.Name() + `_out_req => ` + fb.externalInterface.Name() + `_out_req,
-		` + fb.externalInterface.Name() + `_out_ack => ` + fb.externalInterface.Name() + `_out_ack
+		` + fb.externalInterface.Name() + `_out_req =>  ` + fb.Out[1].GetReqSignalName() + `,
+		` + fb.externalInterface.Name() + `_out_ack =>  ` + fb.Out[1].GetAckSignalName() + `,
+		` + fb.externalInterface.Name() + `_out_data =>  ` + fb.OutData[1].GetDataSignalName() + `
 	);
 	`
 }
@@ -255,13 +283,4 @@ func (fb *FuncBlock) Architecture() string {
 
   end ` + fb.archName + `;
   `
-}
-
-func (fb *FuncBlock) GetSignalDefs() string {
-	panic("signaldefs not implemented")
-	return ""
-}
-
-func (fb *FuncBlock) Connect(bc BodyComponentType, x interface{}) {
-	panic("not implemented")
 }

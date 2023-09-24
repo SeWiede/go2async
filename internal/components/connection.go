@@ -244,6 +244,8 @@ func (hw *HandshakeChannel) ConnectHandshake(to *HandshakeChannel) {
 		panic("To channel was nil")
 	}
 	if hw.Out == to.Out {
+		infoPrinter.DebugPrintfln("[HandshakeChannel]: sdfxgb %s [%s : %s] to %s [%s : %s]", hw.Req, hw.Owner.Name(), getOutDirStr(hw.Out), to.Req, to.Owner.Name(), getOutDirStr(to.Out))
+
 		panic("Cannot connect two channels with the same direction.")
 	}
 
@@ -382,7 +384,7 @@ func (c *DataChannel) ConnectVariable(to *DataChannel, fromVar *variable.Variabl
 			return nil
 		}
 
-		return errors.New("variable '" + fromVar.Name() + "' not in to datachannel")
+		return errors.New("variable '" + fromVar.Name() + "' not in datachannel")
 	}
 
 	viFrom, _ := c.variables.GetActualVariableInfo(fromVar.Name())

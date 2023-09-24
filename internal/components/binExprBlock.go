@@ -263,6 +263,8 @@ func addVariableToLatestAndConnect(bt BodyComponentType, parent BlockType, vi *v
 
 	latestOwner := ownX.ownerList.latest
 
+	infoPrinter.DebugPrintfln("[%s]: @@ Previous component of input '%s' is '%s' or const '%s'", bt.Name(), vi.Name(), latestOwner.Name(), vi.Const_)
+
 	if latestOwner.Name() != bt.Name() {
 		ownX.ownerList.AddSuccessorToLatest(bt)
 
@@ -279,8 +281,6 @@ func addVariableToLatestAndConnect(bt BodyComponentType, parent BlockType, vi *v
 			}
 		}
 	}
-
-	infoPrinter.DebugPrintfln("[%s]: @@ Previous component of input '%s' is '%s' or const '%s'", bt.Name(), vi.Name(), latestOwner.Name(), vi.Const_)
 
 	return nil
 }

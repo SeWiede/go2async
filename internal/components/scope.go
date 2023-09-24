@@ -92,20 +92,20 @@ func (s *Scope) Entity() string {
 	}
 
 	i := 0
-	for _, extIntf := range s.Block.ExternalInterfaces {
-		externalIntferacesGenericsStr += extIntf.Name_ + "_IN_DATA_WIDTH : NATURAL := 8;\n"
-		externalIntferacesGenericsStr += extIntf.Name_ + `_OUT_DATA_WIDTH : NATURAL := 8`
+	for name, _ := range s.Block.ExternalInterfaces {
+		externalIntferacesGenericsStr += name + "_IN_DATA_WIDTH : NATURAL := 8;\n"
+		externalIntferacesGenericsStr += name + `_OUT_DATA_WIDTH : NATURAL := 8`
 
-		externalInterfacesStr += `-- Interface for ` + extIntf.Name_
+		externalInterfacesStr += `-- Interface for ` + name
 		externalInterfacesStr += `
 		-- Input channel
-		` + extIntf.Name_ + `_in_data : OUT STD_LOGIC_VECTOR(` + extIntf.Name_ + `_IN_DATA_WIDTH - 1 DOWNTO 0);
-		` + extIntf.Name_ + `_in_req : OUT STD_LOGIC;
-		` + extIntf.Name_ + `_in_ack : IN STD_LOGIC;
+		` + name + `_in_data : OUT STD_LOGIC_VECTOR(` + name + `_IN_DATA_WIDTH - 1 DOWNTO 0);
+		` + name + `_in_req : OUT STD_LOGIC;
+		` + name + `_in_ack : IN STD_LOGIC;
 		-- Output channel
-		` + extIntf.Name_ + `_out_data : IN STD_LOGIC_VECTOR(` + extIntf.Name_ + `_OUT_DATA_WIDTH - 1 DOWNTO 0);
-		` + extIntf.Name_ + `_out_req : IN STD_LOGIC;
-		` + extIntf.Name_ + `_out_ack : OUT STD_LOGIC`
+		` + name + `_out_data : IN STD_LOGIC_VECTOR(` + name + `_OUT_DATA_WIDTH - 1 DOWNTO 0);
+		` + name + `_out_req : IN STD_LOGIC;
+		` + name + `_out_ack : OUT STD_LOGIC`
 
 		if i != len(s.Block.ExternalInterfaces)-1 {
 			externalIntferacesGenericsStr += ";\n"
@@ -160,20 +160,20 @@ func (s *Scope) ComponentStr() string {
 	}
 
 	i := 0
-	for _, extIntf := range s.Block.ExternalInterfaces {
-		externalIntferacesGenericsStr += extIntf.Name_ + `_IN_DATA_WIDTH => ` + extIntf.Name_ + "_IN_DATA_WIDTH,\n"
-		externalIntferacesGenericsStr += extIntf.Name_ + `_OUT_DATA_WIDTH => ` + extIntf.Name_ + `_OUT_DATA_WIDTH`
+	for name, _ := range s.Block.ExternalInterfaces {
+		externalIntferacesGenericsStr += name + `_IN_DATA_WIDTH => ` + name + "_IN_DATA_WIDTH,\n"
+		externalIntferacesGenericsStr += name + `_OUT_DATA_WIDTH => ` + name + `_OUT_DATA_WIDTH`
 
-		externalInterfacesStr += `-- Interface for ` + extIntf.Name_
+		externalInterfacesStr += `-- Interface for ` + name
 		externalInterfacesStr += `
 		-- Input channel
-		` + extIntf.Name_ + `_in_data  => ` + extIntf.Name_ + `_in_data,
-		` + extIntf.Name_ + `_in_req => ` + extIntf.Name_ + `_in_req,
-		` + extIntf.Name_ + `_in_ack => ` + extIntf.Name_ + `_in_ack,
+		` + name + `_in_data  => ` + name + `_in_data,
+		` + name + `_in_req => ` + name + `_in_req,
+		` + name + `_in_ack => ` + name + `_in_ack,
 		-- Output channel
-		` + extIntf.Name_ + `_out_data => ` + extIntf.Name_ + `_out_data,
-		` + extIntf.Name_ + `_out_req => ` + extIntf.Name_ + `_out_req,
-		` + extIntf.Name_ + `_out_ack => ` + extIntf.Name_ + `_out_ack`
+		` + name + `_out_data => ` + name + `_out_data,
+		` + name + `_out_req => ` + name + `_out_req,
+		` + name + `_out_ack => ` + name + `_out_ack`
 
 		if i != len(s.Block.ExternalInterfaces)-1 {
 			externalInterfacesStr += ",\n"
