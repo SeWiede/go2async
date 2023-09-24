@@ -160,20 +160,21 @@ func (s *Scope) ComponentStr() string {
 	}
 
 	i := 0
-	for name, _ := range s.Block.ExternalInterfaces {
-		externalIntferacesGenericsStr += name + `_IN_DATA_WIDTH => ` + name + "_IN_DATA_WIDTH,\n"
-		externalIntferacesGenericsStr += name + `_OUT_DATA_WIDTH => ` + name + `_OUT_DATA_WIDTH`
+	for fName, extIntf := range s.Block.ExternalInterfaces {
+		externalIntferacesGenericsStr += fName + `_IN_DATA_WIDTH => ` + fName + "_IN_DATA_WIDTH,\n"
+		externalIntferacesGenericsStr += fName + `_OUT_DATA_WIDTH => ` + fName + `_OUT_DATA_WIDTH`
 
-		externalInterfacesStr += `-- Interface for ` + name
+		externalInterfacesStr += `-- Interface for ` + fName
 		externalInterfacesStr += `
 		-- Input channel
-		` + name + `_in_data  => ` + name + `_in_data,
-		` + name + `_in_req => ` + name + `_in_req,
-		` + name + `_in_ack => ` + name + `_in_ack,
+		` + fName + `_in_req => ` + extIntf.In.GetReqSignalName() + `,
+		` + fName + `_in_ack => ` + extIntf.In.GetAckSignalName() + `,
+		` + fName + `_in_data  => ` + extIntf.InData.GetDataSignalName() + `,
 		-- Output channel
-		` + name + `_out_data => ` + name + `_out_data,
-		` + name + `_out_req => ` + name + `_out_req,
-		` + name + `_out_ack => ` + name + `_out_ack`
+		` + fName + `_out_req => ` + extIntf.Out.GetReqSignalName() + `,
+		` + fName + `_out_ack => ` + extIntf.Out.GetReqSignalName() + `,
+		` + fName + `_out_data => ` + extIntf.OutData.GetDataSignalName() + `
+		`
 
 		if i != len(s.Block.ExternalInterfaces)-1 {
 			externalInterfacesStr += ",\n"
@@ -220,6 +221,16 @@ func (s *Scope) signalDefs() string {
 	ret += "signal " + s.Block.Name() + "_out_data : std_logic_vector(" + strconv.Itoa(s.Block.OutputVariables().Size) + " - 1 downto 0);"
 	ret += "\n"
 
+	for _, extIntf := range s.Block.ExternalInterfaces {
+		ret += extIntf.In.SignalDefs()
+		ret += "\n"
+		ret += extIntf.Out.SignalDefs()
+		ret += "\n"
+		ret += extIntf.InData.SignalDefs()
+		ret += extIntf.OutData.SignalDefs()
+		ret += "\n"
+	}
+
 	// OutReg
 	ret += "signal " + s.OutReg.Name() + "_in_req : std_logic;"
 	ret += "signal " + s.OutReg.Name() + "_in_ack : std_logic;"
@@ -238,19 +249,45 @@ func (s *Scope) signalAssignments() string {
 	ret := ""
 
 	// Scope Inputs to Block
-	ret += s.Block.Name() + "_in_req <= in_req;\n"
-	ret += "in_ack <= " + s.Block.Name() + "_in_ack;\n"
-	ret += s.Block.Name() + "_in_data <= in_data;\n"
+	ret += s.Block.Name() + "_in_req <= in_req;"
+	ret += "\n"
+	ret += "in_ack <= " + s.Block.Name() + "_in_ack;"
+	ret += "\n"
+	ret += s.Block.Name() + "_in_data <= in_data;"
+	ret += "\n"
 
 	// Block to Reg
-	ret += s.OutReg.Name() + "_in_req <= " + s.Block.Name() + "_out_req;\n"
-	ret += s.Block.Name() + "_out_ack <= " + s.OutReg.Name() + "_in_ack;\n"
-	ret += s.OutReg.Name() + "_in_data <= " + s.Block.Name() + "_out_data;\n"
+	ret += s.OutReg.Name() + "_in_req <= " + s.Block.Name() + "_out_req;"
+	ret += "\n"
+	ret += s.Block.Name() + "_out_ack <= " + s.OutReg.Name() + "_in_ack;"
+	ret += "\n"
+	ret += s.OutReg.Name() + "_in_data <= " + s.Block.Name() + "_out_data;"
+	ret += "\n"
 
 	// Reg to Scope Ouput
-	ret += "out_req <= " + s.OutReg.Name() + "_out_req;\n"
-	ret += s.OutReg.Name() + "_out_ack <= out_ack;\n"
-	ret += "out_data <= " + s.OutReg.Name() + "_out_data;\n"
+	ret += "out_req <= " + s.OutReg.Name() + "_out_req;"
+	ret += "\n"
+	ret += s.OutReg.Name() + "_out_ack <= out_ack;"
+	ret += "\n"
+	ret += "out_data <= " + s.OutReg.Name() + "_out_data;"
+	ret += "\n"
+
+	for name, extIntf := range s.Block.ExternalInterfaces {
+		ret += name + "_in_req <= " + extIntf.In.GetReqSignalName() + ";"
+		ret += "\n"
+		ret += name + "_out_ack <= " + extIntf.Out.GetAckSignalName() + ";"
+		ret += "\n"
+		ret += extIntf.In.GetAckSignalName() + " <= " + name + "_in_ack;"
+		ret += "\n"
+		ret += extIntf.Out.GetReqSignalName() + " <= " + name + "_out_req;"
+		ret += "\n"
+		ret += name + "_in_data <= " + extIntf.InData.GetDataSignalName() + ";"
+		ret += "\n"
+		ret += extIntf.OutData.GetDataSignalName() + " <= " + name + "_out_data;"
+		ret += "\n"
+
+		ret += "\n"
+	}
 
 	return ret
 }

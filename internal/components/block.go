@@ -233,20 +233,21 @@ func (b *Block) ComponentStr() string {
 	}
 
 	i := 0
-	for fName, _ := range b.ExternalInterfaces {
+	for fName, extIntf := range b.ExternalInterfaces {
 		externalIntferacesGenericsStr += fName + `_IN_DATA_WIDTH => ` + fName + "_IN_DATA_WIDTH,\n"
 		externalIntferacesGenericsStr += fName + `_OUT_DATA_WIDTH => ` + fName + `_OUT_DATA_WIDTH`
 
 		externalInterfacesStr += `-- Interface for ` + fName
 		externalInterfacesStr += `
 		-- Input channel
-		` + fName + `_in_data  => ` + fName + `_in_data,
-		` + fName + `_in_req => ` + fName + `_in_req,
-		` + fName + `_in_ack => ` + fName + `_in_ack,
+		` + fName + `_in_req => ` + extIntf.In.GetReqSignalName() + `,
+		` + fName + `_in_ack => ` + extIntf.In.GetAckSignalName() + `,
+		` + fName + `_in_data  => ` + extIntf.InData.GetDataSignalName() + `,
 		-- Output channel
-		` + fName + `_out_data => ` + fName + `_out_data,
-		` + fName + `_out_req => ` + fName + `_out_req,
-		` + fName + `_out_ack => ` + fName + `_out_ack`
+		` + fName + `_out_req => ` + extIntf.Out.GetReqSignalName() + `,
+		` + fName + `_out_ack => ` + extIntf.Out.GetAckSignalName() + `,
+		` + fName + `_out_data => ` + extIntf.OutData.GetDataSignalName() + `
+		`
 
 		if i != len(b.ExternalInterfaces)-1 {
 			externalInterfacesStr += ",\n"
@@ -740,13 +741,13 @@ func (b *Block) AddFunctionInterface(f *variable.VariableInfo) error {
 	blkExtPrefix := b.Name() + "_" + extPrefix
 
 	externalIn := NewOutputHandshakeChannel(b, blkExtPrefix+"_in_req", blkExtPrefix+"_in_ack")
-	b.In = append(b.In, externalIn)
+	b.Out = append(b.Out, externalIn)
 	externalOut := NewInputHandshakeChannel(b, blkExtPrefix+"_out_req", blkExtPrefix+"_out_ack")
-	b.Out = append(b.Out, externalOut)
+	b.In = append(b.In, externalOut)
 	externalInData := NewOutDataChannel(b, f.FuncIntf_.Parameters, blkExtPrefix+"_in_data")
-	b.InData = append(b.InData, externalInData)
+	b.OutData = append(b.OutData, externalInData)
 	externalOutData := NewInDataChannel(b, f.FuncIntf_.Results, blkExtPrefix+"_out_data")
-	b.OutData = append(b.OutData, externalOutData)
+	b.InData = append(b.InData, externalOutData)
 
 	externalInnerIn := NewInputHandshakeChannel(b, extPrefix+"_in_req", extPrefix+"_in_ack")
 	b.InnerOutChannel = append(b.InnerOutChannel, externalInnerIn)
@@ -802,14 +803,15 @@ func (b *Block) GetAndAssignFunctionInterface(fname string) (*ExternalInterface,
 			// Reversed
 			extPrefix := extIntfParent.Vi.Name_
 			blkExtPrefix := b.Name() + "_" + extPrefix
+
 			externalIn := NewOutputHandshakeChannel(b, blkExtPrefix+"_in_req", blkExtPrefix+"_in_ack")
-			b.In = append(b.In, externalIn)
+			b.Out = append(b.Out, externalIn)
 			externalOut := NewInputHandshakeChannel(b, blkExtPrefix+"_out_req", blkExtPrefix+"_out_ack")
-			b.Out = append(b.Out, externalOut)
+			b.In = append(b.In, externalOut)
 			externalInData := NewOutDataChannel(b, extIntfParent.Vi.FuncIntf_.Parameters, blkExtPrefix+"_in_data")
-			b.InData = append(b.InData, externalInData)
+			b.OutData = append(b.OutData, externalInData)
 			externalOutData := NewInDataChannel(b, extIntfParent.Vi.FuncIntf_.Results, blkExtPrefix+"_out_data")
-			b.OutData = append(b.OutData, externalOutData)
+			b.InData = append(b.InData, externalOutData)
 
 			externalInnerIn := NewInputHandshakeChannel(b, extPrefix+"_in_req", extPrefix+"_in_ack")
 			b.InnerOutChannel = append(b.InnerOutChannel, externalInnerIn)
