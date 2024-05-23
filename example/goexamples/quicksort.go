@@ -1,7 +1,7 @@
 package goexamples
 
 func Quicksort(x [6]int) [6]int {
-	var l, r [15]int // Queues to safe recursive bound states (left bound, right bound)
+	var l, r [15]int // Queues for saving recursive bound states (left bound, right bound)
 	var n, d int     // Queue states
 	l[0] = 0         // First left bound: leftmost element
 	r[0] = 6 - 1     // First right bound: rightmost element
